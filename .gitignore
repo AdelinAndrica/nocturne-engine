@@ -1,0 +1,31 @@
+# Build outputs / intermediates
+Build/
+bin/
+obj/
+out/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.VC.db
+*.VC.opendb
+
+# MSVC artifacts
+*.pdb
+*.idb
+*.ilk
+*.ipch
+*.tlog
+*.log
+*.cache
+*.recipe
+
+# CMake (if/when we add it)
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+
+# vcpkg local copies/logs
+vcpkg_installed/
+vcpkg.applocal.log

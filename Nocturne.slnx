@@ -1,0 +1,13 @@
+<Solution>
+  <Configurations>
+    <BuildType Name="Debug" />
+    <BuildType Name="Development" />
+    <BuildType Name="Ship" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="Ide/VS2026/NocturneEngine/NocturneEngine.vcxproj" />
+  <Project Path="Ide/VS2026/NocturneHost/NocturneHost.vcxproj">
+    <Build Solution="Development|x64" Project="false" />
+  </Project>
+</Solution>
