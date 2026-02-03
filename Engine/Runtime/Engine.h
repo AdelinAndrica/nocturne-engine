@@ -9,6 +9,7 @@
 #endif
 
 #include "Resources/VirtualFileSystem.h"
+#include "Resources/ResourceManager.h"
 #include "EngineConfig.h"
 
 namespace noc {
@@ -20,11 +21,9 @@ namespace noc {
     {
     public:
         // Config access: only valid BEFORE Init().
-        // If you need to modify config after Init, that becomes a different system later.
         EngineConfig& ConfigMutable();
         const EngineConfig& Config() const { return cfg_; }
 
-        // Convenience pre-init setters (return false if called too late).
         bool SetContentRoot(const char* path);
         bool SetOverrideRoot(const char* path);
         bool SetArchivePath(const char* path);
@@ -33,7 +32,7 @@ namespace noc {
         void TickOnce();
         void Shutdown();
 
-        int Run();                 // creates window + runs loop
+        int Run();
         void BeginFrame();
         void Tick();
         void EndFrame();
@@ -42,6 +41,7 @@ namespace noc {
         LinearArena& FrameArena();
 
         VirtualFileSystem& VFS() { return vfs_; }
+        ResourceManager& Resources() { return resources_; }
 
         bool InitMemory();
         void KillMemory();
@@ -65,6 +65,7 @@ namespace noc {
         LinearArena frameArena_;
 
         VirtualFileSystem vfs_;
+        ResourceManager resources_;
 
         EngineConfig cfg_{};
         bool initialized_ = false;

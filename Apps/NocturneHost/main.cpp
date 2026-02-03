@@ -1,95 +1,79 @@
-﻿// Apps/NocturneHost/main.cpp
-
-#include "Runtime/Engine.h"
+﻿#include "Runtime/Engine.h"
 #include "Core/Log.h"
-#include "Resources/VirtualFileSystem.h"
-#include "Core/Memory/Allocator.h"
 
+#include <algorithm>
+#include <cctype>
 #include <string>
 
-// Minimal helper so we can build absolute paths from NOC_CONTENT_ROOT.
-// (Design choice: keep this test-local; no need for a global path util yet.)
-static std::string JoinPath(const char* a, const char* b)
+#ifndef NOC_CONTENT_ROOT
+#define NOC_CONTENT_ROOT .
+#endif
+
+static void LogPreview(const uint8_t* bytes, size_t size)
 {
-    std::string s = a ? a : "";
-    if (!s.empty() && s.back() != '/' && s.back() != '\\')
-        s.push_back('/');
-    s += (b ? b : "");
-    return s;
-}
-
-static void Phase3_ArchiveSmokeTest(noc::Engine& engine)
-{
-    auto& vfs = engine.VFS();
-    auto& alloc = engine.Allocator();
-
-    size_t size = 0;
-    uint8_t* bytes = vfs.ReadAllBytes("hello_archive.txt", size, alloc);
-
-    if (!bytes)
+    if (!bytes || size == 0)
     {
-        NOC_LOG_ERROR("Test", "ReadAllBytes('hello_archive.txt') failed");
+        NOC_LOG_INFO("Host", "File empty");
         return;
     }
 
-    NOC_LOG_INFO("Test", "Archive read OK: %zu bytes, text='%.*s'",
-        size, (int)size, (const char*)bytes);
+    const size_t n = std::min<size_t>(size, 64);
+    std::string s;
+    s.reserve(n);
 
-    alloc.Deallocate(bytes);
-}
-
-static void Phase3_MountPriorityTest(noc::Engine& engine)
-{
-    auto& vfs = engine.VFS();
-    auto& alloc = engine.Allocator();
-
-    // Put these on disk:
-    //   D:/Projects/Nocturne/Data/priority.txt           -> "CONTENT"
-    //   D:/Projects/Nocturne/DataOverrides/priority.txt  -> "OVERRIDE"
-    //
-    // With "later mounts override earlier", and mount order archive->content->override,
-    // we expect OVERRIDE here.
-    size_t size = 0;
-    uint8_t* bytes = vfs.ReadAllBytes("priority.txt", size, alloc);
-
-    if (!bytes)
+    for (size_t i = 0; i < n; ++i)
     {
-        NOC_LOG_ERROR("Test", "ReadAllBytes('priority.txt') failed");
-        return;
+        const char c = static_cast<char>(bytes[i]);
+        s.push_back((std::isprint((unsigned char)c) ? c : '.'));
     }
 
-    NOC_LOG_INFO("Test", "priority.txt resolved to: '%.*s'", (int)size, (const char*)bytes);
-    alloc.Deallocate(bytes);
+    NOC_LOG_INFO("Host", "Preview (first %zu bytes): %s", n, s.c_str());
 }
 
 int main()
 {
     noc::Engine engine;
 
-    // Loose content root (already working in your logs)
-    engine.SetContentRoot(NOC_CONTENT_ROOT);
-
-    // Dev overrides: create this folder and add priority.txt to prove precedence.
-    // (If you don't have it yet, create D:/Projects/Nocturne/DataOverrides)
-    engine.SetOverrideRoot("D:/Projects/Nocturne/DataOverrides");
-
-    // Archive test: ensure this file exists on disk:
-    //   D:/Projects/Nocturne/Data/test_archive.zip
-    // containing:
-    //   hello_archive.txt (stored/method 0)
-    const std::string archiveAbs = JoinPath(NOC_CONTENT_ROOT, "test_archive.zip");
-    engine.SetArchivePath(archiveAbs.c_str());
+    // Phase 3 config defaults to contentRoot="Data".
+    // If your repo uses a different layout, you can override here before Init():
+     engine.SetContentRoot(NOC_CONTENT_ROOT);
+    // engine.SetOverrideRoot("DataOverrides");
+    // engine.SetArchivePath("Data.pak");
 
     if (!engine.Init())
         return -1;
 
-#if NOC_ENABLE_ASSERTS
-    // Phase 3 verification lives in the host (NOT inside Engine::Init()).
-    Phase3_ArchiveSmokeTest(engine);
-    Phase3_MountPriorityTest(engine);
-#endif
+    // Phase 4 smoke test (host-side): load hello.txt via ResourceManager.
+    auto h = engine.Resources().RequestBinary("hello.txt");
+    if (!h.IsValid())
+    {
+        NOC_LOG_ERROR("Host", "Failed to request hello.txt");
+    }
+    else
+    {
+        const bool ok = engine.Resources().WaitUntilReady(h, /*timeoutMs*/ 2000);
+        if (!ok)
+        {
+            NOC_LOG_ERROR("Host", "hello.txt did not become ready (failed or timed out)");
+        }
+        else
+        {
+            const uint8_t* bytes = engine.Resources().GetBytes(h);
+            const size_t size = engine.Resources().GetSize(h);
+            NOC_LOG_INFO("Host", "hello.txt loaded (%zu bytes)", size);
+            LogPreview(bytes, size);
+        }
+    }
+
+    auto h1 = engine.Resources().RequestBinary("hello.txt");
+    auto h2 = engine.Resources().RequestBinary("hello.txt");
+
+    NOC_LOG_INFO("Host", "Handle1 = (%u, %u)", h1.index, h1.generation);
+    NOC_LOG_INFO("Host", "Handle2 = (%u, %u)", h2.index, h2.generation);
+
 
     const int rc = engine.Run();
+
     engine.Shutdown();
     return rc;
 }
