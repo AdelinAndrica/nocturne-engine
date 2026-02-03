@@ -27,10 +27,44 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\Engine\Core\NocturneEngine.h" />
+    <ClInclude Include="..\..\..\Engine\Core\Assert.h" />
+    <ClInclude Include="..\..\..\Engine\Core\BuildConfig.h" />
+    <ClInclude Include="..\..\..\Engine\Core\Log.h" />
+    <ClInclude Include="..\..\..\Engine\Core\Memory\Allocator.h" />
+    <ClInclude Include="..\..\..\Engine\Core\Memory\DebugAlloc.h" />
+    <ClInclude Include="..\..\..\Engine\Core\Memory\LinearArena.h" />
+    <ClInclude Include="..\..\..\Engine\Core\Subsystems\Subsystem.h" />
+    <ClInclude Include="..\..\..\Engine\Core\Subsystems\SubsystemRegistry.h" />
+    <ClInclude Include="..\..\..\Engine\Core\Clock.h" />
+    <ClInclude Include="..\..\..\Engine\Platform\Win32\WinFileSystem.h" />
+    <ClInclude Include="..\..\..\Engine\Platform\Win32\WinPlatform.h" />
+    <ClInclude Include="..\..\..\Engine\Platform\Win32\WinWindow.h" />
+    <ClInclude Include="..\..\..\Engine\Resources\ArchiveFileMount.h" />
+    <ClInclude Include="..\..\..\Engine\Resources\FileHandle.h" />
+    <ClInclude Include="..\..\..\Engine\Resources\IFileMount.h" />
+    <ClInclude Include="..\..\..\Engine\Resources\LooseFileMount.h" />
+    <ClInclude Include="..\..\..\Engine\Resources\VirtualFileSystem.h" />
+    <ClInclude Include="..\..\..\Engine\Resources\VPath.h" />
+    <ClInclude Include="..\..\..\Engine\Runtime\Engine.h" />
+    <ClInclude Include="..\..\..\Engine\Runtime\MainLoop.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\Engine\Core\NocturneEngine.cpp" />
+    <ClCompile Include="..\..\..\Engine\Core\Assert.cpp" />
+    <ClCompile Include="..\..\..\Engine\Core\Log.cpp" />
+    <ClCompile Include="..\..\..\Engine\Core\Memory\Allocator.cpp" />
+    <ClCompile Include="..\..\..\Engine\Core\Memory\DebugAlloc.cpp" />
+    <ClCompile Include="..\..\..\Engine\Core\Memory\LinearArena.cpp" />
+    <ClCompile Include="..\..\..\Engine\Core\Subsystems\SubsystemRegistry.cpp" />
+    <ClCompile Include="..\..\..\Engine\Core\Clock.cpp" />
+    <ClCompile Include="..\..\..\Engine\Platform\Win32\WinFileSystem.cpp" />
+    <ClCompile Include="..\..\..\Engine\Platform\Win32\WinPlatform.cpp" />
+    <ClCompile Include="..\..\..\Engine\Platform\Win32\WinWindow.cpp" />
+    <ClCompile Include="..\..\..\Engine\Resources\ArchiveFileMount.cpp" />
+    <ClCompile Include="..\..\..\Engine\Resources\LooseFileMount.cpp" />
+    <ClCompile Include="..\..\..\Engine\Resources\VirtualFileSystem.cpp" />
+    <ClCompile Include="..\..\..\Engine\Resources\VPath.cpp" />
+    <ClCompile Include="..\..\..\Engine\Runtime\Engine.cpp" />
+    <ClCompile Include="..\..\..\Engine\Runtime\MainLoop.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>18.0</VCProjectVersion>
@@ -100,17 +134,29 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_LIB;NOC_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>$(SolutionDir)Engine
+</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>
       </SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'">
+    <ClCompile>
+      <PreprocessorDefinitions>NOC_DEV;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Ship|x64'">
+    <ClCompile>
+      <PreprocessorDefinitions>NOC_SHIP</PreprocessorDefinitions>
+    </ClCompile>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -6,8 +6,8 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="Ide/VS2026/NocturneEngine/NocturneEngine.vcxproj" />
-  <Project Path="Ide/VS2026/NocturneHost/NocturneHost.vcxproj">
+  <Project Path="Ide/VS2026/NocturneEngine/NocturneEngine.vcxproj" Id="35e1aeba-66a3-4950-9c19-2658b2a30af1" />
+  <Project Path="Ide/VS2026/NocturneHost/NocturneHost.vcxproj" Id="660b21c5-e86b-4bb8-b48b-35a7899e0160">
     <Build Solution="Development|x64" Project="false" />
   </Project>
 </Solution>
