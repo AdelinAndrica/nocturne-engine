@@ -1,6 +1,6 @@
 ﻿# Phase 3 — Resources & Virtual File System
 
-> **Status:** READY FOR IMPLEMENTATION ⏳  
+> **Status:** IMPLEMENTED & VERIFIED ✅  
 > **Scope:** Virtual File System (VFS), mount points, virtual paths, file I/O abstraction  
 > **Depends on:** Phase 1 — Core Systems, Phase 2 — Window & Main Loop  
 >
@@ -19,67 +19,47 @@ Only **bytes in → bytes out**, correctly.
 ## Phase 3 — Resources & Virtual File System (Checklist)
 
 ### ✅ Completed
+
 - [x] **VPath normalization core is working**
   - Virtual paths like `hello.txt` resolve consistently through VFS.
+
 - [x] **VirtualFileSystem mounts loose directories**
   - `MountLooseDirectory(...)` succeeds and logs mount info.
+
 - [x] **Deterministic content root via engine-owned config**
   - Engine has default `EngineConfig` with `contentRoot = "Data"`.
   - Application can override via **pre-init setters** (e.g. `engine.SetContentRoot(...)`).
+
 - [x] **Config lifecycle rule enforced**
   - Config is **mutable only before** `Engine::Init()`.
   - Attempts to modify after init **fail and log**.
+
 - [x] **No platform path discovery in Runtime**
   - Content root selection is solved via config/policy, not Win32 queries.
+
 - [x] **Loose file read end-to-end validated**
-  - Smoke test confirmed: mount → open → read → close works (`hello.txt`).
-- [x] **Basic archive mount code compiled**
-  - Archive-related classes build and link (ZIP indexing path compiles).
+  - Host-side smoke test confirmed: mount → open → read → close works.
 
----
+- [x] **Archive mount indexing validated**
+  - ZIP central directory parsed.
+  - Entry count logged during mount.
 
-### ⏳ Not Yet Completed (Remaining Work)
-#### 1) Clean up Phase-3 testing
-- [ ] **Move the `hello.txt` smoke test out of `Engine::Init()`**
-  - Prefer host/app-side test or a dedicated debug test function.
+- [x] **Stored-entry archive reads verified**
+  - ZIP method **0 (stored)** entries can be opened and read successfully.
 
-#### 2) VFS convenience APIs (high leverage for upcoming phases)
-- [ ] **`VirtualFileSystem::ReadAllBytes(vpath)`**
-  - Open → allocate buffer → read full file → close.
-  - Decide allocator strategy (engine allocator vs `std::vector` with standard allocator).
-- [ ] **`VirtualFileSystem::ReadAllText(vpath)` (debug-only helper)**
-  - Wraps `ReadAllBytes`, appends `'\0'`, returns `std::string`.
+- [x] **Unsupported archive compression handled cleanly**
+  - ZIP entries using unsupported compression methods fail open with a clear error.
 
-#### 3) Archive mount functionality validation (ZIP)
-- [ ] **Archive indexing test**
-  - Mount a `.zip` and log number of entries indexed.
-- [ ] **Stored-entry read support verified**
-  - Confirm files using ZIP method **0 (stored)** can be opened and read.
-- [ ] **Graceful handling of unsupported compression**
-  - If method != 0, log clear error and fail open cleanly.
+- [x] **VFS convenience APIs implemented**
+  - `VirtualFileSystem::ReadAllBytes(...)`
+  - `VirtualFileSystem::ReadAllText(...)` (debug-only helper)
 
-#### 4) Mount priority behavior (policy)
-- [ ] **Explicit mount priority documented + tested**
-  - Confirm “earlier mounts win” (or change to “later mounts win”).
-  - Add a simple override test (`DataOverrides/hello.txt` beats `Data/hello.txt`) if desired.
+- [x] **Smoke tests moved out of `Engine::Init()`**
+  - All file I/O validation now lives in host-side test code.
 
-#### 5) Documentation updates (must match decisions)
-- [ ] **Update `Docs/Nocturne Engine Architecture.md`**
-  - Add “Engine Configuration Model” section.
-  - Add “Content Root & File System Policy” section.
-  - Add “Policy vs Mechanism Ownership (Locked)” section.
-- [ ] **Create/Update `Docs/Phase 3 — Resources and File System.md`**
-  - Scope, implementation notes, and verification checklist.
-  - Include the final content root policy you’re using.
-
----
-
-### ✅ Phase 3 Exit Criteria
-- [ ] Loose mount works with deterministic content root policy (already validated).
-- [ ] Archive mount indexing + stored-entry reading validated.
-- [ ] `ReadAllBytes` helper exists and is used by at least one test.
-- [ ] Smoke test lives outside engine init (host-side or debug test harness).
-- [ ] Architecture doc updated with locked config + content-root decisions.
+- [x] **Mount priority behavior implemented, tested, and locked**
+  - Policy: **later mounts override earlier mounts**
+  - Verified with override test (`DataOverrides` beats `Data`).
 
 
 ---
@@ -239,20 +219,31 @@ Rules:
 
 A **mount** maps a virtual root (`/`) to a physical data source.
 
-Example mounts:
+Example mounts (actual Phase 3 behavior):
 
-| Priority | Virtual Root | Physical Source |
-|--------|--------------|-----------------|
-| 0 | `/` | `D:/Nocturne/Data/` |
-| 1 | `/` | `D:/Nocturne/Packed/game.zip` |
+| Mount Order | Virtual Root | Physical Source |
+|------------|--------------|-----------------|
+| 0 | `/` | Packed archive (`.zip`) |
+| 1 | `/` | Loose content directory |
+| 2 | `/` | Loose override directory |
 
-Resolution rules:
+### Resolution Rules (LOCKED)
 
-1. Mounts are queried **in order**
-2. First successful open wins
-3. Later mounts override earlier ones
+1. All mounts share the same virtual root namespace.
+2. Mounts are searched **in reverse order of insertion**.
+3. **Later mounts override earlier mounts**.
+4. The first successful open wins.
 
-This supports development overrides without repackaging.
+This enables:
+- Packed data as a baseline
+- Loose content during development
+- Explicit override directories for rapid iteration
+
+Mount order enforced by the engine:
+
+```
+archive → content → override
+```
 
 ---
 
@@ -358,12 +349,14 @@ Async I/O comes later.
 
 ## 12. Verification Checklist (Phase 3 Is Done When…)
 
-* [ ] Engine mounts a loose data directory at startup
-* [ ] Files open correctly via virtual paths
-* [ ] Archive and loose mounts coexist
-* [ ] Mount priority resolves deterministically
-* [ ] No OS file APIs are used outside Platform layer
-* [ ] Clean shutdown with no leaked file handles
+- [x] Engine mounts a loose data directory at startup
+- [x] Files open correctly via virtual paths
+- [x] Archive and loose mounts coexist
+- [x] Stored-entry archive reads verified
+- [x] Mount priority resolves deterministically
+- [x] No OS file APIs are used outside Platform layer
+- [x] Clean shutdown with no leaked file handles
+
 
 ---
 
@@ -378,13 +371,18 @@ Async I/O comes later.
 
 ## 14. Phase 3 Completion Criteria
 
-Phase 3 is complete when:
+Phase 3 is **complete**.
 
-* A Virtual File System exists
-* All file access goes through it
-* No resource-specific logic exists yet
+The engine now provides:
 
-This becomes the **foundation for all asset loading and streaming**.
+- A fully functional Virtual File System
+- Deterministic virtual path resolution
+- Multiple mount support with explicit override policy
+- Platform-isolated file I/O
+- Verified loose and archive-backed reads
+
+This layer is stable and becomes the **foundation for all resource loading, streaming, and asset management** in subsequent phases.
+
 
 ---
 
@@ -403,7 +401,14 @@ Phase 4 will introduce:
 
 ---
 
-## 16. Implementations
+## 16. Implementation Notes (Locked)
+
+- ZIP archive support in Phase 3 is **read-only** and **stored-entry only**.
+- Compression and decompression are intentionally deferred.
+- All file I/O is synchronous by design.
+- Resource identity is fully decoupled from physical storage.
+
+## 17. Implementations
 
 Below are **all files implemented/modified in Phase 2**, each with:
 
@@ -686,6 +691,9 @@ namespace noc
 
 #include "Core/Log.h"
 
+#include <cstring>   // memcpy
+#include <limits>    // numeric_limits
+
 namespace noc
 {
     VirtualFileSystem::~VirtualFileSystem() = default;
@@ -730,8 +738,10 @@ namespace noc
 
         const std::string_view normalized{ norm };
 
-        for (auto& m : mounts_)
+        // Later mounts override earlier mounts -> search in reverse order.
+        for (size_t i = mounts_.size(); i-- > 0; )
         {
+            auto& m = mounts_[i];
             if (!m)
                 continue;
 
@@ -746,13 +756,22 @@ namespace noc
         return {};
     }
 
+
     void VirtualFileSystem::Close(FileHandle& h)
     {
         if (!h.valid || !h.mount)
             return;
 
         h.mount->Close(h);
+
+        // Defensive: make double-close safe.
+        h.valid = false;
+        h.mount = nullptr;
+        h.backend = nullptr;
+        h.sizeBytes = 0;
+        h.cursor = 0;
     }
+
 
     size_t VirtualFileSystem::Read(FileHandle& h, void* dst, size_t bytes)
     {
@@ -768,6 +787,125 @@ namespace noc
             return 0;
 
         return h.mount->Size(h);
+    }
+
+    // ------------------------------------------------------------
+    // Convenience APIs
+    // ------------------------------------------------------------
+
+    uint8_t* VirtualFileSystem::ReadAllBytes(const char* virtualPath, size_t& outSize, IAllocator& alloc)
+    {
+        outSize = 0;
+
+        if (!virtualPath || virtualPath[0] == 0)
+            return nullptr;
+
+        FileHandle h = this->OpenRead(std::string_view{ virtualPath });
+        if (!h.valid)
+            return nullptr;
+
+        const uint64_t size64 = this->Size(h);
+        if (size64 == 0)
+        {
+            // Zero-length file is valid; return a non-null pointer only if you want.
+            // Design choice: return nullptr for empty file, but treat as success.
+            this->Close(h);
+            outSize = 0;
+            return nullptr;
+        }
+
+        if (size64 > static_cast<uint64_t>(std::numeric_limits<size_t>::max()))
+        {
+            NOC_LOG_ERROR("VFS", "ReadAllBytes too large for size_t: %s (size=%llu)",
+                virtualPath, (unsigned long long)size64);
+            this->Close(h);
+            return nullptr;
+        }
+
+        const size_t size = static_cast<size_t>(size64);
+        void* mem = alloc.Allocate(size, 16);
+        if (!mem)
+        {
+            NOC_LOG_ERROR("VFS", "ReadAllBytes allocation failed: %s (size=%zu)", virtualPath, size);
+            this->Close(h);
+            return nullptr;
+        }
+
+        uint8_t* data = static_cast<uint8_t*>(mem);
+
+        size_t totalRead = 0;
+        while (totalRead < size)
+        {
+            const size_t toRead = size - totalRead;
+            const size_t got = this->Read(h, data + totalRead, toRead);
+            if (got == 0)
+            {
+                NOC_LOG_ERROR("VFS", "ReadAllBytes short read: %s (got=%zu expected=%zu)",
+                    virtualPath, totalRead, size);
+                alloc.Deallocate(data);
+                this->Close(h);
+                return nullptr;
+            }
+            totalRead += got;
+        }
+
+        this->Close(h);
+        outSize = size;
+        return data;
+    }
+
+    bool VirtualFileSystem::ReadAllText(const char* virtualPath, IAllocator& alloc, char*& outText)
+    {
+        outText = nullptr;
+
+        if (!virtualPath || virtualPath[0] == 0)
+            return false;
+
+        FileHandle h = this->OpenRead(std::string_view{ virtualPath });
+        if (!h.valid)
+            return false;
+
+        const uint64_t size64 = this->Size(h);
+        if (size64 > static_cast<uint64_t>(std::numeric_limits<size_t>::max() - 1))
+        {
+            NOC_LOG_ERROR("VFS", "ReadAllText too large for size_t: %s (size=%llu)",
+                virtualPath, (unsigned long long)size64);
+            this->Close(h);
+            return false;
+        }
+
+        const size_t size = static_cast<size_t>(size64);
+
+        // +1 for '\0'
+        char* text = static_cast<char*>(alloc.Allocate(size + 1, 16));
+        if (!text)
+        {
+            NOC_LOG_ERROR("VFS", "ReadAllText allocation failed: %s (size=%zu)", virtualPath, size + 1);
+            this->Close(h);
+            return false;
+        }
+
+        size_t totalRead = 0;
+        while (totalRead < size)
+        {
+            const size_t toRead = size - totalRead;
+            const size_t got = this->Read(h, text + totalRead, toRead);
+            if (got == 0)
+            {
+                NOC_LOG_ERROR("VFS", "ReadAllText short read: %s (got=%zu expected=%zu)",
+                    virtualPath, totalRead, size);
+                alloc.Deallocate(text);
+                this->Close(h);
+                return false;
+            }
+            totalRead += got;
+        }
+
+        text[size] = '\0';
+
+        this->Close(h);
+        outText = text;
+        return true;
     }
 }
 ````
@@ -1710,12 +1848,19 @@ namespace noc {
 
 		// Phase 3: VFS mount policy from engine config.
 		//
-		// Mount priority rule (current VFS behavior): earlier mounts win.
-		// For dev overrides, mount overrideRoot FIRST so it wins.
-		if (cfg_.overrideRoot && cfg_.overrideRoot[0] != 0)
+		// Mount priority rule: later mounts override earlier mounts.
+		// Desired priority (highest last):
+		//   overrideRoot > contentRoot > archive
+		//
+		// So mount in this order:
+		//   1) archivePath
+		//   2) contentRoot
+		//   3) overrideRoot
+
+		if (cfg_.archivePath && cfg_.archivePath[0] != 0)
 		{
-			if (!vfs_.MountLooseDirectory(cfg_.overrideRoot))
-				NOC_LOG_WARN("VFS", "Failed to mount overrideRoot: %s", cfg_.overrideRoot);
+			if (!vfs_.MountArchive(cfg_.archivePath))
+				NOC_LOG_WARN("VFS", "Failed to mount archivePath: %s", cfg_.archivePath);
 		}
 
 		if (cfg_.contentRoot && cfg_.contentRoot[0] != 0)
@@ -1724,11 +1869,12 @@ namespace noc {
 				NOC_LOG_WARN("VFS", "Failed to mount contentRoot: %s", cfg_.contentRoot);
 		}
 
-		if (cfg_.archivePath && cfg_.archivePath[0] != 0)
+		if (cfg_.overrideRoot && cfg_.overrideRoot[0] != 0)
 		{
-			if (!vfs_.MountArchive(cfg_.archivePath))
-				NOC_LOG_WARN("VFS", "Failed to mount archivePath: %s", cfg_.archivePath);
+			if (!vfs_.MountLooseDirectory(cfg_.overrideRoot))
+				NOC_LOG_WARN("VFS", "Failed to mount overrideRoot: %s", cfg_.overrideRoot);
 		}
+
 
 		return true;
 	}

@@ -54,8 +54,10 @@ namespace noc
 
         const std::string_view normalized{ norm };
 
-        for (auto& m : mounts_)
+        // Later mounts override earlier mounts -> search in reverse order.
+        for (size_t i = mounts_.size(); i-- > 0; )
         {
+            auto& m = mounts_[i];
             if (!m)
                 continue;
 
@@ -69,6 +71,7 @@ namespace noc
         NOC_LOG_ERROR("VFS", "File not found in any mount: %s", norm);
         return {};
     }
+
 
     void VirtualFileSystem::Close(FileHandle& h)
     {
