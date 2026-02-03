@@ -159,12 +159,19 @@ namespace noc {
 
 		// Phase 3: VFS mount policy from engine config.
 		//
-		// Mount priority rule (current VFS behavior): earlier mounts win.
-		// For dev overrides, mount overrideRoot FIRST so it wins.
-		if (cfg_.overrideRoot && cfg_.overrideRoot[0] != 0)
+		// Mount priority rule: later mounts override earlier mounts.
+		// Desired priority (highest last):
+		//   overrideRoot > contentRoot > archive
+		//
+		// So mount in this order:
+		//   1) archivePath
+		//   2) contentRoot
+		//   3) overrideRoot
+
+		if (cfg_.archivePath && cfg_.archivePath[0] != 0)
 		{
-			if (!vfs_.MountLooseDirectory(cfg_.overrideRoot))
-				NOC_LOG_WARN("VFS", "Failed to mount overrideRoot: %s", cfg_.overrideRoot);
+			if (!vfs_.MountArchive(cfg_.archivePath))
+				NOC_LOG_WARN("VFS", "Failed to mount archivePath: %s", cfg_.archivePath);
 		}
 
 		if (cfg_.contentRoot && cfg_.contentRoot[0] != 0)
@@ -173,11 +180,12 @@ namespace noc {
 				NOC_LOG_WARN("VFS", "Failed to mount contentRoot: %s", cfg_.contentRoot);
 		}
 
-		if (cfg_.archivePath && cfg_.archivePath[0] != 0)
+		if (cfg_.overrideRoot && cfg_.overrideRoot[0] != 0)
 		{
-			if (!vfs_.MountArchive(cfg_.archivePath))
-				NOC_LOG_WARN("VFS", "Failed to mount archivePath: %s", cfg_.archivePath);
+			if (!vfs_.MountLooseDirectory(cfg_.overrideRoot))
+				NOC_LOG_WARN("VFS", "Failed to mount overrideRoot: %s", cfg_.overrideRoot);
 		}
+
 
 		return true;
 	}
