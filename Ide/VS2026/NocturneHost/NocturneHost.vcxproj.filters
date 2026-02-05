@@ -18,6 +18,9 @@
     <ClCompile Include="..\..\..\Apps\NocturneHost\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\Apps\NocturneHost\Tests\phase5_tests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\Apps\NocturneHost\AppConfig.h">

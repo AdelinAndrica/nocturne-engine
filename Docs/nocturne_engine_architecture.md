@@ -114,6 +114,23 @@ renderStage();
 
 ```
 
+#### Multi-Rate Update Model (Locked)
+
+Nocturne does not introduce a single monolithic “scheduler subsystem.” Instead, once the Job System exists, individual engine systems declare their update cadence and are serviced accordingly within the engine frame lifecycle.
+
+
+Examples:
+
+- Input is sampled once per frame.
+- Physics may run at a fixed timestep (potentially multiple steps per frame) with interpolation.
+- Animation, AI, audio, and gameplay may run at their own cadences if needed.
+
+Multi-rate simulation is an emergent property of system design coordinated by Engine/Runtime, not a standalone phase.
+
+Gameplay and physics simulation use fixed timesteps where determinism is required; rendering interpolates between simulation states.
+
+---
+
 Notes:
 
 - The **game loop is the master loop**.
@@ -268,11 +285,30 @@ Rules:
 
 ---
 
+### 3.8.5 Engine/Camera
+
+**Purpose:** View representation and control.
+
+Responsibilities:
+
+- Camera transforms and projection parameters
+- First-person, third-person, and cinematic camera models
+- Camera controllers driven by gameplay or editor
+- View data production for rendering
+
+Rules:
+
+- Cameras are data producers only
+- Rendering consumes camera view data
+- Gameplay may control cameras but does not render directly
+
+---
+
 ### 3.9 Engine/Gameplay
 
 **Purpose:** Gameplay foundation layer shared by all games built on the engine.
 
-Responsibilities:
+**Responsibilities**:
 
 - Game object model
 - Component system
@@ -281,7 +317,14 @@ Responsibilities:
 - Gameplay-level systems
 - Scripting integration (future)
 
-Rules:
+**Notes**:
+
+- Serialization is shared by both runtime and tools/editor workflows:
+  - Runtime: save/load game state.
+  - Tools/Editor: scenes, prefabs, component data, and authored configurations.
+- The engine must not maintain separate “editor serializer” and “runtime serializer.”
+
+**Rules**:
 
 - Depends on engine systems
 - Never depends on Game/* code
@@ -312,18 +355,34 @@ Rules:
 
 **Purpose:** Offline and development tools.
 
-Responsibilities:
+**Editor philosophy**:
+
+- The editor shares the same engine modules as the game runtime (resources, rendering, physics, audio, gameplay foundation).
+- Editor-only features are layered on top (panels, inspectors, gizmos, asset preview, PIE bridges).
+- The editor does not become a second engine; it is a client of the engine plus authoring UI.
+
+**Responsibilities**:
 
 - Asset importers
 - Resource linker / packager (build ZIP/composite archives)
 - Build and cook pipeline
 - Debug and profiling tools
-- Editor (future)
+- Editor (authoring tool built on the runtime engine)
 
 Notes:
 
 - Tools are responsible for **writing** packed archives
 - Runtime engine is responsible only for **reading** them
+
+### Editor ↔ Runtime Boundary (Locked)
+
+The editor is a tool built on top of the runtime engine. The runtime retains ownership of the main loop and system orchestration.
+
+Rules:
+
+- The editor may embed and drive an instance of the runtime engine.
+- The editor must not replace or fork the engine loop; it can only provide hooks (e.g., pause/step, inspection, gizmos).
+- Play-In-Editor runs the same runtime loop with editor-provided bridges, not a separate “editor loop.”
 
 ---
 

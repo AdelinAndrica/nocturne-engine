@@ -46,6 +46,12 @@
     <ClInclude Include="..\..\..\Engine\Resources\ResourceHandle.h" />
     <ClInclude Include="..\..\..\Engine\Resources\ResourceID.h" />
     <ClInclude Include="..\..\..\Engine\Resources\ResourceManager.h" />
+    <ClInclude Include="..\..\..\Engine\Resources\Typed\IResourceLoader.h" />
+    <ClInclude Include="..\..\..\Engine\Resources\Typed\ResourceHandleT.h" />
+    <ClInclude Include="..\..\..\Engine\Resources\Typed\ResourceLoaderRegistry.h" />
+    <ClInclude Include="..\..\..\Engine\Resources\Typed\ResourceType.h" />
+    <ClInclude Include="..\..\..\Engine\Resources\Typed\TextResource.h" />
+    <ClInclude Include="..\..\..\Engine\Resources\Typed\TextResourceLoader.h" />
     <ClInclude Include="..\..\..\Engine\Resources\VirtualFileSystem.h" />
     <ClInclude Include="..\..\..\Engine\Resources\VPath.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Engine.h" />

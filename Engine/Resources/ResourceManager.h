@@ -4,6 +4,10 @@
 #include <string_view>
 
 #include "Resources/ResourceHandle.h"
+#include "Resources/Typed/ResourceLoaderRegistry.h"
+#include "Resources/Typed/ResourceHandleT.h"
+#include "Resources/Typed/TextResource.h"
+#include "Resources/Typed/ResourceType.h"
 
 namespace noc
 {
@@ -34,8 +38,21 @@ namespace noc
         const uint8_t* GetBytes(ResourceHandle h) const;
         size_t GetSize(ResourceHandle h) const;
 
+        // Returns nullptr if:
+        // - handle invalid
+        // - resource has not failed
+        // Otherwise returns a stable, null-terminated error message.
+        const char* GetError(ResourceHandle h) const;
+
         // Optional helper for host-side testing.
         bool WaitUntilReady(ResourceHandle h, uint32_t timeoutMs);
+
+        ResourceHandleT<TextResource> RequestText(const char* vpath);
+
+        const TextResource* GetText(ResourceHandleT<TextResource> h) const;
+
+        ResourceLoaderRegistry& Loaders() { return loaders_; }
+        const ResourceLoaderRegistry& Loaders() const { return loaders_; }
 
     private:
         bool ValidateHandle_(ResourceHandle h, uint32_t* outIndex) const;
@@ -50,6 +67,8 @@ namespace noc
 
         void* loaderThread_ = nullptr;
         bool running_ = false;
+
+        ResourceLoaderRegistry loaders_;
     };
 
 } // namespace noc
