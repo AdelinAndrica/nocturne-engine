@@ -29,6 +29,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\..\Engine\Core\Assert.h" />
     <ClInclude Include="..\..\..\Engine\Core\BuildConfig.h" />
+    <ClInclude Include="..\..\..\Engine\Core\Jobs\JobSystem.h" />
     <ClInclude Include="..\..\..\Engine\Core\Log.h" />
     <ClInclude Include="..\..\..\Engine\Core\Memory\Allocator.h" />
     <ClInclude Include="..\..\..\Engine\Core\Memory\DebugAlloc.h" />
@@ -36,9 +37,13 @@
     <ClInclude Include="..\..\..\Engine\Core\Subsystems\Subsystem.h" />
     <ClInclude Include="..\..\..\Engine\Core\Subsystems\SubsystemRegistry.h" />
     <ClInclude Include="..\..\..\Engine\Core\Clock.h" />
+    <ClInclude Include="..\..\..\Engine\Input\ActionMap.h" />
+    <ClInclude Include="..\..\..\Engine\Input\InputSystem.h" />
+    <ClInclude Include="..\..\..\Engine\Input\InputTypes.h" />
     <ClInclude Include="..\..\..\Engine\Platform\Win32\WinFileSystem.h" />
     <ClInclude Include="..\..\..\Engine\Platform\Win32\WinPlatform.h" />
     <ClInclude Include="..\..\..\Engine\Platform\Win32\WinWindow.h" />
+    <ClInclude Include="..\..\..\Engine\Render\RenderSystem.h" />
     <ClInclude Include="..\..\..\Engine\Resources\ArchiveFileMount.h" />
     <ClInclude Include="..\..\..\Engine\Resources\FileHandle.h" />
     <ClInclude Include="..\..\..\Engine\Resources\IFileMount.h" />
@@ -55,19 +60,24 @@
     <ClInclude Include="..\..\..\Engine\Resources\VirtualFileSystem.h" />
     <ClInclude Include="..\..\..\Engine\Resources\VPath.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Engine.h" />
+    <ClInclude Include="..\..\..\Engine\Runtime\EngineConfig.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\MainLoop.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\Engine\Core\Assert.cpp" />
+    <ClCompile Include="..\..\..\Engine\Core\Jobs\JobSystem.cpp" />
     <ClCompile Include="..\..\..\Engine\Core\Log.cpp" />
     <ClCompile Include="..\..\..\Engine\Core\Memory\Allocator.cpp" />
     <ClCompile Include="..\..\..\Engine\Core\Memory\DebugAlloc.cpp" />
     <ClCompile Include="..\..\..\Engine\Core\Memory\LinearArena.cpp" />
     <ClCompile Include="..\..\..\Engine\Core\Subsystems\SubsystemRegistry.cpp" />
     <ClCompile Include="..\..\..\Engine\Core\Clock.cpp" />
+    <ClCompile Include="..\..\..\Engine\Input\ActionMap.cpp" />
+    <ClCompile Include="..\..\..\Engine\Input\InputSystem.cpp" />
     <ClCompile Include="..\..\..\Engine\Platform\Win32\WinFileSystem.cpp" />
     <ClCompile Include="..\..\..\Engine\Platform\Win32\WinPlatform.cpp" />
     <ClCompile Include="..\..\..\Engine\Platform\Win32\WinWindow.cpp" />
+    <ClCompile Include="..\..\..\Engine\Render\RenderSystem.cpp" />
     <ClCompile Include="..\..\..\Engine\Resources\ArchiveFileMount.cpp" />
     <ClCompile Include="..\..\..\Engine\Resources\LooseFileMount.cpp" />
     <ClCompile Include="..\..\..\Engine\Resources\ResourceManager.cpp" />

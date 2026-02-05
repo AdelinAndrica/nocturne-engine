@@ -1,10 +1,12 @@
 #include "Engine.h"
 
-#include <cstring>
+#include <algorithm>
+#include <span>
 
-#include "Core/Log.h"
 #include "Core/Assert.h"
+#include "Core/Log.h"
 #include "Core/Clock.h"
+
 #include "Platform/Win32/WinWindow.h"
 #include "Runtime/MainLoop.h"
 
@@ -15,44 +17,45 @@ namespace noc {
 
     EngineConfig& Engine::ConfigMutable()
     {
-        NOC_ASSERT_MSG(IsConfigMutable(), "Engine config is immutable after Engine::Init()");
+        if (initialized_)
+        {
+            NOC_LOG_ERROR("Runtime", "EngineConfig is frozen after Init(). Modify config before calling Init().");
+            return cfg_;
+        }
         return cfg_;
-    }
-
-    static bool SetCString_(const char*& dst, const char* src)
-    {
-        dst = src;
-        return true;
     }
 
     bool Engine::SetContentRoot(const char* path)
     {
         if (!IsConfigMutable())
         {
-            NOC_LOG_WARN("Core", "SetContentRoot ignored (called after Init)");
+            NOC_LOG_ERROR("Runtime", "SetContentRoot() called after Init(); ignored.");
             return false;
         }
-        return SetCString_(cfg_.contentRoot, path);
+        cfg_.contentRoot = path;
+        return true;
     }
 
     bool Engine::SetOverrideRoot(const char* path)
     {
         if (!IsConfigMutable())
         {
-            NOC_LOG_WARN("Core", "SetOverrideRoot ignored (called after Init)");
+            NOC_LOG_ERROR("Runtime", "SetOverrideRoot() called after Init(); ignored.");
             return false;
         }
-        return SetCString_(cfg_.overrideRoot, path);
+        cfg_.overrideRoot = path;
+        return true;
     }
 
     bool Engine::SetArchivePath(const char* path)
     {
         if (!IsConfigMutable())
         {
-            NOC_LOG_WARN("Core", "SetArchivePath ignored (called after Init)");
+            NOC_LOG_ERROR("Runtime", "SetArchivePath() called after Init(); ignored.");
             return false;
         }
-        return SetCString_(cfg_.archivePath, path);
+        cfg_.archivePath = path;
+        return true;
     }
 
     bool Engine::InitMemory()
@@ -130,8 +133,10 @@ namespace noc {
         e->KillMemory();
     }
 
-    static bool StartupWindow(void*)
+    static bool StartupWindow(void* ctx)
     {
+        auto* e = static_cast<Engine*>(ctx);
+        (void)e;
         NOC_LOG_INFO("Win32", "Window subsystem ready");
         return true;
     }
@@ -141,25 +146,42 @@ namespace noc {
         NOC_LOG_INFO("Win32", "Window subsystem shutdown");
     }
 
+    static bool StartupJobs(void* ctx)
+    {
+        auto* e = static_cast<noc::Engine*>(ctx);
+        // Design choice: worker count = HW threads - 1 (leave room for main thread), clamped.
+        const uint32_t hw = (std::max)(1u, std::thread::hardware_concurrency());
+        const uint32_t workers = (hw > 1) ? (hw - 1) : 1;
+        return e->Jobs().Init(workers);
+    }
+
+    static void ShutdownJobs(void* ctx)
+    {
+        auto* e = static_cast<noc::Engine*>(ctx);
+        e->Jobs().Shutdown();
+    }
+
     bool Engine::Init()
     {
-        // Freeze config from this point on.
-        initialized_ = true;
-
         std::span<const char* const> depsLog{};
+
         static const char* kDepsNeedLog[] = { "Log" };
         std::span<const char* const> depsNeedLog{ kDepsNeedLog, 1 };
+
+        static const char* kDepsJobs[] = { "Log", "Memory" };
+        std::span<const char* const> depsJobs{ kDepsJobs, 2 };
 
         registry_.Register(SubsystemDesc{ "Log",    depsLog,     &StartupLog,    &ShutdownLog });
         registry_.Register(SubsystemDesc{ "Time",   depsNeedLog, &StartupTime,   &ShutdownTime });
         registry_.Register(SubsystemDesc{ "Memory", depsNeedLog, &StartupMemory, &ShutdownMemory });
         registry_.Register(SubsystemDesc{ "Assert", depsNeedLog, &StartupAssert, &ShutdownAssert });
         registry_.Register(SubsystemDesc{ "Window", depsNeedLog, &StartupWindow, &ShutdownWindow });
+        registry_.Register(SubsystemDesc{ "Jobs",   depsJobs,    &StartupJobs,   &ShutdownJobs });
 
         if (!registry_.StartupAll(this))
             return false;
 
-        // Phase 3 policy (locked): later mounts override earlier mounts.
+        // Phase 3 policy: later mounts override earlier mounts.
         if (cfg_.archivePath && cfg_.archivePath[0] != 0)
         {
             if (!vfs_.MountArchive(cfg_.archivePath))
@@ -178,8 +200,39 @@ namespace noc {
                 NOC_LOG_WARN("VFS", "Failed to mount overrideRoot: %s", cfg_.overrideRoot);
         }
 
-        // Phase 4: ResourceManager init (must be after VFS mounts).
+        // Phase 6: ResourceManager uses JobSystem (must be after jobs + VFS mounts).
         if (!resources_.Init(*this, vfs_))
+            return false;
+
+		// Phase 7: InputSystem init (HWND comes later in AttachWindow).
+		if (!input_.Init(*this))
+			return false;
+
+        // Phase 8: RenderSystem init (no HWND yet)
+#if NOC_ENABLE_ASSERTS
+		const bool enableDebugLayer = true;
+#else
+		const bool enableDebugLayer = false;
+#endif
+
+		if (!render_.Init(enableDebugLayer))
+			return false;
+
+        initialized_ = true;
+        return true;
+    }
+
+    bool Engine::AttachWindow(WinWindow& window)
+    {
+        // Forward WM_INPUT + focus loss -> InputSystem.
+        window.SetRawInputSink(input_.RawSink());
+
+        // Register Raw Input devices (requires HWND).
+        if (!input_.AttachToWindow(window.Handle()))
+            return false;
+
+        // Phase 8: DX12 attach (requires HWND + client size).
+        if (!render_.AttachToWindow(window.Handle(), window.ClientWidth(), window.ClientHeight()))
             return false;
 
         return true;
@@ -200,6 +253,13 @@ namespace noc {
             return -1;
         }
 
+        if (!AttachWindow(window))
+        {
+            NOC_LOG_FATAL("Runtime", "Failed to attach InputSystem to window");
+            window.Destroy();
+            return -1;
+		}
+
         MainLoop loop;
         loop.Run(*this, window);
 
@@ -211,16 +271,19 @@ namespace noc {
     {
         GetTime().BeginFrame();
         FrameArena().Reset();
+		input_.BeginFrame();
+		render_.BeginFrame();
     }
 
     void Engine::Tick()
     {
-        // Phase 4: pump completed resource loads.
+		input_.Update();
         resources_.Update();
     }
 
     void Engine::EndFrame()
     {
+        render_.EndFramePresent();
         GetTime().EndFrame();
     }
 
@@ -242,9 +305,11 @@ namespace noc {
 
     void Engine::Shutdown()
     {
-        // Phase 4: shutdown resource manager BEFORE core teardown.
-        resources_.Shutdown();
+		render_.Shutdown();
 
+        // Resource manager must shutdown while jobs + memory + log still exist.
+        resources_.Shutdown();
+		input_.Shutdown();
         registry_.ShutdownAll(this);
     }
 

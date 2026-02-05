@@ -29,7 +29,7 @@ namespace noc
         // Call once per frame on the main thread.
         void Update();
 
-        // ---- Binary blob API (Phase 4 scope) ----
+        // ---- Binary blob API ----
         ResourceHandle RequestBinary(std::string_view vpath);
 
         bool IsReady(ResourceHandle h) const;
@@ -47,8 +47,8 @@ namespace noc
         // Optional helper for host-side testing.
         bool WaitUntilReady(ResourceHandle h, uint32_t timeoutMs);
 
+        // ---- Typed API (Phase 5) ----
         ResourceHandleT<TextResource> RequestText(const char* vpath);
-
         const TextResource* GetText(ResourceHandleT<TextResource> h) const;
 
         ResourceLoaderRegistry& Loaders() { return loaders_; }
@@ -56,7 +56,8 @@ namespace noc
 
     private:
         bool ValidateHandle_(ResourceHandle h, uint32_t* outIndex) const;
-        void LoaderThreadMain_();
+        void EnqueueLoadJob_(uint32_t index);
+        void WaitAllJobs_();
 
     private:
         Engine* engine_ = nullptr;
@@ -65,7 +66,6 @@ namespace noc
         // Internal opaque state (allocated in .cpp)
         void* state_ = nullptr;
 
-        void* loaderThread_ = nullptr;
         bool running_ = false;
 
         ResourceLoaderRegistry loaders_;
