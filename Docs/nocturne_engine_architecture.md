@@ -440,37 +440,136 @@ project assumptions from leaking into engine code.
 
 ## 9. Roadmap (Phase-Based)
 
-1. **Phase 1 — Core Systems** (logging, asserts, memory, time, basic utilities)
-2. **Phase 2 — Window & Main Loop Skeleton** (Win32 window, message pump, frame lifecycle)
-3. **Phase 3 — Resources & Virtual File System** (virtual paths, mounts, loose + archive read)
-4. **Phase 4 — Resource Manager Core** (resource identity, cache, async load thread, states)
-5. **Phase 5 — Typed Resources & Loader Registry** (text/json/images stubs, decode/parse stage)
-6. **Phase 6 — Job System & Async Infrastructure** (thread pool, work stealing/queues, futures)
-7. **Phase 7 — Input System** (raw devices + action mapping + rebinding)
-8. **Phase 8 — Rendering Bootstrap** (graphics API setup, swapchain, command submission, clear/present)
-9. **Phase 9 — Rendering Engine Foundation** (GPU resource lifetime, PSO/shader pipeline, frame graph baseline)
-10. **Phase 10 — Scene Representation** (world, transforms, spatial hierarchy, visibility basics)
-11. **Phase 11 — Asset Import Pipeline** (importers, intermediate formats, metadata, dependency graph)
-12. **Phase 12 — Cooker & Packager Tools** (cook step, deterministic outputs, archive build, versioning)
-13. **Phase 13 — Editor Framework Bootstrap** (desktop app shell, docking UI, project system, content browser)
-14. **Phase 14 — Editor Rendering Viewport** (viewport camera, gizmos, selection, debug draw)
-15. **Phase 15 — Entity/Component System** (ECS or component model, serialization-ready data layout)
-16. **Phase 16 — Editor Scene Editing** (create/delete entities, component inspectors, prefab prototype)
-17. **Phase 17 — Serialization & Save/Load** (scene files, prefabs, savegame, version tolerance)
-18. **Phase 18 — Physics & Collision** (broadphase, narrowphase, rigid bodies, queries, character controller)
-19. **Phase 19 — Animation System** (skeletons, clips, blend trees/state machines, retargeting baseline)
-20. **Phase 20 — Audio System** (device, voices, mixing, 3D spatialization, streaming audio)
-21. **Phase 21 — Lighting & Post-Processing** (deferred/forward+ choice, shadows, tone map, fog, bloom)
-22. **Phase 22 — Materials & PBR Workflow** (material graph or parameter system, texture sets, instancing)
-23. **Phase 23 — Editor Asset Previewers** (mesh/anim/texture/audio preview panes, reimport hooks)
-24. **Phase 24 — Scripting & Gameplay Runtime Layer** (bindings, events, triggers, gameplay framework)
-25. **Phase 25 — AI & Navigation** (navmesh build, pathfinding, perception, BT/FSM framework)
-26. **Phase 26 — Gameplay Systems for Horror** (interaction, inventory, doors/locks, stamina, sanity/fear hooks)
-27. **Phase 27 — Editor Play-In-Editor** (PIE launch, hot-reload of scripts/data, runtime ↔ editor bridge)
-28. **Phase 28 — Debug & Profiling Tooling** (in-engine profiler, GPU timings, capture tools, debug overlays)
-29. **Phase 29 — Build & Deployment Pipeline** (configurations, packaging, crash reporting hooks, installer)
-30. **Phase 30 — Optimization & Content Validation** (asset validation rules, LODs, streaming budgets, perf gates)
-31. **Phase 31 — Shipping Polish** (QA tools, regression tests, deterministic cooks, final editor UX passes)
+### Completed
+
+- [x] **Phase 1 — Core Systems**  
+  (logging, asserts, memory, time, basic utilities)
+
+- [x] **Phase 2 — Window & Main Loop Skeleton**  
+  (Win32 window, message pump, frame lifecycle)
+
+- [x] **Phase 3 — Resources & Virtual File System**  
+  (virtual paths, mounts, loose + archive read)
+
+- [x] **Phase 4 — Resource Manager Core**  
+  (resource identity, cache, async load thread, states)
+
+- [x] **Phase 5 — Typed Resources & Loader Registry**  
+  (text/json/binary resources, decode/parse stage)
+
+- [x] **Phase 6 — Job System & Async Infrastructure**  
+  (thread pool, work stealing/queues, futures)
+
+- [x] **Phase 7 — Input System**  
+  (raw devices, action mapping, rebinding)
+
+- [x] **Phase 8 — Rendering Bootstrap**  
+  (graphics API setup, device, swapchain, command submission, clear/present)
+
+- [x] **Phase 9 — Rendering Engine Foundation**  
+  (SRP-based renderer, frame lifecycle,  
+  GPU resource foundation: default/upload heaps, descriptor heaps, root signature,  
+  PSO cache, asset-backed mesh upload, deferred GPU-safe destruction)
+
+---
+
+### Full Roadmap
+
+1. **Phase 1 — Core Systems**  
+   (logging, asserts, memory, time, basic utilities)
+
+2. **Phase 2 — Window & Main Loop Skeleton**  
+   (Win32 window, message pump, frame lifecycle)
+
+3. **Phase 3 — Resources & Virtual File System**  
+   (virtual paths, mounts, loose + archive read)
+
+4. **Phase 4 — Resource Manager Core**  
+   (resource identity, cache, async load thread, states)
+
+5. **Phase 5 — Typed Resources & Loader Registry**  
+   (text/json/binary resources, decode/parse stage)
+
+6. **Phase 6 — Job System & Async Infrastructure**  
+   (thread pool, work stealing/queues, futures)
+
+7. **Phase 7 — Input System**  
+   (raw devices, action mapping, rebinding)
+
+8. **Phase 8 — Rendering Bootstrap**  
+   (graphics API setup, device, swapchain, command submission, clear/present)
+
+9. **Phase 9 — Rendering Engine Foundation**  
+   (SRP-based renderer, frame lifecycle,  
+   GPU resource foundation: default/upload heaps, descriptor heaps, root signature,  
+   PSO cache, asset-backed mesh upload, deferred GPU-safe destruction)
+
+10. **Phase 10 — Scene Representation**  
+    (world, transforms, spatial hierarchy, visibility basics)
+
+11. **Phase 11 — Asset Import Pipeline**  
+    (importers, intermediate formats, metadata, dependency graph)
+
+12. **Phase 12 — Cooker & Packager Tools**  
+    (cook step, deterministic outputs, archive build, versioning)
+
+13. **Phase 13 — Editor Framework Bootstrap**  
+    (desktop app shell, docking UI, project system, content browser)
+
+14. **Phase 14 — Editor Rendering Viewport**  
+    (viewport camera, gizmos, selection, debug draw)
+
+15. **Phase 15 — Entity / Component System**  
+    (ECS or component model, serialization-ready data layout)
+
+16. **Phase 16 — Editor Scene Editing**  
+    (create/delete entities, component inspectors, prefab prototype)
+
+17. **Phase 17 — Serialization & Save / Load**  
+    (scene files, prefabs, savegame, version tolerance)
+
+18. **Phase 18 — Physics & Collision**  
+    (broadphase, narrowphase, rigid bodies, queries, character controller)
+
+19. **Phase 19 — Animation System**  
+    (skeletons, clips, blend trees / state machines, retargeting baseline)
+
+20. **Phase 20 — Audio System**  
+    (device, voices, mixing, 3D spatialization, streaming audio)
+
+21. **Phase 21 — Lighting & Post-Processing**  
+    (deferred/forward+ choice, shadows, tone mapping, fog, bloom)
+
+22. **Phase 22 — Materials & PBR Workflow**  
+    (material parameter system, texture sets, instancing)
+
+23. **Phase 23 — Editor Asset Previewers**  
+    (mesh/animation/texture/audio preview panes, reimport hooks)
+
+24. **Phase 24 — Scripting & Gameplay Runtime Layer**  
+    (bindings, events, triggers, gameplay framework)
+
+25. **Phase 25 — AI & Navigation**  
+    (navmesh build, pathfinding, perception, BT/FSM framework)
+
+26. **Phase 26 — Gameplay Systems for Horror**  
+    (interaction, inventory, doors/locks, stamina, sanity/fear hooks)
+
+27. **Phase 27 — Editor Play-In-Editor (PIE)**  
+    (PIE launch, hot-reload of scripts/data, runtime ↔ editor bridge)
+
+28. **Phase 28 — Debug & Profiling Tooling**  
+    (in-engine profiler, GPU timings, capture tools, debug overlays)
+
+29. **Phase 29 — Build & Deployment Pipeline**  
+    (configurations, packaging, crash reporting hooks, installer)
+
+30. **Phase 30 — Optimization & Content Validation**  
+    (asset validation rules, LODs, streaming budgets, performance gates)
+
+31. **Phase 31 — Shipping Polish**  
+    (QA tools, regression tests, deterministic cooks, final editor UX passes)
+
 
 
 ---

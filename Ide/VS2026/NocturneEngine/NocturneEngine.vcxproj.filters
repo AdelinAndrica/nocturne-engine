@@ -46,6 +46,9 @@
     <Filter Include="Header Files\Resources\Typed">
       <UniqueIdentifier>{e3c3a1ae-ccf1-438b-a265-a2f53d854547}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\Render\Dx12">
+      <UniqueIdentifier>{e7f6661b-09ac-435e-a46a-91c8337463ac}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\Engine\Core\Assert.h">
@@ -153,6 +156,51 @@
     <ClInclude Include="..\..\..\Engine\Runtime\EngineConfig.h">
       <Filter>Header Files\Runtime</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Render\DX12\Dx12Common.h">
+      <Filter>Header Files\Render\Dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Render\DX12\Dx12Device.h">
+      <Filter>Header Files\Render\Dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Render\DX12\Dx12FrameSync.h">
+      <Filter>Header Files\Render\Dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Render\DX12\Dx12Renderer.h">
+      <Filter>Header Files\Render\Dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Render\DX12\ShaderCompiler.h">
+      <Filter>Header Files\Render\Dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Render\DX12\Dx12SwapChain.h">
+      <Filter>Header Files\Render\Dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Render\DX12\TrianglePass.h">
+      <Filter>Header Files\Render\Dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Render\DX12\Dx12DeferredReleaseQueue.h">
+      <Filter>Header Files\Render\Dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Render\DX12\Dx12DescriptorAllocator.h">
+      <Filter>Header Files\Render\Dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Render\DX12\Dx12PsoCache.h">
+      <Filter>Header Files\Render\Dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Render\DX12\GpuBuffer.h">
+      <Filter>Header Files\Render\Dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Render\DX12\GpuRingConstantBuffer.h">
+      <Filter>Header Files\Render\Dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Render\DX12\MeshFormat.h">
+      <Filter>Header Files\Render\Dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Render\DX12\MeshPass.h">
+      <Filter>Header Files\Render\Dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Render\DX12\d3dx12.h">
+      <Filter>Header Files\Render\Dx12</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\Engine\Core\Assert.cpp">
@@ -216,6 +264,42 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\Engine\Render\RenderSystem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Engine\Render\DX12\Dx12Device.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Engine\Render\DX12\Dx12FrameSync.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Engine\Render\DX12\Dx12Renderer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Engine\Render\DX12\ShaderCompiler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Engine\Render\DX12\Dx12SwapChain.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Engine\Render\DX12\Dx12DeferredReleaseQueue.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Engine\Render\DX12\Dx12DescriptorAllocator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Engine\Render\DX12\Dx12PsoCache.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Engine\Render\DX12\GpuBuffer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Engine\Render\DX12\GpuRingConstantBuffer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Engine\Render\DX12\MeshFormat.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Engine\Render\DX12\MeshPass.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

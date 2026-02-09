@@ -218,6 +218,8 @@ namespace noc {
 		if (!render_.Init(enableDebugLayer))
 			return false;
 
+        render_.SetResourceManager(&resources_);
+
         initialized_ = true;
         return true;
     }
