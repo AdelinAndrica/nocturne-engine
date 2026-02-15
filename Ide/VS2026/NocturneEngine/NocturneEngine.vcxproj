@@ -31,6 +31,7 @@
     <ClInclude Include="..\..\..\Engine\Core\BuildConfig.h" />
     <ClInclude Include="..\..\..\Engine\Core\Jobs\JobSystem.h" />
     <ClInclude Include="..\..\..\Engine\Core\Log.h" />
+    <ClInclude Include="..\..\..\Engine\Core\Math\MathTypes.h" />
     <ClInclude Include="..\..\..\Engine\Core\Memory\Allocator.h" />
     <ClInclude Include="..\..\..\Engine\Core\Memory\DebugAlloc.h" />
     <ClInclude Include="..\..\..\Engine\Core\Memory\LinearArena.h" />
@@ -58,6 +59,7 @@
     <ClInclude Include="..\..\..\Engine\Render\DX12\ShaderCompiler.h" />
     <ClInclude Include="..\..\..\Engine\Render\DX12\Dx12SwapChain.h" />
     <ClInclude Include="..\..\..\Engine\Render\DX12\TrianglePass.h" />
+    <ClInclude Include="..\..\..\Engine\Render\RenderQueue.h" />
     <ClInclude Include="..\..\..\Engine\Render\RenderSystem.h" />
     <ClInclude Include="..\..\..\Engine\Resources\ArchiveFileMount.h" />
     <ClInclude Include="..\..\..\Engine\Resources\FileHandle.h" />
@@ -74,9 +76,14 @@
     <ClInclude Include="..\..\..\Engine\Resources\Typed\TextResourceLoader.h" />
     <ClInclude Include="..\..\..\Engine\Resources\VirtualFileSystem.h" />
     <ClInclude Include="..\..\..\Engine\Resources\VPath.h" />
+    <ClInclude Include="..\..\..\Engine\Runtime\Bounds.h" />
+    <ClInclude Include="..\..\..\Engine\Runtime\Camera.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Engine.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\EngineConfig.h" />
+    <ClInclude Include="..\..\..\Engine\Runtime\Frustum.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\MainLoop.h" />
+    <ClInclude Include="..\..\..\Engine\Runtime\SceneObject.h" />
+    <ClInclude Include="..\..\..\Engine\Runtime\World.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\Engine\Core\Assert.cpp" />
@@ -112,6 +119,7 @@
     <ClCompile Include="..\..\..\Engine\Resources\VPath.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\Engine.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\MainLoop.cpp" />
+    <ClCompile Include="..\..\..\Engine\Runtime\World.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>18.0</VCProjectVersion>

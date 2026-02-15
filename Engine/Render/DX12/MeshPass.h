@@ -17,12 +17,8 @@ namespace noc
 	class ResourceManager;
 	class Dx12SwapChain;
 	class Dx12FrameSync;
+	struct RenderQueue;
 
-	// Phase 10: a minimal “real” draw pass:
-	// - shader source from VFS (TextResource)
-	// - mesh bytes from VFS (Binary)
-	// - default-heap VB/IB
-	// - descriptor table for per-frame CBV
 	class MeshPass
 	{
 	public:
@@ -34,7 +30,6 @@ namespace noc
 
 		void Shutdown(Dx12DeferredReleaseQueue& deferred, uint64_t safeFenceValue);
 
-		// Called every frame after cmd list is reset and RT is in RT state.
 		void Record(
 			ID3D12Device* device,
 			ID3D12GraphicsCommandList* cmd,
@@ -42,47 +37,47 @@ namespace noc
 			const Dx12FrameSync& sync,
 			uint32_t frameIndex,
 			Dx12DeferredReleaseQueue& deferred,
-			ResourceManager* rm);
+			ResourceManager* rm,
+			const RenderQueue* queue);
 
 	private:
-		bool EnsureRootSigAndPso_(
-			ID3D12Device* device,
-			Dx12PsoCache& cache,
-			ResourceManager* rm);
-
-		bool EnsureMeshUploaded_(
-			ID3D12Device* device,
-			ID3D12GraphicsCommandList* cmd,
-			Dx12DeferredReleaseQueue& deferred,
-			const Dx12FrameSync& sync,
-			uint32_t frameIndex,
-			ResourceManager* rm);
+		bool EnsureRootSigAndPso_(ID3D12Device* device, Dx12PsoCache& cache, ResourceManager* rm);
+		bool EnsureMeshUploaded_(ID3D12Device* device, ID3D12GraphicsCommandList* cmd, Dx12DeferredReleaseQueue& deferred,
+			const Dx12FrameSync& sync, uint32_t frameIndex, ResourceManager* rm);
 
 		void EnsurePerFrameCbv_(ID3D12Device* device);
+		void EnsurePerFrameInstanceSrv_(ID3D12Device* device);
 
 	private:
-		// --- Assets (CPU) ---
-		ResourceHandle meshBin_{};                 // RequestBinary("Meshes/triangle.nmsh")
-		ResourceHandleT<TextResource> shaderHlsl_; // RequestText("Shaders/Basic.hlsl")
+		ResourceHandleT<TextResource> shaderHlsl_;
 
-		// --- GPU objects ---
+		// GPU objects
 		dx12::ComPtr<ID3D12RootSignature> rootSig_;
 		dx12::ComPtr<ID3D12PipelineState> pso_;
 
+		// For Phase 10 demo: one mesh upload path (triangle.nmsh), but drawn N times.
+		ResourceHandle meshBin_{};
 		GpuBuffer vb_;
 		GpuBuffer ib_;
 		uint32_t indexCount_ = 0;
 
+		// Per-frame constants
 		GpuRingConstantBuffer perFrameCB_;
 		Dx12DescriptorAllocator* cbvSrvUav_ = nullptr;
 		Dx12DescriptorHandle perFrameCbv_[dx12::kFrameCount]{};
 
+		// Per-frame instance matrices in an upload buffer (mapped once), exposed as SRV t0.
+		dx12::ComPtr<ID3D12Resource> instanceBuf_[dx12::kFrameCount];
+		uint8_t* instanceMapped_[dx12::kFrameCount]{};
+		uint32_t instanceCapacity_ = 0;
+		Dx12DescriptorHandle instanceSrv_[dx12::kFrameCount]{};
+
 		Dx12PsoCache* psoCache_ = nullptr;
 
-		// state flags
 		bool rootReady_ = false;
 		bool psoReady_ = false;
 		bool meshReady_ = false;
 		bool cbReady_ = false;
+		bool instReady_ = false;
 	};
 }

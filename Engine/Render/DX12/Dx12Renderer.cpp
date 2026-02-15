@@ -1,6 +1,7 @@
 #include "Dx12Renderer.h"
 
 #include "Resources/ResourceManager.h"
+#include "Render/RenderQueue.h"
 
 namespace noc
 {
@@ -25,14 +26,12 @@ namespace noc
 		if (!inited_)
 			return;
 
-		// Ensure GPU is idle before releasing.
 		if (attached_)
 			sync_.WaitForGpu(device_.Queue());
 
-		// After GPU idle, it is safe to clear deferred queue immediately.
 		deferred_.Clear();
 
-		meshPass_.Shutdown(deferred_, /*safeFenceValue*/sync_.CompletedValue());
+		meshPass_.Shutdown(deferred_, sync_.CompletedValue());
 
 		cmdList_.Reset();
 		for (uint32_t i = 0; i < dx12::kFrameCount; ++i)
@@ -49,6 +48,7 @@ namespace noc
 
 		inited_ = false;
 		attached_ = false;
+		frameQueue_ = nullptr;
 
 		NOC_LOG_INFO("Render", "Dx12Renderer shutdown");
 	}
@@ -66,7 +66,6 @@ namespace noc
 
 		frameIndex_ = swap_.FrameIndex();
 
-		// Commands: allocators + one list.
 		for (uint32_t i = 0; i < dx12::kFrameCount; ++i)
 		{
 			if (!dx12::HrOk(device_.Device()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&cmdAlloc_[i])),
@@ -84,13 +83,11 @@ namespace noc
 		}
 		dx12::HrOk(cmdList_->Close(), "cmdList->Close (initial)");
 
-		// Phase 10: descriptor heaps (persistent; no per-frame recreation).
 		if (!cbvSrvUavHeap_.Init(device_.Device(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1024, true))
 			return false;
 		if (!samplerHeap_.Init(device_.Device(), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, 64, true))
 			return false;
 
-		// Phase 10: mesh pass
 		if (!meshPass_.Init(device_.Device(), cbvSrvUavHeap_, samplerHeap_, psoCache_))
 			return false;
 
@@ -114,10 +111,8 @@ namespace noc
 		}
 		frameOpen_ = true;
 
-		// Collect deferred releases for everything the GPU has finished.
 		deferred_.Collect(sync_.CompletedValue());
 
-		// Reset allocator/list for current back buffer.
 		if (FAILED(cmdAlloc_[frameIndex_]->Reset()))
 		{
 			LogDeviceRemoved_("cmdAlloc->Reset");
@@ -132,7 +127,6 @@ namespace noc
 			return;
 		}
 
-		// Transition Present->RT for current back buffer.
 		swap_.TransitionTo(cmdList_.Get(), frameIndex_, D3D12_RESOURCE_STATE_RENDER_TARGET);
 	}
 
@@ -151,10 +145,9 @@ namespace noc
 		}
 		struct Guard { bool& b; ~Guard() { b = false; } } g{ frameOpen_ };
 
-		// Record pass into cmd list (clear + draw if assets ready).
-		meshPass_.Record(device_.Device(), cmdList_.Get(), swap_, sync_, frameIndex_, deferred_, rm_);
+		// Record pass: clear + draw instances from frameQueue_ (if any are ready).
+		meshPass_.Record(device_.Device(), cmdList_.Get(), swap_, sync_, frameIndex_, deferred_, rm_, frameQueue_);
 
-		// Transition RT->Present.
 		swap_.TransitionTo(cmdList_.Get(), frameIndex_, D3D12_RESOURCE_STATE_PRESENT);
 
 		if (FAILED(cmdList_->Close()))
@@ -166,10 +159,8 @@ namespace noc
 		ID3D12CommandList* lists[] = { cmdList_.Get() };
 		device_.Queue()->ExecuteCommandLists(1, lists);
 
-		// Present
 		swap_.Present();
 
-		// Signal + advance/wait using Phase 8/9 model.
 		sync_.MoveToNextFrame(device_.Queue(), swap_.SwapChain(), frameIndex_);
 		swap_.UpdateFrameIndex(frameIndex_);
 	}

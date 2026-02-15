@@ -1,7 +1,6 @@
 #include "RenderSystem.h"
 
 #include "Core/Log.h"
-#include "Resources/ResourceManager.h"
 #include "Render/DX12/Dx12Renderer.h"
 
 namespace noc
@@ -9,7 +8,6 @@ namespace noc
 	struct RenderSystem::Impl
 	{
 		Dx12Renderer renderer;
-		ResourceManager* rm = nullptr;
 	};
 
 	bool RenderSystem::Init(bool enableDebugLayer)
@@ -48,21 +46,19 @@ namespace noc
 		if (!impl_)
 			return false;
 
-		if (!impl_->renderer.AttachToWindow(nativeHwnd, clientWidth, clientHeight))
-			return false;
-
-		// If RM was already provided, forward it now that renderer is attached.
-		impl_->renderer.SetResourceManager(impl_->rm);
-		return true;
+		return impl_->renderer.AttachToWindow(nativeHwnd, clientWidth, clientHeight);
 	}
 
 	void RenderSystem::SetResourceManager(ResourceManager* rm)
 	{
-		if (!impl_)
-			return;
-
-		impl_->rm = rm;
+		if (!impl_) return;
 		impl_->renderer.SetResourceManager(rm);
+	}
+
+	void RenderSystem::SetFrameRenderQueue(const RenderQueue* q)
+	{
+		if (!impl_) return;
+		impl_->renderer.SetFrameRenderQueue(q);
 	}
 
 	void RenderSystem::BeginFrame()

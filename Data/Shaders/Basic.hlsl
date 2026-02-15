@@ -10,21 +10,26 @@ struct VSOut
     float4 color : COLOR;
 };
 
+// b0: per-frame
 cbuffer PerFrame : register(b0)
 {
-    float gTime;
-    float3 _pad;
+    float4x4 gViewProj;
 };
 
-VSOut VSMain(VSIn v)
+// t0: per-instance world matrices
+StructuredBuffer<float4x4> gWorld : register(t0);
+
+VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
 {
     VSOut o;
-    o.pos = float4(v.pos, 1.0);
-    o.color = v.color;
+
+    float4 wpos = mul(gWorld[instanceId], float4(input.pos, 1.0));
+    o.pos = mul(gViewProj, wpos);
+    o.color = input.color;
     return o;
 }
 
-float4 PSMain(VSOut i) : SV_Target
+float4 PSMain(VSOut input) : SV_Target0
 {
-    return i.color;
+    return input.color;
 }

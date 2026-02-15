@@ -10,6 +10,8 @@
 #include "Platform/Win32/WinWindow.h"
 #include "Runtime/MainLoop.h"
 
+#include "Render/RenderQueue.h"
+
 namespace noc {
 
     IAllocator& Engine::Allocator() { return *alloc_; }
@@ -220,6 +222,10 @@ namespace noc {
 
         render_.SetResourceManager(&resources_);
 
+        // World is runtime-owned
+        if (!world_.Init(Allocator()))
+            return false;
+
         initialized_ = true;
         return true;
     }
@@ -239,6 +245,18 @@ namespace noc {
 
         return true;
     }
+
+    bool Engine::CreateAndAttachMainWindow(WinWindowDesc desc, WinWindow& outWindow)
+    {
+        if (!outWindow.Create(desc))
+            return false;
+
+        if (!AttachWindow(outWindow))
+            return false;
+
+        return true;
+    }
+
 
     int Engine::Run()
     {
@@ -281,10 +299,20 @@ namespace noc {
     {
 		input_.Update();
         resources_.Update();
+        world_.Update();
     }
 
     void Engine::EndFrame()
     {
+        // Phase 10: runtime builds render submission in FrameArena and hands it to Render.
+        // This keeps Render from touching Runtime state.
+        // Viewport size is owned by the swapchain; in this phase we mirror host window size.
+        // (Design choice) If you already expose swapchain size, wire it here instead.
+        const uint32_t viewportW = 1280;
+        const uint32_t viewportH = 720;
+
+        RenderQueue rq = world_.BuildRenderQueue(FrameArena(), viewportW, viewportH);
+        render_.SetFrameRenderQueue(&rq);
         render_.EndFramePresent();
         GetTime().EndFrame();
     }
@@ -308,7 +336,7 @@ namespace noc {
     void Engine::Shutdown()
     {
 		render_.Shutdown();
-
+        world_.Shutdown();
         // Resource manager must shutdown while jobs + memory + log still exist.
         resources_.Shutdown();
 		input_.Shutdown();

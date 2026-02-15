@@ -15,6 +15,9 @@
 #include "Input/InputSystem.h"
 #include "Render/RenderSystem.h"
 
+#include "Runtime/World.h"
+#include <Platform/Win32/WinWindow.h>
+
 namespace noc {
 
 	class WinWindow;
@@ -23,7 +26,6 @@ namespace noc {
 	class Engine
 	{
 	public:
-		// Config access: only valid BEFORE Init().
 		EngineConfig& ConfigMutable();
 		const EngineConfig& Config() const { return cfg_; }
 
@@ -53,10 +55,15 @@ namespace noc {
 		JobSystem& Jobs() { return jobs_; }
 		const JobSystem& Jobs() const { return jobs_; }
 
+		World& GetWorld() { return world_; }
+		const World& GetWorld() const { return world_; }
+
 		bool InitMemory();
 		void KillMemory();
 
 		bool AttachWindow(WinWindow& window);
+		bool CreateAndAttachMainWindow(WinWindowDesc desc, WinWindow& outWindow);
+
 
 	private:
 		bool IsConfigMutable() const { return !initialized_; }
@@ -82,6 +89,7 @@ namespace noc {
 		InputSystem input_;
 
 		RenderSystem render_;
+		World world_;
 
 		EngineConfig cfg_{};
 		bool initialized_ = false;

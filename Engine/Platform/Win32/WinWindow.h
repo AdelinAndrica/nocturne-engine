@@ -47,7 +47,10 @@ namespace noc
 		void Destroy();
 
 		bool ShouldQuit() const { return shouldQuit_; }
-		void RequestQuit() { shouldQuit_ = true; }
+		void RequestQuit() { 
+			shouldQuit_ = true;
+			PostQuitMessage(0);
+		}
 
 		void* Handle() const { return (void*)hwnd_; }
 

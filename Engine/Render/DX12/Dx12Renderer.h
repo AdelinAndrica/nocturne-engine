@@ -13,6 +13,7 @@
 namespace noc
 {
 	class ResourceManager;
+	struct RenderQueue;
 
 	class Dx12Renderer
 	{
@@ -23,6 +24,7 @@ namespace noc
 		bool AttachToWindow(void* nativeHwnd, uint32_t clientWidth, uint32_t clientHeight);
 
 		void SetResourceManager(ResourceManager* rm) { rm_ = rm; }
+		void SetFrameRenderQueue(const RenderQueue* q) { frameQueue_ = q; }
 
 		void BeginFrame();
 		void EndFramePresent();
@@ -35,6 +37,7 @@ namespace noc
 		bool attached_ = false;
 
 		ResourceManager* rm_ = nullptr;
+		const RenderQueue* frameQueue_ = nullptr; // points to FrameArena memory
 
 		Dx12Device device_;
 		Dx12SwapChain swap_;
@@ -46,9 +49,8 @@ namespace noc
 		uint32_t frameIndex_ = 0;
 		bool frameOpen_ = false;
 
-		// Phase 10: resource foundation
 		Dx12DescriptorAllocator cbvSrvUavHeap_;
-		Dx12DescriptorAllocator samplerHeap_; // not used yet, but reserved for materials
+		Dx12DescriptorAllocator samplerHeap_;
 		Dx12DeferredReleaseQueue deferred_;
 		Dx12PsoCache psoCache_;
 

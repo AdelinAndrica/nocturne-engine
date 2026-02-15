@@ -1,9 +1,10 @@
-#pragma once
+﻿#pragma once
 #include <cstdint>
 
 namespace noc
 {
 	class ResourceManager;
+	struct RenderQueue;
 
 	class RenderSystem
 	{
@@ -17,8 +18,12 @@ namespace noc
 
 		void SetResourceManager(ResourceManager* rm);
 
+		// Frame lifecycle (unchanged semantics)
 		void BeginFrame();
 		void EndFramePresent();
+
+		// Runtime -> Render handoff for this frame (no ownership taken).
+		void SetFrameRenderQueue(const RenderQueue* q);
 
 	private:
 		struct Impl;

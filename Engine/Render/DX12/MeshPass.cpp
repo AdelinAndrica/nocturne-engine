@@ -5,20 +5,19 @@
 #include "ShaderCompiler.h"
 
 #include "Resources/ResourceManager.h"
+#include "Render/RenderQueue.h"
 
 namespace noc
 {
+	// Matches Basic.hlsl
 	struct PerFrameConstants
 	{
-		float time;
-		float pad[3];
+		Mat4 viewProj;
 	};
 
 	static uint64_t HashInputLayoutPC_()
 	{
-		// Stable constant for Phase 10: position+color layout.
-		// (Design choice) Replace with real hashing later.
-		return 0xA0C0CA11u;
+		return 0xA0C0CA11u; // stable constant for Phase 9.5/10 demo
 	}
 
 	bool MeshPass::Init(
@@ -35,26 +34,24 @@ namespace noc
 		cbvSrvUav_ = &cbvSrvUav;
 		psoCache_ = &psoCache;
 
-		// Request assets (vpaths are relative to your mounted content root).
-		// These return immediately; readiness is polled in Record().
-		// NOTE: shader file should live at Data/Shaders/Basic.hlsl, and mesh at Data/Meshes/triangle.nmsh.
-		// VFS mount in Phase 3/6 already maps Data/ as root.
-		// If your VFS uses different conventions, adjust vpaths accordingly.
 		rootReady_ = false;
 		psoReady_ = false;
 		meshReady_ = false;
 		cbReady_ = false;
+		instReady_ = false;
 
-		// Per-frame constant buffers (upload heap, one per swap buffer).
+		// Per-frame constant buffers
 		if (!perFrameCB_.Init(device, 64 * 1024))
 			return false;
+
+		// Instance buffer capacity (Design choice): enough for a small test scene.
+		instanceCapacity_ = 1024;
 
 		return true;
 	}
 
 	void MeshPass::Shutdown(Dx12DeferredReleaseQueue& deferred, uint64_t safeFenceValue)
 	{
-		// Queue GPU objects for safe release (or release now after GPU idle).
 		if (pso_)
 		{
 			dx12::ComPtr<IUnknown> u;
@@ -73,6 +70,14 @@ namespace noc
 		vb_.ShutdownNow();
 		ib_.ShutdownNow();
 
+		for (uint32_t i = 0; i < dx12::kFrameCount; ++i)
+		{
+			if (instanceBuf_[i] && instanceMapped_[i])
+				instanceBuf_[i]->Unmap(0, nullptr);
+			instanceMapped_[i] = nullptr;
+			instanceBuf_[i].Reset();
+		}
+
 		perFrameCB_.Shutdown();
 	}
 
@@ -87,7 +92,6 @@ namespace noc
 
 			D3D12_CONSTANT_BUFFER_VIEW_DESC d{};
 			d.BufferLocation = perFrameCB_.Resource(i)->GetGPUVirtualAddress();
-			// CBV size must be 256-byte aligned.
 			d.SizeInBytes = (UINT)((sizeof(PerFrameConstants) + 255u) & ~255u);
 
 			device->CreateConstantBufferView(&d, perFrameCbv_[i].cpu);
@@ -96,22 +100,70 @@ namespace noc
 		cbReady_ = true;
 	}
 
+	void MeshPass::EnsurePerFrameInstanceSrv_(ID3D12Device* device)
+	{
+		if (instReady_ || !device || !cbvSrvUav_)
+			return;
+
+		// Upload heap, persistently mapped.
+		for (uint32_t i = 0; i < dx12::kFrameCount; ++i)
+		{
+			instanceSrv_[i] = cbvSrvUav_->Allocate();
+
+			const UINT64 bytes = (UINT64)instanceCapacity_ * sizeof(Mat4);
+
+			D3D12_HEAP_PROPERTIES hp{};
+			hp.Type = D3D12_HEAP_TYPE_UPLOAD;
+
+			D3D12_RESOURCE_DESC d = dx12::BufferDesc(bytes);
+
+			if (!dx12::HrOk(device->CreateCommittedResource(
+				&hp,
+				D3D12_HEAP_FLAG_NONE,
+				&d,
+				D3D12_RESOURCE_STATE_GENERIC_READ,
+				nullptr,
+				IID_PPV_ARGS(&instanceBuf_[i])), "CreateCommittedResource(InstanceUpload)"))
+			{
+				return;
+			}
+
+			void* mapped = nullptr;
+			D3D12_RANGE r{ 0, 0 };
+			if (!dx12::HrOk(instanceBuf_[i]->Map(0, &r, &mapped), "InstanceUpload.Map"))
+				return;
+
+			instanceMapped_[i] = (uint8_t*)mapped;
+
+			D3D12_SHADER_RESOURCE_VIEW_DESC sd{};
+			sd.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+			sd.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			sd.Buffer.FirstElement = 0;
+			sd.Buffer.NumElements = instanceCapacity_;
+			sd.Buffer.StructureByteStride = sizeof(Mat4);
+			sd.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+			sd.Format = DXGI_FORMAT_UNKNOWN;
+
+			device->CreateShaderResourceView(instanceBuf_[i].Get(), &sd, instanceSrv_[i].cpu);
+		}
+
+		instReady_ = true;
+	}
+
 	bool MeshPass::EnsureRootSigAndPso_(ID3D12Device* device, Dx12PsoCache& cache, ResourceManager* rm)
 	{
 		if (!device || !rm)
 			return false;
 
-		// Request handles once.
 		if (!shaderHlsl_.IsValid())
 			shaderHlsl_ = rm->RequestText("Shaders/Basic.hlsl");
 
-		// Root signature: build once (no dependency on asset readiness).
 		if (!rootReady_)
 		{
 			// Root parameters:
 			// 0: CBV table (b0) per-frame
-			// 1: SRV table (t0..t7) per-draw/material (future)
-			// 2: Sampler table (s0..s7) (future)
+			// 1: SRV table (t0..t7) (t0 used for instance matrices)
+			// 2: Sampler table (s0..s7) (reserved)
 			D3D12_DESCRIPTOR_RANGE ranges[3]{};
 
 			ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
@@ -142,7 +194,7 @@ namespace noc
 			params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 			params[1].DescriptorTable.NumDescriptorRanges = 1;
 			params[1].DescriptorTable.pDescriptorRanges = &ranges[1];
-			params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+			params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
 			params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 			params[2].DescriptorTable.NumDescriptorRanges = 1;
@@ -171,10 +223,9 @@ namespace noc
 			rootReady_ = true;
 		}
 
-		// Shader compilation requires the TextResource to be ready.
 		const TextResource* src = rm->GetText(shaderHlsl_);
 		if (!src)
-			return false; // not ready yet
+			return false;
 
 		dx12::ComPtr<ID3DBlob> vs;
 		dx12::ComPtr<ID3DBlob> ps;
@@ -184,7 +235,6 @@ namespace noc
 		if (!ShaderCompiler::CompileFromMemory("Shaders/Basic.hlsl", src->Str().c_str(), src->Str().size(), "PSMain", "ps_5_1", ps))
 			return false;
 
-		// PSO cache lookup.
 		Dx12PsoKey key{};
 		key.vs = vs.Get();
 		key.ps = ps.Get();
@@ -199,7 +249,6 @@ namespace noc
 			return true;
 		}
 
-		// Create PSO
 		D3D12_INPUT_ELEMENT_DESC layout[2]{};
 		layout[0].SemanticName = "POSITION";
 		layout[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
@@ -290,41 +339,50 @@ namespace noc
 		const Dx12FrameSync& sync,
 		uint32_t frameIndex,
 		Dx12DeferredReleaseQueue& deferred,
-		ResourceManager* rm)
+		ResourceManager* rm,
+		const RenderQueue* queue)
 	{
 		if (!device || !cmd)
 			return;
 
-		// Always ensure per-frame CBV descriptors exist.
 		EnsurePerFrameCbv_(device);
+		EnsurePerFrameInstanceSrv_(device);
 
-		// Clear RT (swap already provides RTV).
 		auto rtv = swap.CurrentRtv(frameIndex);
 		cmd->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
 
 		const float clearColor[4] = { 0.05f, 0.05f, 0.08f, 1.0f };
 		cmd->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
 
-		if (!rm)
+		if (!rm || !queue || queue->instanceCount == 0)
 			return;
 
-		// Build root/PSO when shader becomes ready.
 		if (!EnsureRootSigAndPso_(device, *psoCache_, rm))
 			return;
 
-		// Upload mesh when bytes become ready.
 		if (!EnsureMeshUploaded_(device, cmd, deferred, sync, frameIndex, rm))
 			return;
 
-		// Write per-frame constants.
+		// Per-frame constants: viewProj
 		perFrameCB_.BeginFrame(frameIndex);
 		D3D12_GPU_VIRTUAL_ADDRESS gpu = 0;
 		void* cpu = nullptr;
 		if (perFrameCB_.Allocate(sizeof(PerFrameConstants), gpu, cpu))
 		{
 			auto* c = (PerFrameConstants*)cpu;
-			c->time = 0.0f; // (Design choice) wire real time later
+			c->viewProj = queue->view.viewProj;
 		}
+
+		// Upload instance matrices for this frame (clamp to capacity).
+		const uint32_t count = (queue->instanceCount > instanceCapacity_) ? instanceCapacity_ : queue->instanceCount;
+
+		// Correct: write matrices one-by-one because RenderInstance contains a mesh handle before the matrix.
+		Mat4* dst = reinterpret_cast<Mat4*>(instanceMapped_[frameIndex]);
+		for (uint32_t i = 0; i < count; ++i)
+		{
+			dst[i] = queue->instances[i].world;
+		}
+
 
 		// Bind descriptor heaps (shader-visible).
 		ID3D12DescriptorHeap* heaps[] = { cbvSrvUav_->Heap() };
@@ -336,7 +394,9 @@ namespace noc
 		// Root slot 0: per-frame CBV table (b0)
 		cmd->SetGraphicsRootDescriptorTable(0, perFrameCbv_[frameIndex].gpu);
 
-		// Viewport/scissor from swapchain size.
+		// Root slot 1: SRV table (t0..), we use t0 = instance matrices
+		cmd->SetGraphicsRootDescriptorTable(1, instanceSrv_[frameIndex].gpu);
+
 		D3D12_VIEWPORT vp{};
 		vp.Width = (float)swap.Width();
 		vp.Height = (float)swap.Height();
@@ -352,7 +412,6 @@ namespace noc
 		cmd->RSSetViewports(1, &vp);
 		cmd->RSSetScissorRects(1, &sc);
 
-		// IA bind
 		auto vbv = vb_.VertexView();
 		auto ibv = ib_.IndexView(DXGI_FORMAT_R16_UINT);
 
@@ -360,6 +419,6 @@ namespace noc
 		cmd->IASetVertexBuffers(0, 1, &vbv);
 		cmd->IASetIndexBuffer(&ibv);
 
-		cmd->DrawIndexedInstanced(indexCount_, 1, 0, 0, 0);
+		cmd->DrawIndexedInstanced(indexCount_, count, 0, 0, 0);
 	}
 }
