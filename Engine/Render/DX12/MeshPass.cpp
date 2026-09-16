@@ -17,7 +17,7 @@ namespace noc
 
 	static uint64_t HashInputLayoutPC_()
 	{
-		return 0xA0C0CA11u; // stable constant for Phase 9.5/10 demo
+		return 0xA0C0CA11u; // stable POSITION/COLOR layout hash
 	}
 
 	bool MeshPass::Init(
@@ -40,13 +40,12 @@ namespace noc
 		cbReady_ = false;
 		instReady_ = false;
 
-		// Per-frame constant buffers
 		if (!perFrameCB_.Init(device, 64 * 1024))
 			return false;
 
-		// Instance buffer capacity (Design choice): enough for a small test scene.
+		// Design choice (not directly from the book): enough for the current
+		// small validation scene while preserving the existing instancing path.
 		instanceCapacity_ = 1024;
-
 		return true;
 	}
 
@@ -93,7 +92,6 @@ namespace noc
 			D3D12_CONSTANT_BUFFER_VIEW_DESC d{};
 			d.BufferLocation = perFrameCB_.Resource(i)->GetGPUVirtualAddress();
 			d.SizeInBytes = (UINT)((sizeof(PerFrameConstants) + 255u) & ~255u);
-
 			device->CreateConstantBufferView(&d, perFrameCbv_[i].cpu);
 		}
 
@@ -105,16 +103,13 @@ namespace noc
 		if (instReady_ || !device || !cbvSrvUav_)
 			return;
 
-		// Upload heap, persistently mapped.
 		for (uint32_t i = 0; i < dx12::kFrameCount; ++i)
 		{
 			instanceSrv_[i] = cbvSrvUav_->Allocate();
-
 			const UINT64 bytes = (UINT64)instanceCapacity_ * sizeof(Mat4);
 
 			D3D12_HEAP_PROPERTIES hp{};
 			hp.Type = D3D12_HEAP_TYPE_UPLOAD;
-
 			D3D12_RESOURCE_DESC d = dx12::BufferDesc(bytes);
 
 			if (!dx12::HrOk(device->CreateCommittedResource(
@@ -143,7 +138,6 @@ namespace noc
 			sd.Buffer.StructureByteStride = sizeof(Mat4);
 			sd.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 			sd.Format = DXGI_FORMAT_UNKNOWN;
-
 			device->CreateShaderResourceView(instanceBuf_[i].Get(), &sd, instanceSrv_[i].cpu);
 		}
 
@@ -160,12 +154,7 @@ namespace noc
 
 		if (!rootReady_)
 		{
-			// Root parameters:
-			// 0: CBV table (b0) per-frame
-			// 1: SRV table (t0..t7) (t0 used for instance matrices)
-			// 2: Sampler table (s0..s7) (reserved)
 			D3D12_DESCRIPTOR_RANGE ranges[3]{};
-
 			ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
 			ranges[0].NumDescriptors = 1;
 			ranges[0].BaseShaderRegister = 0;
@@ -185,7 +174,6 @@ namespace noc
 			ranges[2].OffsetInDescriptorsFromTableStart = 0;
 
 			D3D12_ROOT_PARAMETER params[3]{};
-
 			params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 			params[0].DescriptorTable.NumDescriptorRanges = 1;
 			params[0].DescriptorTable.pDescriptorRanges = &ranges[0];
@@ -219,7 +207,6 @@ namespace noc
 
 			if (!dx12::HrOk(device->CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(), IID_PPV_ARGS(&rootSig_)), "CreateRootSignature"))
 				return false;
-
 			rootReady_ = true;
 		}
 
@@ -229,7 +216,6 @@ namespace noc
 
 		dx12::ComPtr<ID3DBlob> vs;
 		dx12::ComPtr<ID3DBlob> ps;
-
 		if (!ShaderCompiler::CompileFromMemory("Shaders/Basic.hlsl", src->Str().c_str(), src->Str().size(), "VSMain", "vs_5_1", vs))
 			return false;
 		if (!ShaderCompiler::CompileFromMemory("Shaders/Basic.hlsl", src->Str().c_str(), src->Str().size(), "PSMain", "ps_5_1", ps))
@@ -240,6 +226,7 @@ namespace noc
 		key.ps = ps.Get();
 		key.rootSig = rootSig_.Get();
 		key.rtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+		key.dsvFormat = Dx12SwapChain::kDepthFormat;
 		key.inputLayoutHash = HashInputLayoutPC_();
 
 		if (auto* cached = cache.Find(key))
@@ -268,9 +255,15 @@ namespace noc
 		pso.PS = { ps->GetBufferPointer(), ps->GetBufferSize() };
 		pso.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 		pso.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+		// Design choice (not directly from the book): disable culling for the
+		// colored validation primitive so Phase 14 can focus on depth/picking.
+		pso.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 		pso.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-		pso.DepthStencilState.DepthEnable = FALSE;
+		pso.DepthStencilState.DepthEnable = TRUE;
+		pso.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+		pso.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
 		pso.DepthStencilState.StencilEnable = FALSE;
+		pso.DSVFormat = key.dsvFormat;
 		pso.SampleMask = UINT_MAX;
 		pso.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 		pso.NumRenderTargets = 1;
@@ -288,42 +281,53 @@ namespace noc
 		return true;
 	}
 
-	bool MeshPass::EnsureMeshUploaded_(
+	bool MeshPass::EnsureValidationCubeUploaded_(
 		ID3D12Device* device,
 		ID3D12GraphicsCommandList* cmd,
 		Dx12DeferredReleaseQueue& deferred,
 		const Dx12FrameSync& sync,
-		uint32_t frameIndex,
-		ResourceManager* rm)
+		uint32_t frameIndex)
 	{
 		if (meshReady_)
 			return true;
 
-		if (!meshBin_.IsValid())
-			meshBin_ = rm->RequestBinary("Meshes/triangle.nmsh");
-
-		if (!rm->IsReady(meshBin_))
-			return false;
-
-		const uint8_t* bytes = rm->GetBytes(meshBin_);
-		const size_t size = rm->GetSize(meshBin_);
-		if (!bytes || size == 0)
-			return false;
-
+		// Design choice (not directly from the book): Phase 14 uses a procedural
+		// unit cube as validation geometry. This deliberately avoids pretending the
+		// existing Phase 9 single-mesh pass is already a general multi-mesh renderer.
 		CpuMeshPC cpu{};
-		const char* err = nullptr;
-		if (!ParseNocMeshPC(bytes, size, cpu, err))
+		auto vertex = [](float x, float y, float z, float r, float g, float b)
 		{
-			NOC_LOG_ERROR("Render", "Mesh parse failed: %s", err ? err : "unknown");
-			return false;
-		}
+			return MeshVertexPC{ x, y, z, r, g, b, 1.0f };
+		};
+		auto addFace = [&](const MeshVertexPC& a, const MeshVertexPC& b,
+			const MeshVertexPC& c, const MeshVertexPC& d)
+		{
+			const uint16_t base = static_cast<uint16_t>(cpu.vertices.size());
+			cpu.vertices.push_back(a);
+			cpu.vertices.push_back(b);
+			cpu.vertices.push_back(c);
+			cpu.vertices.push_back(d);
+			cpu.indices.push_back(base + 0); cpu.indices.push_back(base + 1); cpu.indices.push_back(base + 2);
+			cpu.indices.push_back(base + 0); cpu.indices.push_back(base + 2); cpu.indices.push_back(base + 3);
+		};
 
-		indexCount_ = (uint32_t)cpu.indices.size();
+		addFace(vertex(-1,-1,-1, 0.18f,0.45f,0.95f), vertex(-1, 1,-1, 0.18f,0.45f,0.95f),
+			vertex( 1, 1,-1, 0.18f,0.45f,0.95f), vertex( 1,-1,-1, 0.18f,0.45f,0.95f));
+		addFace(vertex( 1,-1, 1, 0.13f,0.30f,0.72f), vertex( 1, 1, 1, 0.13f,0.30f,0.72f),
+			vertex(-1, 1, 1, 0.13f,0.30f,0.72f), vertex(-1,-1, 1, 0.13f,0.30f,0.72f));
+		addFace(vertex(-1,-1, 1, 0.80f,0.22f,0.28f), vertex(-1, 1, 1, 0.80f,0.22f,0.28f),
+			vertex(-1, 1,-1, 0.80f,0.22f,0.28f), vertex(-1,-1,-1, 0.80f,0.22f,0.28f));
+		addFace(vertex( 1,-1,-1, 0.20f,0.72f,0.38f), vertex( 1, 1,-1, 0.20f,0.72f,0.38f),
+			vertex( 1, 1, 1, 0.20f,0.72f,0.38f), vertex( 1,-1, 1, 0.20f,0.72f,0.38f));
+		addFace(vertex(-1, 1,-1, 0.92f,0.67f,0.22f), vertex(-1, 1, 1, 0.92f,0.67f,0.22f),
+			vertex( 1, 1, 1, 0.92f,0.67f,0.22f), vertex( 1, 1,-1, 0.92f,0.67f,0.22f));
+		addFace(vertex(-1,-1, 1, 0.26f,0.29f,0.34f), vertex(-1,-1,-1, 0.26f,0.29f,0.34f),
+			vertex( 1,-1,-1, 0.26f,0.29f,0.34f), vertex( 1,-1, 1, 0.26f,0.29f,0.34f));
 
+		indexCount_ = static_cast<uint32_t>(cpu.indices.size());
 		if (!vb_.CreateStatic(device, cmd, deferred, sync, frameIndex, GpuBuffer::Kind::Vertex,
 			cpu.vertices.data(), cpu.vertices.size() * sizeof(MeshVertexPC), sizeof(MeshVertexPC)))
 			return false;
-
 		if (!ib_.CreateStatic(device, cmd, deferred, sync, frameIndex, GpuBuffer::Kind::Index,
 			cpu.indices.data(), cpu.indices.size() * sizeof(uint16_t), 0))
 			return false;
@@ -349,21 +353,22 @@ namespace noc
 		EnsurePerFrameInstanceSrv_(device);
 
 		auto rtv = swap.CurrentRtv(frameIndex);
-		cmd->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+		auto dsv = swap.DepthStencilView();
+		if (rtv.ptr == 0 || dsv.ptr == 0)
+			return;
 
-		const float clearColor[4] = { 0.05f, 0.05f, 0.08f, 1.0f };
+		cmd->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
+		const float clearColor[4] = { 0.035f, 0.040f, 0.055f, 1.0f };
 		cmd->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
+		cmd->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 		if (!rm || !queue || queue->instanceCount == 0)
 			return;
-
 		if (!EnsureRootSigAndPso_(device, *psoCache_, rm))
 			return;
-
-		if (!EnsureMeshUploaded_(device, cmd, deferred, sync, frameIndex, rm))
+		if (!EnsureValidationCubeUploaded_(device, cmd, deferred, sync, frameIndex))
 			return;
 
-		// Per-frame constants: viewProj
 		perFrameCB_.BeginFrame(frameIndex);
 		D3D12_GPU_VIRTUAL_ADDRESS gpu = 0;
 		void* cpu = nullptr;
@@ -373,28 +378,16 @@ namespace noc
 			c->viewProj = queue->view.viewProj;
 		}
 
-		// Upload instance matrices for this frame (clamp to capacity).
 		const uint32_t count = (queue->instanceCount > instanceCapacity_) ? instanceCapacity_ : queue->instanceCount;
-
-		// Correct: write matrices one-by-one because RenderInstance contains a mesh handle before the matrix.
 		Mat4* dst = reinterpret_cast<Mat4*>(instanceMapped_[frameIndex]);
 		for (uint32_t i = 0; i < count; ++i)
-		{
 			dst[i] = queue->instances[i].world;
-		}
 
-
-		// Bind descriptor heaps (shader-visible).
 		ID3D12DescriptorHeap* heaps[] = { cbvSrvUav_->Heap() };
 		cmd->SetDescriptorHeaps(1, heaps);
-
 		cmd->SetGraphicsRootSignature(rootSig_.Get());
 		cmd->SetPipelineState(pso_.Get());
-
-		// Root slot 0: per-frame CBV table (b0)
 		cmd->SetGraphicsRootDescriptorTable(0, perFrameCbv_[frameIndex].gpu);
-
-		// Root slot 1: SRV table (t0..), we use t0 = instance matrices
 		cmd->SetGraphicsRootDescriptorTable(1, instanceSrv_[frameIndex].gpu);
 
 		D3D12_VIEWPORT vp{};
@@ -408,17 +401,14 @@ namespace noc
 		sc.top = 0;
 		sc.right = (LONG)swap.Width();
 		sc.bottom = (LONG)swap.Height();
-
 		cmd->RSSetViewports(1, &vp);
 		cmd->RSSetScissorRects(1, &sc);
 
 		auto vbv = vb_.VertexView();
 		auto ibv = ib_.IndexView(DXGI_FORMAT_R16_UINT);
-
 		cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		cmd->IASetVertexBuffers(0, 1, &vbv);
 		cmd->IASetIndexBuffer(&ibv);
-
 		cmd->DrawIndexedInstanced(indexCount_, count, 0, 0, 0);
 	}
 }
