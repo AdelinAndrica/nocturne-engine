@@ -44,6 +44,25 @@ namespace noc
 		rtvDescriptorSize_ = 0;
 	}
 
+	bool Dx12SwapChain::CreateBackBufferViews_(ID3D12Device* device)
+	{
+		if (!device || !swapChain_ || !rtvHeap_)
+			return false;
+
+		D3D12_CPU_DESCRIPTOR_HANDLE base = rtvHeap_->GetCPUDescriptorHandleForHeapStart();
+		for (uint32_t i = 0; i < dx12::kFrameCount; ++i)
+		{
+			if (!dx12::HrOk(swapChain_->GetBuffer(i, IID_PPV_ARGS(&backBuffers_[i])), "SwapChain.GetBuffer"))
+				return false;
+
+			D3D12_CPU_DESCRIPTOR_HANDLE h = base;
+			h.ptr += (SIZE_T)i * (SIZE_T)rtvDescriptorSize_;
+			device->CreateRenderTargetView(backBuffers_[i].Get(), nullptr, h);
+			bbState_[i] = D3D12_RESOURCE_STATE_PRESENT;
+		}
+		return true;
+	}
+
 	bool Dx12SwapChain::CreateRtvHeapAndViews(ID3D12Device* device)
 	{
 		if (!device || !swapChain_)
@@ -58,22 +77,29 @@ namespace noc
 			return false;
 
 		rtvDescriptorSize_ = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+		return CreateBackBufferViews_(device);
+	}
 
-		D3D12_CPU_DESCRIPTOR_HANDLE base = rtvHeap_->GetCPUDescriptorHandleForHeapStart();
+	bool Dx12SwapChain::Resize(ID3D12Device* device, uint32_t clientWidth, uint32_t clientHeight)
+	{
+		if (!device || !swapChain_)
+			return false;
+		if (clientWidth == 0 || clientHeight == 0)
+			return true;
+		if (clientWidth == width_ && clientHeight == height_)
+			return true;
 
 		for (uint32_t i = 0; i < dx12::kFrameCount; ++i)
-		{
-			if (!dx12::HrOk(swapChain_->GetBuffer(i, IID_PPV_ARGS(&backBuffers_[i])), "SwapChain.GetBuffer"))
-				return false;
+			backBuffers_[i].Reset();
 
-			D3D12_CPU_DESCRIPTOR_HANDLE h = base;
-			h.ptr += (SIZE_T)i * (SIZE_T)rtvDescriptorSize_;
-			device->CreateRenderTargetView(backBuffers_[i].Get(), nullptr, h);
+		if (!dx12::HrOk(swapChain_->ResizeBuffers(dx12::kFrameCount, clientWidth, clientHeight,
+			DXGI_FORMAT_R8G8B8A8_UNORM, 0), "SwapChain.ResizeBuffers"))
+			return false;
 
-			bbState_[i] = D3D12_RESOURCE_STATE_PRESENT;
-		}
-
-		return true;
+		width_ = clientWidth;
+		height_ = clientHeight;
+		frameIndex_ = swapChain_->GetCurrentBackBufferIndex();
+		return CreateBackBufferViews_(device);
 	}
 
 	D3D12_CPU_DESCRIPTOR_HANDLE Dx12SwapChain::CurrentRtv(uint32_t frameIndex) const
@@ -89,7 +115,7 @@ namespace noc
 
 	void Dx12SwapChain::TransitionTo(ID3D12GraphicsCommandList* cmd, uint32_t frameIndex, D3D12_RESOURCE_STATES to)
 	{
-		if (!cmd)
+		if (!cmd || frameIndex >= dx12::kFrameCount || !backBuffers_[frameIndex])
 			return;
 
 		if (bbState_[frameIndex] == to)
