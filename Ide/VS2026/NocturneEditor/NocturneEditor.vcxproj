@@ -15,12 +15,14 @@
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorShellV3.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorTheme.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorControls.cpp" />
+    <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorIconRenderer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorShell.h" />
     <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorShellV3.h" />
     <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorTheme.h" />
     <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorControls.h" />
+    <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorIconRenderer.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\NocturneEngine\NocturneEngine.vcxproj">
@@ -84,7 +86,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comctl32.lib;Dwmapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comctl32.lib;Dwmapi.lib;D2d1.lib;D3d11.lib;Windowscodecs.lib;Shlwapi.lib;Msimg32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
 

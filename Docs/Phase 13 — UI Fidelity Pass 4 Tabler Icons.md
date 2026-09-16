@@ -54,7 +54,7 @@ The renderer searches for `ThirdParty/TablerIcons/icons/outline` from the curren
 
 ## Final integration step
 
-Run the idempotent helper script:
+Because the GitHub connector only replaces complete files and `EditorShellV3.cpp` is intentionally kept intact for Phase 13 A/B iteration, the repository contains an idempotent integration script:
 
 ```powershell
 .\Tools\Phase13\ApplyTablerIconRenderer.ps1
@@ -65,7 +65,7 @@ It performs only two changes to `EditorShellV3.cpp`:
 1. adds `#include "EditorIconRenderer.h"`;
 2. makes `DrawIcon()` try the Tabler SVG renderer first and fall back to the validated Pass 3 GDI icon only if SVG rendering is unavailable.
 
-After local build and visual validation, commit that generated diff to `phase-13-editor-framework`.
+After local build and visual validation, commit that small generated diff to `phase-13-editor-framework`.
 
 ## Verification checklist
 
