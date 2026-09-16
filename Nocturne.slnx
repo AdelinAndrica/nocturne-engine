@@ -10,4 +10,5 @@
   <Project Path="Ide/VS2026/NocturneHost/NocturneHost.vcxproj" Id="660b21c5-e86b-4bb8-b48b-35a7899e0160">
     <Build Solution="Development|x64" Project="false" />
   </Project>
+  <Project Path="Ide/VS2026/NocturneEditor/NocturneEditor.vcxproj" Id="86a9d91a-41e7-4e33-a2a3-55e33594a413" />
 </Solution>
