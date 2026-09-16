@@ -1,6 +1,6 @@
 # Phase 14 — Editor Rendering Viewport — Implementation Report
 
-> **Implementation status:** IMPLEMENTED ON `phase-14-editor-rendering-viewport`
+> **Implementation status:** IMPLEMENTED + 3D VALIDATION PATCH ON `phase-14-editor-rendering-viewport`
 >
 > **Validation status:** SOURCE/DIFF VALIDATED; LOCAL WINDOWS BUILD + INTERACTIVE GPU VALIDATION REQUIRED
 >
@@ -12,13 +12,14 @@
 
 Replace only the central Phase 13 viewport placeholder with a DX12-backed child render surface while preserving `EditorShellV3`, the approved Phase 13 chrome, and the runtime-owned main loop.
 
-The implementation adds:
+The current implementation now includes:
 
 - a dedicated child HWND presentation target inside the existing viewport body;
-- resize-aware DXGI back-buffer recreation;
-- real runtime scene rendering in the editor viewport;
+- resize-aware DXGI back-buffer **and depth-buffer** recreation;
+- depth-tested 3D rendering in the editor viewport;
+- a deterministic validation scene with three selectable cubes plus a ground/platform cube;
 - an editor fly camera;
-- click picking against the current Phase 14 renderable;
+- nearest-hit single-object picking across the selectable validation cubes;
 - viewport/hierarchy selection synchronization at the level supported by the Phase 13 hierarchy;
 - selection bounds visualization;
 - translate / rotate / scale gizmo interaction foundation;
@@ -26,16 +27,18 @@ The implementation adds:
 
 ## 2. Key concepts from the books
 
-The implementation follows the references already locked in `Docs/Phase 14 — Editor Rendering Viewport Handoff.md`:
+The implementation follows the references locked in `Docs/Phase 14 — Editor Rendering Viewport Handoff.md`:
 
 - Jason Gregory, *Game Engine Architecture (3rd Edition)*, §15.4.1.2: game-world visualization inside editor tooling;
-- §15.4.1.3: editor viewport navigation;
-- §15.4.1.4: selection and synchronization with tree/list representations;
-- §15.4.1.7: placement/alignment handles for transforms;
-- Frank D. Luna, *Introduction to 3D Game Programming with DirectX 12*, Chapter 4: swap-chain/back-buffer/viewport lifecycle;
-- Luna, Chapter 17: screen-to-ray picking and nearest-hit selection principles.
+- Gregory §15.4.1.3: editor viewport navigation;
+- Gregory §15.4.1.4: selection and synchronization with tree/list representations;
+- Gregory §15.4.1.7: placement/alignment handles for transforms;
+- Frank D. Luna, *Introduction to 3D Game Programming with DirectX 12*, Chapter 4: swap chain, back buffers, depth buffering, viewport/scissor and resize lifecycle;
+- Luna Chapter 17: screen-to-ray picking, bounding-volume tests and nearest-hit selection.
 
-The exact Win32 child-window composition, editor overlay, control bindings, Phase 13 hierarchy bridge and gizmo interaction constants are **Design choice (not directly from the book)**.
+Luna Chapter 4 explicitly places creation of the depth/stencil buffer and its DSV in the Direct3D initialization/resize lifecycle. Phase 14 now follows that requirement for the editor viewport target.
+
+The exact Win32 child-window composition, editor overlay, camera bindings, validation-scene layout, procedural cube geometry, hierarchy bridge and gizmo interaction constants are **Design choice (not directly from the book)**.
 
 ## 3. What was implemented
 
@@ -55,43 +58,62 @@ The existing Perspective / Lit / Show strip remains owned by Phase 13. The rende
 
 No editor main loop was added.
 
-The existing execution path remains:
+The execution path remains:
 
 `MainLoop -> Engine::BeginFrame() -> Engine::Tick() -> Engine::EndFrame()`
 
-The viewport controller uses ordinary Win32 messages/timer events only to mutate editor camera/tool state. Rendering and presentation still occur exclusively through the engine frame lifecycle.
+The viewport controller uses Win32 messages/timer events only to mutate editor camera/tool state. Rendering and presentation still occur through the engine frame lifecycle.
 
-### 3.3 DX12 resize lifecycle
+### 3.3 DX12 resize + depth lifecycle
 
-The rendering stack now exposes a narrow resize path:
+The rendering stack exposes the narrow resize path:
 
 - `Engine::ResizeRenderWindow()`
 - `RenderSystem::ResizeAttachedWindow()`
 - `Dx12Renderer::ResizeAttachedWindow()`
 - `Dx12SwapChain::Resize()`
 
-For a non-zero resize the renderer:
+For a non-zero resize the renderer waits for GPU completion, releases viewport-sized resources, resizes the swap-chain buffers, recreates RTVs, and recreates a matching `D24_UNORM_S8_UINT` depth/stencil resource + DSV.
 
-1. waits for GPU completion using the existing `Dx12FrameSync` / queue;
-2. releases swap-chain back-buffer references;
-3. calls `IDXGISwapChain::ResizeBuffers`;
-4. refreshes the current back-buffer index;
-5. recreates RTVs;
-6. resets tracked back-buffer states to `PRESENT`.
+The depth resource remains in `D3D12_RESOURCE_STATE_DEPTH_WRITE` for this simple Phase 14 forward pass. A 0×0 viewport suspends frame submission without invalid DXGI resize work.
 
-A 0×0 editor viewport suspends frame submission without calling `ResizeBuffers(0, 0)`.
+**Design choice (not directly from the book):** the depth target currently lives with `Dx12SwapChain` because that object already owns the viewport-dependent dimensions/back-buffer lifecycle. A larger presentation-target abstraction is intentionally deferred until the codebase proves it necessary.
 
-### 3.4 Real viewport dimensions used by the runtime camera
+### 3.4 Depth-tested MeshPass
 
-The old hard-coded `1280 × 720` values in `Engine::EndFrame()` were removed.
+`MeshPass` now:
 
-`Engine` now tracks the actual attached render-target extent and supplies it to `World::BuildRenderQueue()`. This keeps the runtime camera projection aspect synchronized with the child viewport dimensions.
+- includes the DSV format in the PSO cache key;
+- creates a PSO with depth enabled, writes enabled and `LESS` comparison;
+- binds RTV + DSV together;
+- clears both color and depth every frame;
+- renders the Phase 14 validation instances with real depth occlusion.
 
-### 3.5 Editor camera
+This is the minimum required to judge a viewport as real spatial 3D rather than a flat triangle smoke test.
 
-`EditorViewportController` owns editor-only camera state and drives the existing runtime `World` camera object.
+### 3.5 Procedural validation cube
 
-Controls:
+The old renderer path hardcoded `Meshes/triangle.nmsh` as its one uploaded geometry. Phase 14 now uploads a colored unit cube procedurally and draws it through the existing instancing path.
+
+**Design choice (not directly from the book):** this does **not** claim that `MeshPass` is now a general multi-mesh renderer. `RenderQueue::mesh` is still not used for per-instance mesh routing by this pass. Refactoring the renderer into a complete multi-mesh/material system is outside this patch and must not be hidden behind the Phase 14 viewport task.
+
+The procedural cube exists specifically so depth, perspective, transform, selection and gizmo behavior can be validated honestly.
+
+### 3.6 Real 3D validation scene
+
+Before the Phase 13 hierarchy is populated, `EditorViewportController::PrepareScene()` creates:
+
+- three spatially separated/selectable cube instances at different positions/depths/scales/rotations;
+- one large flattened cube used as a ground/platform reference;
+- one editor camera object.
+
+The ground object is deliberately not selectable. The three visible cube objects are selectable.
+
+This scene is **Design choice (not directly from the book)** and exists only as a deterministic Phase 14 validation environment; it is not a replacement for Phase 16 scene authoring.
+
+### 3.7 Editor camera
+
+Controls remain:
 
 - RMB capture + mouse move: yaw/pitch;
 - `W/S`: forward/back;
@@ -100,140 +122,117 @@ Controls:
 - `Shift`: faster movement;
 - mouse wheel: camera speed adjustment.
 
-Camera movement is active only while the viewport owns RMB capture.
+Projection aspect follows the actual viewport child dimensions.
 
-### 3.6 Picking and selection
+### 3.8 Picking and nearest selection
 
-Phase 14 currently creates one deterministic visible triangle renderable plus an editor camera object before `EditorShellV3` populates its Phase 13 hierarchy.
+Picking follows the Luna Chapter 17 flow at the current broad-phase precision level:
 
-Viewport picking:
+1. convert viewport-client pixel coordinates to NDC;
+2. construct a view-space ray from FOV/aspect;
+3. rotate the ray into world space with the editor camera;
+4. test transformed world AABBs for every selectable validation cube;
+5. choose the valid hit with the smallest positive `t`;
+6. clear selection on empty-space click.
 
-1. converts the clicked pixel to normalized device coordinates;
-2. creates a view-space ray using the current FOV/aspect;
-3. rotates that ray into world space with the editor camera orientation;
-4. intersects it with the renderable's transformed AABB;
-5. selects the object on hit;
-6. clears selection when clicking empty space.
+Per-triangle mesh intersection remains outside the necessary Phase 14 scope because transformed bounds are sufficient for the current primitive validation scene.
 
-This is the Phase 14 coarse-selection foundation. Per-triangle mesh picking remains outside this phase.
+### 3.9 Hierarchy synchronization
 
-### 3.7 Hierarchy synchronization
+Phase 13 exposes only an aggregate `Runtime Objects` row rather than stable authored object rows.
 
-The Phase 13 hierarchy does not yet expose authored per-entity rows; Phase 15/16 are intentionally not pulled forward.
+Therefore:
 
-Therefore Phase 14 maps the existing `Runtime Objects` hierarchy row to its single selectable renderable:
+- any viewport cube selection highlights `Runtime Objects`;
+- empty-space selection maps back to the root row;
+- clicking `Runtime Objects` selects the primary validation cube.
 
-- viewport hit -> selects the `Runtime Objects` row;
-- viewport empty click -> selects the root row / clears object selection;
-- clicking `Runtime Objects` -> selects the viewport object.
+A synchronization guard prevents the synthetic tree update from overwriting which of the three cubes was selected in the viewport.
 
-This is intentionally limited to the level supported by the current Phase 13 hierarchy and current pre-ECS scene model.
+This is deliberately limited until Phase 15/16 introduce richer object/editor representation.
 
-### 3.8 Selection visualization and debug draw
+### 3.10 Selection visualization, gizmos and debug draw
 
-An editor-only color-keyed Win32 overlay is layered above the DX12 child target. It renders:
+The editor-only color-keyed overlay renders:
 
-- ground grid;
+- projected ground grid;
 - world X/Y/Z origin axes;
-- selected world-space AABB;
-- transform gizmo axes and handles.
+- selected cube world AABB;
+- transform gizmo axes/handles.
 
-This avoids adding editor concerns to runtime mesh/material rendering.
+Move/Rotate/Scale now operate on whichever validation cube is selected rather than a single hardcoded object.
 
-**Design choice (not directly from the book):** the Phase 14 debug primitives are a Win32 editor overlay rather than a new runtime GPU debug-draw subsystem. A generalized GPU debug-draw facility can be introduced later without changing the Phase 14 viewport ownership model.
+No ECS, serialization, undo stack, snapping system, prefab system, lighting/PBR or PIE was introduced.
 
-### 3.9 Gizmo foundation
+## 4. Files changed by the 3D validation patch
 
-The existing Phase 13 toolbar remains authoritative for tool mode:
-
-- Select
-- Move
-- Rotate
-- Scale
-
-When an object is selected, axis handles are projected from the object's transform. Clicking and dragging a handle updates the same runtime `World` object transform used for rendering.
-
-Implemented behavior:
-
-- Move: drag along the selected local axis;
-- Scale: change one selected local scale component with a positive floor;
-- Rotate: apply an axis-angle delta around the selected local axis.
-
-No ECS, serialization, undo stack, snapping system or prefab integration was introduced.
-
-## 4. Files changed
-
-### Editor
-
-- `Apps/NocturneEditor/main.cpp`
-- `Apps/NocturneEditor/EditorShellV3.h`
-- `Apps/NocturneEditor/EditorViewportController.h` — new
-- `Apps/NocturneEditor/EditorViewportController.cpp` — new
-- `Ide/VS2026/NocturneEditor/NocturneEditor.vcxproj`
-
-### Runtime/render integration
-
-- `Engine/Runtime/Engine.h`
-- `Engine/Runtime/Engine.cpp`
-- `Engine/Render/RenderSystem.h`
-- `Engine/Render/RenderSystem.cpp`
-- `Engine/Render/DX12/Dx12Renderer.h`
-- `Engine/Render/DX12/Dx12Renderer.cpp`
+- `Engine/Render/DX12/Dx12PsoCache.h`
 - `Engine/Render/DX12/Dx12SwapChain.h`
 - `Engine/Render/DX12/Dx12SwapChain.cpp`
+- `Engine/Render/DX12/MeshPass.h`
+- `Engine/Render/DX12/MeshPass.cpp`
+- `Apps/NocturneEditor/EditorViewportController.h`
+- `Apps/NocturneEditor/EditorViewportController.cpp`
+- `Docs/Phase 14 — Implementation Report.md`
 
-`EditorShellV3.cpp`, `EditorTheme`, Content Browser, Console, status bar, toolbar composition and Tabler icon rendering were not redesigned.
+Earlier Phase 14 work also changed the runtime render-window integration, `main.cpp`, the minimal `EditorShellV3.h` seam and editor project/manifest integration. `EditorShellV3.cpp` remains visually unchanged.
 
 ## 5. Verification checklist
 
 ### Verified from repository/source diff
 
-- [x] Branch is based directly on `phase-13-editor-framework` and is ahead with no divergence at implementation time.
 - [x] `EditorShellV3` remains the active shell.
-- [x] Historical `EditorShell` / `EditorControls` were not used as the Phase 14 implementation path.
 - [x] Top-level editor HWND remains unattached to DX12.
-- [x] Dedicated child viewport HWND is the renderer target.
-- [x] No second engine/editor main loop was introduced.
-- [x] Actual viewport width/height replace the old hard-coded render extent.
-- [x] Resize uses the existing device, queue and fence infrastructure.
-- [x] 0×0 presentation is suppressed.
-- [x] Camera/picking/gizmo/debug-draw code is editor-owned.
-- [x] Phase 13 shell chrome/layout implementation was left intact.
+- [x] Dedicated child viewport HWND remains the renderer target.
+- [x] No second engine/editor main loop exists.
+- [x] Viewport-sized depth resource is created and recreated with the viewport target.
+- [x] PSO depth testing is enabled and DSV format participates in the cache key.
+- [x] Color + depth are both cleared before the validation draw.
+- [x] The triangle-only validation geometry has been replaced by a real cube primitive.
+- [x] Multiple cube instances at different depths are submitted through the existing runtime `World -> RenderQueue` path.
+- [x] Picking chooses the nearest selectable AABB hit.
+- [x] Gizmo edits target the currently selected validation cube.
+- [x] Phase 13 shell layout/chrome implementation was not redesigned.
 - [x] No Phase 15+ ECS/serialization/PIE scope was introduced.
 
 ### Requires local Windows validation
 
 - [ ] `Debug x64` build succeeds under the repository's VS2026/v145 setup.
-- [ ] DX12 debug layer reports no errors during repeated resize/maximize/restore.
+- [ ] DX12 debug layer reports zero errors at launch and during resize.
+- [ ] Three colored 3D cubes + ground/platform are visible with correct perspective.
+- [ ] Near geometry correctly occludes farther geometry.
 - [ ] Renderer output stays confined to the child viewport.
-- [ ] Minimize/collapse/restore survives repeated 0×0 transitions.
-- [ ] RMB fly camera controls feel correct and remain viewport-focused.
-- [ ] Viewport aspect remains visually correct at arbitrary panel sizes.
-- [ ] Clicking the triangle selects it; clicking empty space clears it.
+- [ ] Repeated resize/maximize/restore recreates color/depth targets cleanly.
+- [ ] Minimize/collapse/restore survives zero-size transitions.
+- [ ] RMB fly camera works and remains viewport-focused.
+- [ ] Viewport aspect stays correct at arbitrary panel sizes.
+- [ ] Clicking each visible cube selects the nearest expected cube.
+- [ ] Empty-space click clears selection.
 - [ ] Hierarchy aggregate row and viewport selection remain synchronized.
-- [ ] Selection bounds track the object after gizmo edits.
+- [ ] Selection bounds track the selected cube after gizmo edits.
 - [ ] Move/rotate/scale handles can be dragged repeatedly without instability.
-- [ ] Grid/axes/selection/gizmo overlay remains correctly composited over DX12 on supported Windows versions.
+- [ ] Grid/axes/selection/gizmo overlay composites correctly over DX12.
 
-The GitHub connector used for this implementation cannot execute the Windows/MSVC/DX12 binary, so these runtime items are deliberately not marked complete.
+The GitHub connector cannot execute the Windows/MSVC/DX12 binary, so runtime items are intentionally not marked complete.
 
 ## 6. Common pitfalls / follow-up risks
 
-- Do not attach the renderer to the editor top-level HWND; the child target is now an architectural boundary.
-- Do not call swap-chain resize while an engine frame is open. The editor resize path is message-driven before frame submission and the renderer rejects an open-frame resize.
-- Do not convert the editor timer into a second simulation/render loop.
-- Do not move editor grid/gizmo behavior into gameplay/runtime object policy.
-- The Phase 13 hierarchy is intentionally coarse. Do not expand Phase 14 into Phase 15 ECS or Phase 16 scene editing merely to obtain richer hierarchy rows.
-- The Win32 overlay is a Phase 14 design choice; if it proves unsuitable under local GPU/compositor testing, replace only the debug-draw presentation mechanism, not the child-HWND/runtime-loop architecture.
+- `MeshPass` still renders one geometry instanced N times; do not mistake the Phase 14 procedural cube for finished multi-mesh routing.
+- Do not attach the renderer to the editor top-level HWND.
+- Do not resize viewport resources while GPU work still references them.
+- The DSV must always match the current child viewport extent.
+- Do not remove depth testing just to hide geometry/winding problems.
+- The hierarchy remains intentionally coarse until later editor/entity phases.
+- The Win32 overlay remains a Phase 14 design choice; if compositor testing exposes issues, replace the overlay presentation mechanism without undoing the viewport ownership architecture.
 
 ## 7. Next chat handoff
 
 Bring:
 
-1. the `Debug x64` build output for `NocturneEditor`;
-2. DX12 debug-layer output from launch + resize/maximize/restore;
-3. one screenshot of the viewport after launch;
-4. one screenshot with the triangle selected and a transform gizmo active;
-5. any camera, picking, compositing or resize issue observed locally.
+1. fresh `Debug x64` build output after pulling this patch;
+2. full launch log;
+3. one screenshot showing the 3D cubes + ground;
+4. one screenshot with a non-primary cube selected and a gizmo active;
+5. any DX12 debug-layer, picking, camera, depth, compositing or resize issue observed locally.
 
-Do **not** start Phase 15 until the local verification checklist above is closed and this report can be promoted from implementation-complete to fully validated.
+Do **not** start Phase 15 until this local verification checklist is closed.
