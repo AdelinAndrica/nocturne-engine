@@ -12,13 +12,16 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\Apps\NocturneEditor\main.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorShell.cpp" />
+    <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorTheme.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorShell.h" />
+    <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorTheme.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\NocturneEngine\NocturneEngine.vcxproj">
       <Project>{35e1aeba-66a3-4950-9c19-2658b2a30af1}</Project>
+      <AdditionalProperties>SolutionDir=$(RepoRoot)</AdditionalProperties>
     </ProjectReference>
   </ItemGroup>
 
@@ -28,6 +31,8 @@
     <ProjectGuid>{86A9D91A-41E7-4E33-A2A3-55E33594A413}</ProjectGuid>
     <RootNamespace>NocturneEditor</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <RepoRoot>$(MSBuildProjectDirectory)\..\..\..\</RepoRoot>
+    <SolutionDir>$(RepoRoot)</SolutionDir>
   </PropertyGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -57,9 +62,9 @@
   <PropertyGroup Label="UserMacros" />
 
   <PropertyGroup Condition="'$(Platform)'=='x64'">
-    <OutDir>$(SolutionDir)Build\bin\$(ConfigurationName)\</OutDir>
-    <IntDir>$(SolutionDir)Build\obj\$(ProjectName)\$(ConfigurationName)\</IntDir>
-    <LocalDebuggerWorkingDirectory>$(SolutionDir)</LocalDebuggerWorkingDirectory>
+    <OutDir>$(RepoRoot)Build\bin\$(ConfigurationName)\</OutDir>
+    <IntDir>$(RepoRoot)Build\obj\$(ProjectName)\$(ConfigurationName)\</IntDir>
+    <LocalDebuggerWorkingDirectory>$(RepoRoot)</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
 
   <ItemDefinitionGroup>
@@ -68,13 +73,13 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Engine;$(SolutionDir)Engine\Core;$(SolutionDir)Engine\Core\Memory;$(SolutionDir)Engine\Core\Subsystems;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(RepoRoot)Engine;$(RepoRoot)Engine\Core;$(RepoRoot)Engine\Core\Memory;$(RepoRoot)Engine\Core\Subsystems;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>NOC_CONTENT_ROOT="Data";%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comctl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comctl32.lib;Dwmapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
 
