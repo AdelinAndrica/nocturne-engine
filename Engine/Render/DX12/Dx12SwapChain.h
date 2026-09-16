@@ -7,6 +7,8 @@ namespace noc
 	class Dx12SwapChain
 	{
 	public:
+		static constexpr DXGI_FORMAT kDepthFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+
 		bool Init(IDXGIFactory6* factory, ID3D12CommandQueue* queue, void* nativeHwnd, uint32_t clientWidth, uint32_t clientHeight);
 		void Shutdown();
 
@@ -23,11 +25,13 @@ namespace noc
 		uint32_t Height() const { return height_; }
 
 		D3D12_CPU_DESCRIPTOR_HANDLE CurrentRtv(uint32_t frameIndex) const;
+		D3D12_CPU_DESCRIPTOR_HANDLE DepthStencilView() const;
 
 		void TransitionTo(ID3D12GraphicsCommandList* cmd, uint32_t frameIndex, D3D12_RESOURCE_STATES to);
 
 	private:
 		bool CreateBackBufferViews_(ID3D12Device* device);
+		bool CreateDepthStencil_(ID3D12Device* device);
 
 	private:
 		uint32_t width_ = 0, height_ = 0;
@@ -37,6 +41,9 @@ namespace noc
 
 		dx12::ComPtr<ID3D12DescriptorHeap> rtvHeap_;
 		uint32_t rtvDescriptorSize_ = 0;
+
+		dx12::ComPtr<ID3D12DescriptorHeap> dsvHeap_;
+		dx12::ComPtr<ID3D12Resource> depthStencil_;
 
 		dx12::ComPtr<ID3D12Resource> backBuffers_[dx12::kFrameCount];
 		D3D12_RESOURCE_STATES bbState_[dx12::kFrameCount]{};
