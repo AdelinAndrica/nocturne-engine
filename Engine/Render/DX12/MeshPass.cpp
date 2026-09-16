@@ -9,7 +9,6 @@
 
 namespace noc
 {
-	// Matches Basic.hlsl
 	struct PerFrameConstants
 	{
 		Mat4 viewProj;
@@ -17,7 +16,7 @@ namespace noc
 
 	static uint64_t HashInputLayoutPC_()
 	{
-		return 0xA0C0CA11u; // stable POSITION/COLOR layout hash
+		return 0xA0C0CA11u;
 	}
 
 	bool MeshPass::Init(
@@ -27,25 +26,23 @@ namespace noc
 		Dx12PsoCache& psoCache)
 	{
 		(void)samplers;
-
 		if (!device)
 			return false;
 
 		cbvSrvUav_ = &cbvSrvUav;
 		psoCache_ = &psoCache;
-
 		skyReady_ = false;
 		rootReady_ = false;
 		psoReady_ = false;
+		gridPsoReady_ = false;
 		meshReady_ = false;
+		gridReady_ = false;
 		cbReady_ = false;
 		instReady_ = false;
 
 		if (!perFrameCB_.Init(device, 64 * 1024))
 			return false;
 
-		// Design choice (not directly from the book): enough for the current
-		// small validation scene while preserving the existing instancing path.
 		instanceCapacity_ = 1024;
 		return true;
 	}
@@ -62,11 +59,14 @@ namespace noc
 			object.Reset();
 		};
 
+		defer(gridPso_);
+		defer(gridRootSig_);
 		defer(skyPso_);
 		defer(skyRootSig_);
 		defer(pso_);
 		defer(rootSig_);
 
+		gridVb_.ShutdownNow();
 		vb_.ShutdownNow();
 		ib_.ShutdownNow();
 
@@ -89,13 +89,11 @@ namespace noc
 		for (uint32_t i = 0; i < dx12::kFrameCount; ++i)
 		{
 			perFrameCbv_[i] = cbvSrvUav_->Allocate();
-
 			D3D12_CONSTANT_BUFFER_VIEW_DESC d{};
 			d.BufferLocation = perFrameCB_.Resource(i)->GetGPUVirtualAddress();
 			d.SizeInBytes = (UINT)((sizeof(PerFrameConstants) + 255u) & ~255u);
 			device->CreateConstantBufferView(&d, perFrameCbv_[i].cpu);
 		}
-
 		cbReady_ = true;
 	}
 
@@ -112,7 +110,6 @@ namespace noc
 			D3D12_HEAP_PROPERTIES hp{};
 			hp.Type = D3D12_HEAP_TYPE_UPLOAD;
 			D3D12_RESOURCE_DESC d = dx12::BufferDesc(bytes);
-
 			if (!dx12::HrOk(device->CreateCommittedResource(
 				&hp,
 				D3D12_HEAP_FLAG_NONE,
@@ -120,15 +117,12 @@ namespace noc
 				D3D12_RESOURCE_STATE_GENERIC_READ,
 				nullptr,
 				IID_PPV_ARGS(&instanceBuf_[i])), "CreateCommittedResource(InstanceUpload)"))
-			{
 				return;
-			}
 
 			void* mapped = nullptr;
 			D3D12_RANGE r{ 0, 0 };
 			if (!dx12::HrOk(instanceBuf_[i]->Map(0, &r, &mapped), "InstanceUpload.Map"))
 				return;
-
 			instanceMapped_[i] = (uint8_t*)mapped;
 
 			D3D12_SHADER_RESOURCE_VIEW_DESC sd{};
@@ -141,7 +135,6 @@ namespace noc
 			sd.Format = DXGI_FORMAT_UNKNOWN;
 			device->CreateShaderResourceView(instanceBuf_[i].Get(), &sd, instanceSrv_[i].cpu);
 		}
-
 		instReady_ = true;
 	}
 
@@ -154,7 +147,6 @@ namespace noc
 
 		if (!skyHlsl_.IsValid())
 			skyHlsl_ = rm->RequestText("Shaders/EditorSky.hlsl");
-
 		const TextResource* src = rm->GetText(skyHlsl_);
 		if (!src)
 			return false;
@@ -167,12 +159,7 @@ namespace noc
 			return false;
 
 		D3D12_ROOT_SIGNATURE_DESC rs{};
-		rs.NumParameters = 0;
-		rs.pParameters = nullptr;
-		rs.NumStaticSamplers = 0;
-		rs.pStaticSamplers = nullptr;
 		rs.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
-
 		dx12::ComPtr<ID3DBlob> blob;
 		dx12::ComPtr<ID3DBlob> err;
 		if (!dx12::HrOk(D3D12SerializeRootSignature(&rs, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &err), "SerializeRootSignature(EditorSky)"))
@@ -217,7 +204,6 @@ namespace noc
 	{
 		if (!device || !rm)
 			return false;
-
 		if (!shaderHlsl_.IsValid())
 			shaderHlsl_ = rm->RequestText("Shaders/Basic.hlsl");
 
@@ -227,44 +213,26 @@ namespace noc
 			ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
 			ranges[0].NumDescriptors = 1;
 			ranges[0].BaseShaderRegister = 0;
-			ranges[0].RegisterSpace = 0;
-			ranges[0].OffsetInDescriptorsFromTableStart = 0;
-
 			ranges[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 			ranges[1].NumDescriptors = 8;
 			ranges[1].BaseShaderRegister = 0;
-			ranges[1].RegisterSpace = 0;
-			ranges[1].OffsetInDescriptorsFromTableStart = 0;
-
 			ranges[2].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
 			ranges[2].NumDescriptors = 8;
 			ranges[2].BaseShaderRegister = 0;
-			ranges[2].RegisterSpace = 0;
-			ranges[2].OffsetInDescriptorsFromTableStart = 0;
 
 			D3D12_ROOT_PARAMETER params[3]{};
-			params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-			params[0].DescriptorTable.NumDescriptorRanges = 1;
-			params[0].DescriptorTable.pDescriptorRanges = &ranges[0];
-			params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-			params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-			params[1].DescriptorTable.NumDescriptorRanges = 1;
-			params[1].DescriptorTable.pDescriptorRanges = &ranges[1];
-			params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-			params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-			params[2].DescriptorTable.NumDescriptorRanges = 1;
-			params[2].DescriptorTable.pDescriptorRanges = &ranges[2];
-			params[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+			for (int i = 0; i < 3; ++i)
+			{
+				params[i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+				params[i].DescriptorTable.NumDescriptorRanges = 1;
+				params[i].DescriptorTable.pDescriptorRanges = &ranges[i];
+				params[i].ShaderVisibility = i == 2 ? D3D12_SHADER_VISIBILITY_PIXEL : D3D12_SHADER_VISIBILITY_ALL;
+			}
 
 			D3D12_ROOT_SIGNATURE_DESC rs{};
 			rs.NumParameters = 3;
 			rs.pParameters = params;
-			rs.NumStaticSamplers = 0;
-			rs.pStaticSamplers = nullptr;
 			rs.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-
 			dx12::ComPtr<ID3DBlob> blob;
 			dx12::ComPtr<ID3DBlob> err;
 			if (!dx12::HrOk(D3D12SerializeRootSignature(&rs, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &err), "SerializeRootSignature"))
@@ -273,7 +241,6 @@ namespace noc
 				NOC_LOG_ERROR("Render", "RootSig serialize error: %s", e);
 				return false;
 			}
-
 			if (!dx12::HrOk(device->CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(), IID_PPV_ARGS(&rootSig_)), "CreateRootSignature"))
 				return false;
 			rootReady_ = true;
@@ -282,7 +249,6 @@ namespace noc
 		const TextResource* src = rm->GetText(shaderHlsl_);
 		if (!src)
 			return false;
-
 		dx12::ComPtr<ID3DBlob> vs;
 		dx12::ComPtr<ID3DBlob> ps;
 		if (!ShaderCompiler::CompileFromMemory("Shaders/Basic.hlsl", src->Str().c_str(), src->Str().size(), "VSMain", "vs_5_1", vs))
@@ -297,7 +263,6 @@ namespace noc
 		key.rtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 		key.dsvFormat = Dx12SwapChain::kDepthFormat;
 		key.inputLayoutHash = HashInputLayoutPC_();
-
 		if (auto* cached = cache.Find(key))
 		{
 			pso_ = cached;
@@ -309,14 +274,10 @@ namespace noc
 		layout[0].SemanticName = "POSITION";
 		layout[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
 		layout[0].InputSlot = 0;
-		layout[0].AlignedByteOffset = 0;
-		layout[0].InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
-
 		layout[1].SemanticName = "COLOR";
 		layout[1].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
 		layout[1].InputSlot = 0;
 		layout[1].AlignedByteOffset = 12;
-		layout[1].InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC pso{};
 		pso.pRootSignature = rootSig_.Get();
@@ -324,8 +285,6 @@ namespace noc
 		pso.PS = { ps->GetBufferPointer(), ps->GetBufferSize() };
 		pso.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 		pso.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-		// Design choice (not directly from the book): disable culling for the
-		// colored validation primitive so Phase 14 can focus on depth/picking.
 		pso.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 		pso.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
 		pso.DepthStencilState.DepthEnable = TRUE;
@@ -343,10 +302,93 @@ namespace noc
 		dx12::ComPtr<ID3D12PipelineState> created;
 		if (!dx12::HrOk(device->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&created)), "CreateGraphicsPipelineState"))
 			return false;
-
 		pso_ = created;
 		cache.Insert(key, std::move(created));
 		psoReady_ = true;
+		return true;
+	}
+
+	bool MeshPass::EnsureGridPso_(ID3D12Device* device, ResourceManager* rm)
+	{
+		if (gridPsoReady_)
+			return true;
+		if (!device || !rm)
+			return false;
+
+		if (!gridHlsl_.IsValid())
+			gridHlsl_ = rm->RequestText("Shaders/EditorGrid.hlsl");
+		const TextResource* src = rm->GetText(gridHlsl_);
+		if (!src)
+			return false;
+
+		dx12::ComPtr<ID3DBlob> vs;
+		dx12::ComPtr<ID3DBlob> ps;
+		if (!ShaderCompiler::CompileFromMemory("Shaders/EditorGrid.hlsl", src->Str().c_str(), src->Str().size(), "VSMain", "vs_5_1", vs))
+			return false;
+		if (!ShaderCompiler::CompileFromMemory("Shaders/EditorGrid.hlsl", src->Str().c_str(), src->Str().size(), "PSMain", "ps_5_1", ps))
+			return false;
+
+		D3D12_DESCRIPTOR_RANGE range{};
+		range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+		range.NumDescriptors = 1;
+		range.BaseShaderRegister = 0;
+		D3D12_ROOT_PARAMETER param{};
+		param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		param.DescriptorTable.NumDescriptorRanges = 1;
+		param.DescriptorTable.pDescriptorRanges = &range;
+		param.ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+		D3D12_ROOT_SIGNATURE_DESC rs{};
+		rs.NumParameters = 1;
+		rs.pParameters = &param;
+		rs.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+
+		dx12::ComPtr<ID3DBlob> blob;
+		dx12::ComPtr<ID3DBlob> err;
+		if (!dx12::HrOk(D3D12SerializeRootSignature(&rs, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &err), "SerializeRootSignature(EditorGrid)"))
+		{
+			const char* e = err ? (const char*)err->GetBufferPointer() : "unknown";
+			NOC_LOG_ERROR("Render", "Editor grid root signature error: %s", e);
+			return false;
+		}
+		if (!dx12::HrOk(device->CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(), IID_PPV_ARGS(&gridRootSig_)),
+			"CreateRootSignature(EditorGrid)"))
+			return false;
+
+		D3D12_INPUT_ELEMENT_DESC layout[2]{};
+		layout[0].SemanticName = "POSITION";
+		layout[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+		layout[0].InputSlot = 0;
+		layout[1].SemanticName = "COLOR";
+		layout[1].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+		layout[1].InputSlot = 0;
+		layout[1].AlignedByteOffset = 12;
+
+		D3D12_GRAPHICS_PIPELINE_STATE_DESC pso{};
+		pso.pRootSignature = gridRootSig_.Get();
+		pso.VS = { vs->GetBufferPointer(), vs->GetBufferSize() };
+		pso.PS = { ps->GetBufferPointer(), ps->GetBufferSize() };
+		pso.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+		pso.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+		pso.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+		pso.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+		pso.DepthStencilState.DepthEnable = TRUE;
+		pso.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+		pso.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+		pso.DepthStencilState.StencilEnable = FALSE;
+		pso.DSVFormat = Dx12SwapChain::kDepthFormat;
+		pso.SampleMask = UINT_MAX;
+		pso.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
+		pso.NumRenderTargets = 1;
+		pso.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+		pso.SampleDesc.Count = 1;
+		pso.InputLayout = { layout, 2 };
+
+		if (!dx12::HrOk(device->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&gridPso_)),
+			"CreateGraphicsPipelineState(EditorGrid)"))
+			return false;
+
+		gridPsoReady_ = true;
+		NOC_LOG_INFO("Render", "Phase 14 depth-tested GPU editor grid ready");
 		return true;
 	}
 
@@ -360,38 +402,25 @@ namespace noc
 		if (meshReady_)
 			return true;
 
-		// Design choice (not directly from the book): Phase 14 uses a procedural
-		// unit cube as validation geometry. This deliberately avoids pretending the
-		// existing Phase 9 single-mesh pass is already a general multi-mesh renderer.
 		CpuMeshPC cpu{};
 		auto vertex = [](float x, float y, float z, float r, float g, float b)
 		{
 			return MeshVertexPC{ x, y, z, r, g, b, 1.0f };
 		};
-		auto addFace = [&](const MeshVertexPC& a, const MeshVertexPC& b,
-			const MeshVertexPC& c, const MeshVertexPC& d)
+		auto addFace = [&](const MeshVertexPC& a, const MeshVertexPC& b, const MeshVertexPC& c, const MeshVertexPC& d)
 		{
 			const uint16_t base = static_cast<uint16_t>(cpu.vertices.size());
-			cpu.vertices.push_back(a);
-			cpu.vertices.push_back(b);
-			cpu.vertices.push_back(c);
-			cpu.vertices.push_back(d);
+			cpu.vertices.push_back(a); cpu.vertices.push_back(b); cpu.vertices.push_back(c); cpu.vertices.push_back(d);
 			cpu.indices.push_back(base + 0); cpu.indices.push_back(base + 1); cpu.indices.push_back(base + 2);
 			cpu.indices.push_back(base + 0); cpu.indices.push_back(base + 2); cpu.indices.push_back(base + 3);
 		};
 
-		addFace(vertex(-1,-1,-1, 0.18f,0.45f,0.95f), vertex(-1, 1,-1, 0.18f,0.45f,0.95f),
-			vertex( 1, 1,-1, 0.18f,0.45f,0.95f), vertex( 1,-1,-1, 0.18f,0.45f,0.95f));
-		addFace(vertex( 1,-1, 1, 0.13f,0.30f,0.72f), vertex( 1, 1, 1, 0.13f,0.30f,0.72f),
-			vertex(-1, 1, 1, 0.13f,0.30f,0.72f), vertex(-1,-1, 1, 0.13f,0.30f,0.72f));
-		addFace(vertex(-1,-1, 1, 0.80f,0.22f,0.28f), vertex(-1, 1, 1, 0.80f,0.22f,0.28f),
-			vertex(-1, 1,-1, 0.80f,0.22f,0.28f), vertex(-1,-1,-1, 0.80f,0.22f,0.28f));
-		addFace(vertex( 1,-1,-1, 0.20f,0.72f,0.38f), vertex( 1, 1,-1, 0.20f,0.72f,0.38f),
-			vertex( 1, 1, 1, 0.20f,0.72f,0.38f), vertex( 1,-1, 1, 0.20f,0.72f,0.38f));
-		addFace(vertex(-1, 1,-1, 0.92f,0.67f,0.22f), vertex(-1, 1, 1, 0.92f,0.67f,0.22f),
-			vertex( 1, 1, 1, 0.92f,0.67f,0.22f), vertex( 1, 1,-1, 0.92f,0.67f,0.22f));
-		addFace(vertex(-1,-1, 1, 0.26f,0.29f,0.34f), vertex(-1,-1,-1, 0.26f,0.29f,0.34f),
-			vertex( 1,-1,-1, 0.26f,0.29f,0.34f), vertex( 1,-1, 1, 0.26f,0.29f,0.34f));
+		addFace(vertex(-1,-1,-1, 0.18f,0.45f,0.95f), vertex(-1, 1,-1, 0.18f,0.45f,0.95f), vertex( 1, 1,-1, 0.18f,0.45f,0.95f), vertex( 1,-1,-1, 0.18f,0.45f,0.95f));
+		addFace(vertex( 1,-1, 1, 0.13f,0.30f,0.72f), vertex( 1, 1, 1, 0.13f,0.30f,0.72f), vertex(-1, 1, 1, 0.13f,0.30f,0.72f), vertex(-1,-1, 1, 0.13f,0.30f,0.72f));
+		addFace(vertex(-1,-1, 1, 0.80f,0.22f,0.28f), vertex(-1, 1, 1, 0.80f,0.22f,0.28f), vertex(-1, 1,-1, 0.80f,0.22f,0.28f), vertex(-1,-1,-1, 0.80f,0.22f,0.28f));
+		addFace(vertex( 1,-1,-1, 0.20f,0.72f,0.38f), vertex( 1, 1,-1, 0.20f,0.72f,0.38f), vertex( 1, 1, 1, 0.20f,0.72f,0.38f), vertex( 1,-1, 1, 0.20f,0.72f,0.38f));
+		addFace(vertex(-1, 1,-1, 0.92f,0.67f,0.22f), vertex(-1, 1, 1, 0.92f,0.67f,0.22f), vertex( 1, 1, 1, 0.92f,0.67f,0.22f), vertex( 1, 1,-1, 0.92f,0.67f,0.22f));
+		addFace(vertex(-1,-1, 1, 0.26f,0.29f,0.34f), vertex(-1,-1,-1, 0.26f,0.29f,0.34f), vertex( 1,-1,-1, 0.26f,0.29f,0.34f), vertex( 1,-1, 1, 0.26f,0.29f,0.34f));
 
 		indexCount_ = static_cast<uint32_t>(cpu.indices.size());
 		if (!vb_.CreateStatic(device, cmd, deferred, sync, frameIndex, GpuBuffer::Kind::Vertex,
@@ -402,6 +431,58 @@ namespace noc
 			return false;
 
 		meshReady_ = true;
+		return true;
+	}
+
+	bool MeshPass::EnsureGridUploaded_(
+		ID3D12Device* device,
+		ID3D12GraphicsCommandList* cmd,
+		Dx12DeferredReleaseQueue& deferred,
+		const Dx12FrameSync& sync,
+		uint32_t frameIndex)
+	{
+		if (gridReady_)
+			return true;
+
+		std::vector<MeshVertexPC> vertices;
+		vertices.reserve(128);
+		constexpr float y = -1.14f;
+		constexpr int minX = -10;
+		constexpr int maxX = 10;
+		constexpr int minZ = -4;
+		constexpr int maxZ = 20;
+
+		auto addLine = [&](float ax, float ay, float az, float bx, float by, float bz,
+			float r, float g, float b)
+		{
+			vertices.push_back({ ax, ay, az, r, g, b, 1.0f });
+			vertices.push_back({ bx, by, bz, r, g, b, 1.0f });
+		};
+
+		for (int x = minX; x <= maxX; ++x)
+		{
+			const bool major = (x % 5) == 0;
+			const float c = major ? 0.34f : 0.20f;
+			addLine((float)x, y, (float)minZ, (float)x, y, (float)maxZ, c, c + 0.02f, c + 0.06f);
+		}
+		for (int z = minZ; z <= maxZ; ++z)
+		{
+			const bool major = (z % 5) == 0;
+			const float c = major ? 0.34f : 0.20f;
+			addLine((float)minX, y, (float)z, (float)maxX, y, (float)z, c, c + 0.02f, c + 0.06f);
+		}
+
+		// World axes are submitted through the same depth-tested pass.
+		addLine(0.0f, y, 0.0f, 2.0f, y, 0.0f, 0.90f, 0.18f, 0.20f);
+		addLine(0.0f, y, 0.0f, 0.0f, y + 2.0f, 0.0f, 0.22f, 0.86f, 0.38f);
+		addLine(0.0f, y, 0.0f, 0.0f, y, 2.0f, 0.22f, 0.48f, 0.96f);
+
+		gridVertexCount_ = static_cast<uint32_t>(vertices.size());
+		if (!gridVb_.CreateStatic(device, cmd, deferred, sync, frameIndex, GpuBuffer::Kind::Vertex,
+			vertices.data(), vertices.size() * sizeof(MeshVertexPC), sizeof(MeshVertexPC)))
+			return false;
+
+		gridReady_ = true;
 		return true;
 	}
 
@@ -436,18 +517,10 @@ namespace noc
 		vp.Height = (float)swap.Height();
 		vp.MinDepth = 0.0f;
 		vp.MaxDepth = 1.0f;
-
-		D3D12_RECT sc{};
-		sc.left = 0;
-		sc.top = 0;
-		sc.right = (LONG)swap.Width();
-		sc.bottom = (LONG)swap.Height();
+		D3D12_RECT sc{ 0, 0, (LONG)swap.Width(), (LONG)swap.Height() };
 		cmd->RSSetViewports(1, &vp);
 		cmd->RSSetScissorRects(1, &sc);
 
-		// Design choice (not directly from the book): a fullscreen procedural sky
-		// gives the Phase 14 editor viewport spatial context without introducing
-		// cubemap assets, PBR or the later lighting pipeline.
 		if (rm && EnsureSkyPso_(device, rm))
 		{
 			cmd->SetGraphicsRootSignature(skyRootSig_.Get());
@@ -458,39 +531,53 @@ namespace noc
 			cmd->DrawInstanced(3, 1, 0, 0);
 		}
 
-		if (!rm || !queue || queue->instanceCount == 0)
-			return;
-		if (!EnsureRootSigAndPso_(device, *psoCache_, rm))
-			return;
-		if (!EnsureValidationCubeUploaded_(device, cmd, deferred, sync, frameIndex))
+		if (!rm || !queue)
 			return;
 
 		perFrameCB_.BeginFrame(frameIndex);
 		D3D12_GPU_VIRTUAL_ADDRESS gpu = 0;
 		void* cpu = nullptr;
-		if (perFrameCB_.Allocate(sizeof(PerFrameConstants), gpu, cpu))
-		{
-			auto* c = (PerFrameConstants*)cpu;
-			c->viewProj = queue->view.viewProj;
-		}
-
-		const uint32_t count = (queue->instanceCount > instanceCapacity_) ? instanceCapacity_ : queue->instanceCount;
-		Mat4* dst = reinterpret_cast<Mat4*>(instanceMapped_[frameIndex]);
-		for (uint32_t i = 0; i < count; ++i)
-			dst[i] = queue->instances[i].world;
+		if (!perFrameCB_.Allocate(sizeof(PerFrameConstants), gpu, cpu))
+			return;
+		reinterpret_cast<PerFrameConstants*>(cpu)->viewProj = queue->view.viewProj;
 
 		ID3D12DescriptorHeap* heaps[] = { cbvSrvUav_->Heap() };
 		cmd->SetDescriptorHeaps(1, heaps);
-		cmd->SetGraphicsRootSignature(rootSig_.Get());
-		cmd->SetPipelineState(pso_.Get());
-		cmd->SetGraphicsRootDescriptorTable(0, perFrameCbv_[frameIndex].gpu);
-		cmd->SetGraphicsRootDescriptorTable(1, instanceSrv_[frameIndex].gpu);
 
-		auto vbv = vb_.VertexView();
-		auto ibv = ib_.IndexView(DXGI_FORMAT_R16_UINT);
-		cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		cmd->IASetVertexBuffers(0, 1, &vbv);
-		cmd->IASetIndexBuffer(&ibv);
-		cmd->DrawIndexedInstanced(indexCount_, count, 0, 0, 0);
+		if (queue->instanceCount > 0 &&
+			EnsureRootSigAndPso_(device, *psoCache_, rm) &&
+			EnsureValidationCubeUploaded_(device, cmd, deferred, sync, frameIndex))
+		{
+			const uint32_t count = (queue->instanceCount > instanceCapacity_) ? instanceCapacity_ : queue->instanceCount;
+			Mat4* dst = reinterpret_cast<Mat4*>(instanceMapped_[frameIndex]);
+			for (uint32_t i = 0; i < count; ++i)
+				dst[i] = queue->instances[i].world;
+
+			cmd->SetGraphicsRootSignature(rootSig_.Get());
+			cmd->SetPipelineState(pso_.Get());
+			cmd->SetGraphicsRootDescriptorTable(0, perFrameCbv_[frameIndex].gpu);
+			cmd->SetGraphicsRootDescriptorTable(1, instanceSrv_[frameIndex].gpu);
+			auto vbv = vb_.VertexView();
+			auto ibv = ib_.IndexView(DXGI_FORMAT_R16_UINT);
+			cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			cmd->IASetVertexBuffers(0, 1, &vbv);
+			cmd->IASetIndexBuffer(&ibv);
+			cmd->DrawIndexedInstanced(indexCount_, count, 0, 0, 0);
+		}
+
+		// Draw the grid after opaque scene geometry. Because it depth-tests with
+		// LESS_EQUAL and does not write depth, cubes occlude it while its 1 cm lift
+		// above the validation ground prevents z-fighting with the platform top.
+		if (EnsureGridPso_(device, rm) && EnsureGridUploaded_(device, cmd, deferred, sync, frameIndex))
+		{
+			cmd->SetGraphicsRootSignature(gridRootSig_.Get());
+			cmd->SetPipelineState(gridPso_.Get());
+			cmd->SetGraphicsRootDescriptorTable(0, perFrameCbv_[frameIndex].gpu);
+			auto gridVbv = gridVb_.VertexView();
+			cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+			cmd->IASetVertexBuffers(0, 1, &gridVbv);
+			cmd->IASetIndexBuffer(nullptr);
+			cmd->DrawInstanced(gridVertexCount_, 1, 0, 0);
+		}
 	}
 }

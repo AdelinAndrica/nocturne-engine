@@ -1,8 +1,8 @@
 # Phase 14 — Editor Rendering Viewport — Implementation Report
 
-> **Implementation status:** IMPLEMENTED + 3D VALIDATION PATCH ON `phase-14-editor-rendering-viewport`
+> **Implementation status:** ACTIVE — DEPTH-TESTED EDITOR GRID + EXPLICIT HIERARCHY PATCH IMPLEMENTED ON `phase-14-editor-rendering-viewport`
 >
-> **Validation status:** SOURCE/DIFF VALIDATED; LOCAL WINDOWS BUILD + INTERACTIVE GPU VALIDATION REQUIRED
+> **Validation status:** SOURCE/DIFF VALIDATED; LOCAL WINDOWS BUILD + INTERACTIVE GPU/UI VALIDATION REQUIRED
 >
 > **Baseline:** `phase-13-editor-framework`
 
@@ -10,229 +10,203 @@
 
 **Phase 14 — Editor Rendering Viewport**
 
-Replace only the central Phase 13 viewport placeholder with a DX12-backed child render surface while preserving `EditorShellV3`, the approved Phase 13 chrome, and the runtime-owned main loop.
+Replace the Phase 13 central placeholder with a real DX12-backed editor viewport while preserving `EditorShellV3`, the approved Phase 13 chrome and the runtime-owned main loop.
 
-The current implementation now includes:
+The current implementation includes:
 
-- a dedicated child HWND presentation target inside the existing viewport body;
-- resize-aware DXGI back-buffer **and depth-buffer** recreation;
-- depth-tested 3D rendering in the editor viewport;
-- a deterministic validation scene with three selectable cubes plus a ground/platform cube;
+- a dedicated child HWND presentation target inside the Viewport panel;
+- resize-aware swap-chain + depth-buffer lifecycle;
+- depth-tested 3D validation geometry;
+- a procedural editor sky;
+- a depth-tested GPU editor grid and world axes;
 - an editor fly camera;
-- nearest-hit single-object picking across the selectable validation cubes;
-- viewport/hierarchy selection synchronization at the level supported by the Phase 13 hierarchy;
-- selection bounds visualization;
-- translate / rotate / scale gizmo interaction foundation;
-- editor-only grid, origin axes and gizmo debug drawing.
+- nearest-hit picking;
+- explicit Phase 14 hierarchy rows for the actual validation objects;
+- bidirectional viewport/hierarchy object selection;
+- selection bounds and transform-gizmo foundation.
 
 ## 2. Key concepts from the books
 
-The implementation follows the references locked in `Docs/Phase 14 — Editor Rendering Viewport Handoff.md`:
+The Phase 14 design remains grounded in:
 
-- Jason Gregory, *Game Engine Architecture (3rd Edition)*, §15.4.1.2: game-world visualization inside editor tooling;
-- Gregory §15.4.1.3: editor viewport navigation;
-- Gregory §15.4.1.4: selection and synchronization with tree/list representations;
-- Gregory §15.4.1.7: placement/alignment handles for transforms;
-- Frank D. Luna, *Introduction to 3D Game Programming with DirectX 12*, Chapter 4: swap chain, back buffers, depth buffering, viewport/scissor and resize lifecycle;
-- Luna Chapter 17: screen-to-ray picking, bounding-volume tests and nearest-hit selection.
+- Jason Gregory, *Game Engine Architecture (3rd Edition)*, §15.4.1.2 — game-world visualization in editor tooling;
+- Gregory §15.4.1.3 — editor viewport navigation;
+- Gregory §15.4.1.4 — object selection and synchronization with list/tree representations;
+- Gregory §15.4.1.7 — transform/placement handles;
+- Frank D. Luna, *Introduction to 3D Game Programming with DirectX 12*, Chapter 4 — swap chain, back buffers, depth/stencil buffer, viewport/scissor and resize lifecycle;
+- Luna Chapter 17 — screen-to-ray picking, bounds rejection and nearest-hit selection.
 
-Luna Chapter 4 explicitly places creation of the depth/stencil buffer and its DSV in the Direct3D initialization/resize lifecycle. Phase 14 now follows that requirement for the editor viewport target.
+The exact child-HWND composition, procedural sky, GPU editor-grid pass, hierarchy bridge, validation-scene naming and Win32 selection integration are **Design choice (not directly from the book)**.
 
-The exact Win32 child-window composition, editor overlay, camera bindings, validation-scene layout, procedural cube geometry, hierarchy bridge and gizmo interaction constants are **Design choice (not directly from the book)**.
+## 3. Current implementation
 
-## 3. What was implemented
+### 3.1 Dedicated viewport target and depth lifecycle
 
-### 3.1 Dedicated child presentation target
+DX12 remains attached only to the dedicated child render host, never to the top-level editor HWND. `noc::MainLoop` remains authoritative; no second editor render loop exists.
 
-`EditorShellV3` remains the active and visually authoritative shell. It exposes only a minimal Phase 14 integration seam:
+The viewport resize path recreates swap-chain back buffers and the matching `D24_UNORM_S8_UINT` depth/stencil resource. Zero-sized viewport states suppress invalid resize/render work.
 
-- `ViewportBody()`
-- `SceneTree()`
-- `ActiveToolId()`
+### 3.2 Procedural sky and camera projection
 
-`EditorViewportController` creates a child `renderHost_` inside the existing viewport body. The top-level editor HWND remains chrome-only and never receives the DX12 swap chain.
+The viewport renders a fullscreen procedural sky before scene geometry. This supplies spatial context without introducing cubemaps, lighting or PBR before their roadmap phases.
 
-The existing Perspective / Lit / Show strip remains owned by Phase 13. The render child begins below that strip so the approved shell layout is preserved.
+The engine math path uses the Nocturne convention of column-major matrices with column vectors; the view basis is constructed consistently with that convention so the GPU scene and editor projection helpers use the same camera orientation.
 
-### 3.2 Runtime main-loop ownership preserved
+### 3.3 Depth-tested validation scene
 
-No editor main loop was added.
+Phase 14 uses one procedural cube geometry through the existing instancing path. The deterministic validation scene contains:
 
-The execution path remains:
+- `Cube_A`;
+- `Cube_B`;
+- `Cube_C`;
+- `Ground_Plane` (implemented at this stage as a flattened cube instance);
+- the editor/main camera;
+- `Environment (Procedural Sky)` as an editor hierarchy entry.
 
-`MainLoop -> Engine::BeginFrame() -> Engine::Tick() -> Engine::EndFrame()`
+This scene is **Design choice (not directly from the book)** and exists to validate perspective, depth, picking and transforms. It does not replace Phase 16 scene authoring and does not claim that the current renderer is a finished multi-mesh/material renderer.
 
-The viewport controller uses Win32 messages/timer events only to mutate editor camera/tool state. Rendering and presentation still occur through the engine frame lifecycle.
+### 3.4 GPU editor grid and world axes
 
-### 3.3 DX12 resize + depth lifecycle
+The previous implementation drew the grid and origin axes through the layered Win32 overlay. Because that overlay is composited after DX12, grid lines always appeared above the 3D geometry and could not participate in depth testing.
 
-The rendering stack exposes the narrow resize path:
+This patch removes grid/world-axis drawing from `EditorViewportController::PaintOverlay_()` and adds a narrow DX12 editor-grid path:
 
-- `Engine::ResizeRenderWindow()`
-- `RenderSystem::ResizeAttachedWindow()`
-- `Dx12Renderer::ResizeAttachedWindow()`
-- `Dx12SwapChain::Resize()`
+- static POSITION/COLOR line geometry;
+- dedicated `EditorGrid.hlsl`;
+- `D3D12_PRIMITIVE_TOPOLOGY_LINELIST`;
+- depth testing enabled;
+- `LESS_EQUAL` depth comparison;
+- depth writes disabled;
+- grid drawn after opaque validation objects;
+- grid plane at `Y = -1.14`, 1 cm above the validation ground's top surface (`Y = -1.15`) to avoid direct coplanar z-fighting;
+- world X/Y/Z axes submitted in the same depth-tested line pass.
 
-For a non-zero resize the renderer waits for GPU completion, releases viewport-sized resources, resizes the swap-chain buffers, recreates RTVs, and recreates a matching `D24_UNORM_S8_UINT` depth/stencil resource + DSV.
+**Design choice (not directly from the book):** the Phase 14 grid is a small GPU debug/editor pass rather than a generalized debug-draw service. The important architectural property is that world-space editor aids which must obey occlusion now share the viewport's depth buffer.
 
-The depth resource remains in `D3D12_RESOURCE_STATE_DEPTH_WRITE` for this simple Phase 14 forward pass. A 0×0 viewport suspends frame submission without invalid DXGI resize work.
+The layered Win32 overlay remains only for intentionally always-visible editor interaction feedback:
 
-**Design choice (not directly from the book):** the depth target currently lives with `Dx12SwapChain` because that object already owns the viewport-dependent dimensions/back-buffer lifecycle. A larger presentation-target abstraction is intentionally deferred until the codebase proves it necessary.
+- selected-object bounds;
+- transform-gizmo handles.
 
-### 3.4 Depth-tested MeshPass
+### 3.5 Explicit Scene Hierarchy bridge
 
-`MeshPass` now:
+The previous Phase 14 bridge displayed only an aggregate `Runtime Objects: N` row. Selecting a viewport object then synchronized the hierarchy by sending synthetic `WM_LBUTTONDOWN` / `WM_LBUTTONUP` messages to the custom tree. That coupling could cause visible selection flicker and could not preserve individual object identity in the hierarchy.
 
-- includes the DSV format in the PSO cache key;
-- creates a PSO with depth enabled, writes enabled and `LESS` comparison;
-- binds RTV + DSV together;
-- clears both color and depth every frame;
-- renders the Phase 14 validation instances with real depth occlusion.
+This patch replaces that behavior with a Phase 14-specific hierarchy bridge rendered through the existing `EditorShellV3` Scene Hierarchy HWND. The visible rows are:
 
-This is the minimum required to judge a viewport as real spatial 3D rather than a flat triangle smoke test.
+- `Scene (Runtime World)`;
+- `Runtime Objects (4)` — expandable;
+  - `Cube_A`;
+  - `Cube_B`;
+  - `Cube_C`;
+  - `Ground_Plane`;
+- `Main Camera`;
+- `Environment (Procedural Sky)`.
 
-### 3.5 Procedural validation cube
+The four object rows correspond directly to the four `SceneObjectHandle`s created by the Phase 14 validation scene. This is still pre-ECS and does not introduce Phase 15/16 entity/component authoring.
 
-The old renderer path hardcoded `Meshes/triangle.nmsh` as its one uploaded geometry. Phase 14 now uploads a colored unit cube procedurally and draws it through the existing instancing path.
+**Design choice (not directly from the book):** until the later editor-scene architecture exists, `EditorViewportController` supplies the Phase 14 hierarchy presentation for these known runtime validation objects while `EditorShellV3` continues to own the panel/chrome HWND.
 
-**Design choice (not directly from the book):** this does **not** claim that `MeshPass` is now a general multi-mesh renderer. `RenderQueue::mesh` is still not used for per-instance mesh routing by this pass. Refactoring the renderer into a complete multi-mesh/material system is outside this patch and must not be hidden behind the Phase 14 viewport task.
+### 3.6 Flicker-free selection synchronization
 
-The procedural cube exists specifically so depth, perspective, transform, selection and gizmo behavior can be validated honestly.
+Synthetic tree clicks were removed.
 
-### 3.6 Real 3D validation scene
+Viewport -> hierarchy:
 
-Before the Phase 13 hierarchy is populated, `EditorViewportController::PrepareScene()` creates:
+- picking sets `selectedIndex_` directly;
+- the matching hierarchy child row is selected directly;
+- `Runtime Objects` is expanded automatically when necessary;
+- only the hierarchy HWND is invalidated for repaint.
 
-- three spatially separated/selectable cube instances at different positions/depths/scales/rotations;
-- one large flattened cube used as a ground/platform reference;
-- one editor camera object.
+Hierarchy -> viewport:
 
-The ground object is deliberately not selectable. The three visible cube objects are selectable.
+- clicking `Cube_A/B/C` or `Ground_Plane` maps directly to the corresponding validation-object index;
+- clicking the `Runtime Objects` group selects the group but clears object selection;
+- clicking the group's arrow expands/collapses the group without synthetic mouse-message recursion;
+- camera/environment/root rows clear viewport object selection.
 
-This scene is **Design choice (not directly from the book)** and exists only as a deterministic Phase 14 validation environment; it is not a replacement for Phase 16 scene authoring.
+This preserves one explicit Phase 14 selection identity and removes the old feedback loop that caused hierarchy flickering.
 
-### 3.7 Editor camera
+### 3.7 Picking, selection visualization and gizmos
 
-Controls remain:
+Picking remains the Luna Chapter 17 broad-phase foundation:
 
-- RMB capture + mouse move: yaw/pitch;
-- `W/S`: forward/back;
-- `A/D`: strafe;
-- `Q/E`: down/up;
-- `Shift`: faster movement;
-- mouse wheel: camera speed adjustment.
+1. viewport pixel -> NDC;
+2. NDC -> view-space ray using FOV/aspect;
+3. view ray -> world-space ray using editor-camera orientation;
+4. ray vs transformed AABB for selectable validation objects;
+5. nearest positive hit wins.
 
-Projection aspect follows the actual viewport child dimensions.
+The Win32 overlay continues to draw selected-object AABB feedback and transform gizmo handles so editor controls remain clearly visible. Move/Rotate/Scale update the selected validation object's runtime `World` transform.
 
-### 3.8 Picking and nearest selection
+No ECS, serialization, undo system, material/PBR system, lighting pipeline or PIE implementation is introduced by this patch.
 
-Picking follows the Luna Chapter 17 flow at the current broad-phase precision level:
+## 4. Files changed by this patch
 
-1. convert viewport-client pixel coordinates to NDC;
-2. construct a view-space ray from FOV/aspect;
-3. rotate the ray into world space with the editor camera;
-4. test transformed world AABBs for every selectable validation cube;
-5. choose the valid hit with the smallest positive `t`;
-6. clear selection on empty-space click.
-
-Per-triangle mesh intersection remains outside the necessary Phase 14 scope because transformed bounds are sufficient for the current primitive validation scene.
-
-### 3.9 Hierarchy synchronization
-
-Phase 13 exposes only an aggregate `Runtime Objects` row rather than stable authored object rows.
-
-Therefore:
-
-- any viewport cube selection highlights `Runtime Objects`;
-- empty-space selection maps back to the root row;
-- clicking `Runtime Objects` selects the primary validation cube.
-
-A synchronization guard prevents the synthetic tree update from overwriting which of the three cubes was selected in the viewport.
-
-This is deliberately limited until Phase 15/16 introduce richer object/editor representation.
-
-### 3.10 Selection visualization, gizmos and debug draw
-
-The editor-only color-keyed overlay renders:
-
-- projected ground grid;
-- world X/Y/Z origin axes;
-- selected cube world AABB;
-- transform gizmo axes/handles.
-
-Move/Rotate/Scale now operate on whichever validation cube is selected rather than a single hardcoded object.
-
-No ECS, serialization, undo stack, snapping system, prefab system, lighting/PBR or PIE was introduced.
-
-## 4. Files changed by the 3D validation patch
-
-- `Engine/Render/DX12/Dx12PsoCache.h`
-- `Engine/Render/DX12/Dx12SwapChain.h`
-- `Engine/Render/DX12/Dx12SwapChain.cpp`
 - `Engine/Render/DX12/MeshPass.h`
 - `Engine/Render/DX12/MeshPass.cpp`
+- `Data/Shaders/EditorGrid.hlsl` — new
 - `Apps/NocturneEditor/EditorViewportController.h`
 - `Apps/NocturneEditor/EditorViewportController.cpp`
 - `Docs/Phase 14 — Implementation Report.md`
 
-Earlier Phase 14 work also changed the runtime render-window integration, `main.cpp`, the minimal `EditorShellV3.h` seam and editor project/manifest integration. `EditorShellV3.cpp` remains visually unchanged.
+`EditorShellV3` remains the active editor shell and its Phase 13 panel/layout/chrome implementation is not replaced.
 
 ## 5. Verification checklist
 
 ### Verified from repository/source diff
 
+- [x] Grid/world axes are removed from the layered Win32 overlay.
+- [x] Grid/world axes are submitted as DX12 line geometry.
+- [x] Grid PSO uses viewport DSV, depth testing and `LESS_EQUAL`.
+- [x] Grid PSO does not write depth.
+- [x] Grid is positioned slightly above the current validation ground to reduce z-fighting.
+- [x] Selection bounds/gizmo remain editor overlay feedback rather than runtime-game UI.
+- [x] Synthetic Scene Hierarchy mouse clicks were removed from selection synchronization.
+- [x] Four real Phase 14 validation object handles have explicit hierarchy rows.
+- [x] Viewport selection maps directly to the matching hierarchy object row.
+- [x] Hierarchy object selection maps directly to the matching viewport/runtime object.
+- [x] Runtime Objects remains an expandable grouping row.
 - [x] `EditorShellV3` remains the active shell.
-- [x] Top-level editor HWND remains unattached to DX12.
-- [x] Dedicated child viewport HWND remains the renderer target.
-- [x] No second engine/editor main loop exists.
-- [x] Viewport-sized depth resource is created and recreated with the viewport target.
-- [x] PSO depth testing is enabled and DSV format participates in the cache key.
-- [x] Color + depth are both cleared before the validation draw.
-- [x] The triangle-only validation geometry has been replaced by a real cube primitive.
-- [x] Multiple cube instances at different depths are submitted through the existing runtime `World -> RenderQueue` path.
-- [x] Picking chooses the nearest selectable AABB hit.
-- [x] Gizmo edits target the currently selected validation cube.
-- [x] Phase 13 shell layout/chrome implementation was not redesigned.
-- [x] No Phase 15+ ECS/serialization/PIE scope was introduced.
+- [x] No Phase 15 ECS, Phase 16 general scene-authoring or Phase 17 serialization work was introduced.
 
 ### Requires local Windows validation
 
-- [ ] `Debug x64` build succeeds under the repository's VS2026/v145 setup.
-- [ ] DX12 debug layer reports zero errors at launch and during resize.
-- [ ] Three colored 3D cubes + ground/platform are visible with correct perspective.
-- [ ] Near geometry correctly occludes farther geometry.
-- [ ] Renderer output stays confined to the child viewport.
-- [ ] Repeated resize/maximize/restore recreates color/depth targets cleanly.
-- [ ] Minimize/collapse/restore survives zero-size transitions.
-- [ ] RMB fly camera works and remains viewport-focused.
-- [ ] Viewport aspect stays correct at arbitrary panel sizes.
-- [ ] Clicking each visible cube selects the nearest expected cube.
-- [ ] Empty-space click clears selection.
-- [ ] Hierarchy aggregate row and viewport selection remain synchronized.
-- [ ] Selection bounds track the selected cube after gizmo edits.
-- [ ] Move/rotate/scale handles can be dragged repeatedly without instability.
-- [ ] Grid/axes/selection/gizmo overlay composites correctly over DX12.
+- [ ] `Debug x64` builds successfully under VS2026/v145.
+- [ ] DX12 debug layer reports no errors at launch.
+- [ ] Procedural sky remains visible.
+- [ ] Grid is visible on/over the ground where not occluded.
+- [ ] Cubes correctly occlude grid lines passing behind them.
+- [ ] Grid no longer appears composited over cube faces.
+- [ ] No obvious z-fighting occurs between grid and ground.
+- [ ] Scene Hierarchy displays `Cube_A`, `Cube_B`, `Cube_C`, `Ground_Plane`, `Main Camera` and procedural environment.
+- [ ] Expanding/collapsing `Runtime Objects` is stable.
+- [ ] Selecting `Runtime Objects` no longer flickers.
+- [ ] Clicking each hierarchy object selects the corresponding viewport object.
+- [ ] Clicking each visible viewport object selects the matching hierarchy row.
+- [ ] Empty-space viewport click clears object selection.
+- [ ] Selection bounds and gizmos remain stable after hierarchy/viewport selection changes.
+- [ ] Repeated resize/maximize/restore remains DX12-debug-layer clean.
 
-The GitHub connector cannot execute the Windows/MSVC/DX12 binary, so runtime items are intentionally not marked complete.
+The GitHub connector cannot execute the Windows/MSVC/DX12 binary, so local build/runtime checks remain intentionally open.
 
 ## 6. Common pitfalls / follow-up risks
 
-- `MeshPass` still renders one geometry instanced N times; do not mistake the Phase 14 procedural cube for finished multi-mesh routing.
-- Do not attach the renderer to the editor top-level HWND.
-- Do not resize viewport resources while GPU work still references them.
-- The DSV must always match the current child viewport extent.
-- Do not remove depth testing just to hide geometry/winding problems.
-- The hierarchy remains intentionally coarse until later editor/entity phases.
-- The Win32 overlay remains a Phase 14 design choice; if compositor testing exposes issues, replace the overlay presentation mechanism without undoing the viewport ownership architecture.
+- Do not move the world grid back to a composited overlay if it is expected to obey occlusion.
+- Keep gizmo/selection UI visibility policy separate from world-space debug geometry depth policy.
+- The explicit hierarchy names are Phase 14 validation metadata, not a general scene naming/entity system.
+- `MeshPass` still renders one procedural validation geometry instanced N times; this patch is not a complete multi-mesh renderer.
+- Do not rebuild the hierarchy through synthetic mouse messages; selection state must be synchronized directly.
+- Do not introduce ECS/serialization solely to improve the Phase 14 hierarchy.
 
 ## 7. Next chat handoff
 
 Bring:
 
-1. fresh `Debug x64` build output after pulling this patch;
-2. full launch log;
-3. one screenshot showing the 3D cubes + ground;
-4. one screenshot with a non-primary cube selected and a gizmo active;
-5. any DX12 debug-layer, picking, camera, depth, compositing or resize issue observed locally.
+1. fresh `Debug x64` build output after pulling this commit;
+2. one screenshot of the viewport showing grid occlusion around the cubes;
+3. one screenshot with `Runtime Objects` expanded and the individual objects visible;
+4. confirmation whether selecting/collapsing the hierarchy still flickers;
+5. any DX12 debug-layer error or selection mismatch.
 
-Do **not** start Phase 15 until this local verification checklist is closed.
+Do not mark Phase 14 complete until the local verification checklist is closed.

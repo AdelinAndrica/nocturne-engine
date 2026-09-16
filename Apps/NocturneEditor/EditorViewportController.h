@@ -56,6 +56,9 @@ namespace nocturne::editor
         void UpdateCamera_();
         void ApplyCameraTransform_();
         void PaintOverlay_(HDC dc, const RECT& rc);
+        void PaintSceneHierarchy_(HWND hwnd, HDC dc, const RECT& rc);
+        int HierarchyRowFromY_(int y) const;
+        int HierarchyObjectIndexFromRow_(int row) const;
 
         bool Project_(const noc::Vec3& world, POINT& out) const;
         noc::Vec3 MakePickRay_(int x, int y) const;
@@ -87,10 +90,12 @@ namespace nocturne::editor
         bool renderAttached_ = false;
         bool cameraCapturing_ = false;
         bool gizmoDragging_ = false;
-        bool syncingTree_ = false;
+        bool hierarchyObjectsExpanded_ = true;
         int selectedIndex_ = -1;
         int dragObjectIndex_ = -1;
         int gizmoAxis_ = -1;
+        int hierarchySelectedRow_ = 0;
+        int hierarchyHoverRow_ = -1;
 
         POINT lastMouse_{};
         POINT dragStartMouse_{};
