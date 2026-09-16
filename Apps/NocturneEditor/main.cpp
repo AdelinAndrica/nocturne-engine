@@ -1,4 +1,4 @@
-#include "EditorShell.h"
+#include "EditorShellV3.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -43,7 +43,7 @@ int main()
         return 1;
     }
 
-    nocturne::editor::EditorShell shell;
+    nocturne::editor::EditorShellV3 shell;
     if (!shell.Init(engine, window))
     {
         NOC_LOG_FATAL("Editor", "Editor shell initialization failed");
