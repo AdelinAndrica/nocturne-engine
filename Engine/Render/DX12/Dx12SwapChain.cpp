@@ -34,6 +34,9 @@ namespace noc
 
 	void Dx12SwapChain::Shutdown()
 	{
+		depthStencil_.Reset();
+		dsvHeap_.Reset();
+
 		for (uint32_t i = 0; i < dx12::kFrameCount; ++i)
 			backBuffers_[i].Reset();
 
@@ -63,6 +66,67 @@ namespace noc
 		return true;
 	}
 
+	bool Dx12SwapChain::CreateDepthStencil_(ID3D12Device* device)
+	{
+		if (!device || width_ == 0 || height_ == 0)
+			return false;
+
+		if (!dsvHeap_)
+		{
+			D3D12_DESCRIPTOR_HEAP_DESC heapDesc{};
+			heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+			heapDesc.NumDescriptors = 1;
+			heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+			if (!dx12::HrOk(device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&dsvHeap_)), "CreateDescriptorHeap(DSV)"))
+				return false;
+		}
+
+		depthStencil_.Reset();
+
+		D3D12_HEAP_PROPERTIES heapProps{};
+		heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+		heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+		heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+		heapProps.CreationNodeMask = 1;
+		heapProps.VisibleNodeMask = 1;
+
+		D3D12_RESOURCE_DESC resourceDesc{};
+		resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+		resourceDesc.Alignment = 0;
+		resourceDesc.Width = width_;
+		resourceDesc.Height = height_;
+		resourceDesc.DepthOrArraySize = 1;
+		resourceDesc.MipLevels = 1;
+		resourceDesc.Format = kDepthFormat;
+		resourceDesc.SampleDesc.Count = 1;
+		resourceDesc.SampleDesc.Quality = 0;
+		resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+		resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+
+		D3D12_CLEAR_VALUE clearValue{};
+		clearValue.Format = kDepthFormat;
+		clearValue.DepthStencil.Depth = 1.0f;
+		clearValue.DepthStencil.Stencil = 0;
+
+		if (!dx12::HrOk(device->CreateCommittedResource(
+			&heapProps,
+			D3D12_HEAP_FLAG_NONE,
+			&resourceDesc,
+			D3D12_RESOURCE_STATE_DEPTH_WRITE,
+			&clearValue,
+			IID_PPV_ARGS(&depthStencil_)), "CreateCommittedResource(DepthStencil)"))
+		{
+			return false;
+		}
+
+		D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
+		dsvDesc.Format = kDepthFormat;
+		dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+		dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
+		device->CreateDepthStencilView(depthStencil_.Get(), &dsvDesc, dsvHeap_->GetCPUDescriptorHandleForHeapStart());
+		return true;
+	}
+
 	bool Dx12SwapChain::CreateRtvHeapAndViews(ID3D12Device* device)
 	{
 		if (!device || !swapChain_)
@@ -77,7 +141,12 @@ namespace noc
 			return false;
 
 		rtvDescriptorSize_ = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-		return CreateBackBufferViews_(device);
+		if (!CreateBackBufferViews_(device))
+			return false;
+
+		// Luna Chapter 4 grounds the depth-buffer lifecycle alongside the
+		// swap-chain/back-buffer size. Exact ownership here is a Nocturne design choice.
+		return CreateDepthStencil_(device);
 	}
 
 	bool Dx12SwapChain::Resize(ID3D12Device* device, uint32_t clientWidth, uint32_t clientHeight)
@@ -89,6 +158,7 @@ namespace noc
 		if (clientWidth == width_ && clientHeight == height_)
 			return true;
 
+		depthStencil_.Reset();
 		for (uint32_t i = 0; i < dx12::kFrameCount; ++i)
 			backBuffers_[i].Reset();
 
@@ -99,7 +169,10 @@ namespace noc
 		width_ = clientWidth;
 		height_ = clientHeight;
 		frameIndex_ = swapChain_->GetCurrentBackBufferIndex();
-		return CreateBackBufferViews_(device);
+
+		if (!CreateBackBufferViews_(device))
+			return false;
+		return CreateDepthStencil_(device);
 	}
 
 	D3D12_CPU_DESCRIPTOR_HANDLE Dx12SwapChain::CurrentRtv(uint32_t frameIndex) const
@@ -111,6 +184,14 @@ namespace noc
 		h = rtvHeap_->GetCPUDescriptorHandleForHeapStart();
 		h.ptr += (SIZE_T)frameIndex * (SIZE_T)rtvDescriptorSize_;
 		return h;
+	}
+
+	D3D12_CPU_DESCRIPTOR_HANDLE Dx12SwapChain::DepthStencilView() const
+	{
+		D3D12_CPU_DESCRIPTOR_HANDLE h{};
+		if (!dsvHeap_ || !depthStencil_)
+			return h;
+		return dsvHeap_->GetCPUDescriptorHandleForHeapStart();
 	}
 
 	void Dx12SwapChain::TransitionTo(ID3D12GraphicsCommandList* cmd, uint32_t frameIndex, D3D12_RESOURCE_STATES to)
@@ -130,7 +211,6 @@ namespace noc
 	{
 		if (!swapChain_)
 			return;
-
 		swapChain_->Present(1, 0);
 	}
 }
