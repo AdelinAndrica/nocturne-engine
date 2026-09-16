@@ -1,5 +1,6 @@
 #include "EditorIconRenderer.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
@@ -150,19 +151,32 @@ namespace nocturne::editor
             bool Draw(HDC dc, EditorIconId icon, const RECT& rect, COLORREF color)
             {
                 if (!dc || icon == EditorIconId::None) return false;
-                const int width = static_cast<int>(rect.right - rect.left);
-                const int height = static_cast<int>(rect.bottom - rect.top);
-                if (width <= 0 || height <= 0) return false;
+
+                const int slotWidth = static_cast<int>(rect.right - rect.left);
+                const int slotHeight = static_cast<int>(rect.bottom - rect.top);
+                if (slotWidth <= 0 || slotHeight <= 0) return false;
+
+                // Design choice (not directly from the book): Tabler's 24x24 / 2px
+                // outline reads too heavy when it fills our compact Win32 icon slot.
+                // Keep the layout slot unchanged, but render a smaller glyph centered
+                // inside it: 12px for toolbar-style 16px slots and 11px for the
+                // 14-15px hierarchy/header/table slots.
+                const int slotMin = (std::min)(slotWidth, slotHeight);
+                const int glyphSize = slotMin >= 16 ? 12 : slotMin >= 14 ? 11 : slotMin;
+                if (glyphSize <= 0) return false;
+
+                const int drawX = rect.left + (slotWidth - glyphSize) / 2;
+                const int drawY = rect.top + (slotHeight - glyphSize) / 2;
 
                 std::lock_guard<std::mutex> lock(mutex_);
                 if (!EnsureInitialized()) return false;
 
-                const CacheKey key{ static_cast<int>(icon), width, height, color };
+                const CacheKey key{ static_cast<int>(icon), glyphSize, glyphSize, color };
                 auto it = cache_.find(key);
                 HBITMAP bitmap = it == cache_.end() ? nullptr : it->second;
                 if (!bitmap)
                 {
-                    bitmap = Rasterize(icon, width, height, color);
+                    bitmap = Rasterize(icon, glyphSize, glyphSize, color);
                     if (!bitmap) return false;
                     cache_.emplace(key, bitmap);
                 }
@@ -171,8 +185,8 @@ namespace nocturne::editor
                 if (!memory) return false;
                 HGDIOBJ old = SelectObject(memory, bitmap);
                 BLENDFUNCTION blend{ AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
-                const BOOL ok = AlphaBlend(dc, rect.left, rect.top, width, height,
-                    memory, 0, 0, width, height, blend);
+                const BOOL ok = AlphaBlend(dc, drawX, drawY, glyphSize, glyphSize,
+                    memory, 0, 0, glyphSize, glyphSize, blend);
                 SelectObject(memory, old);
                 DeleteDC(memory);
                 return ok != FALSE;
