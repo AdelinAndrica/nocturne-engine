@@ -6,7 +6,7 @@
 namespace nocturne::editor
 {
     // Design choice (not directly from the book): centralized visual tokens keep the
-    // Phase 13 native Win32 bootstrap replaceable while giving the editor a coherent skin.
+    // Phase 13 tooling UI coherent and replaceable without leaking into runtime UI.
     struct ThemeColors
     {
         COLORREF windowBg;
@@ -29,14 +29,20 @@ namespace nocturne::editor
 
     struct ThemeMetrics
     {
-        int menuHeight = 30;
-        int toolbarHeight = 60;
-        int statusHeight = 30;
-        int panelHeaderHeight = 34;
+        int menuHeight = 28;
+        int toolbarHeight = 52;
+        int statusHeight = 26;
+        int panelHeaderHeight = 31;
         int gap = 8;
-        int innerPadding = 10;
-        int buttonHeight = 40;
-        int buttonRadius = 8;
+        int innerPadding = 9;
+        int buttonHeight = 36;
+        int buttonRadius = 6;
+        int inputRadius = 6;
+        int scrollbarWidth = 9;
+        int tableHeaderHeight = 28;
+        int tableRowHeight = 26;
+        int treeRowHeight = 25;
+        int compactRowHeight = 31;
     };
 
     class EditorTheme
