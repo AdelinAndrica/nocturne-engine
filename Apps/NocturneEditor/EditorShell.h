@@ -5,6 +5,8 @@
 #include <CommCtrl.h>
 
 #include <cstdint>
+#include <cwctype>
+#include <iterator>
 #include <string>
 #include <vector>
 
