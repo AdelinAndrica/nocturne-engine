@@ -24,8 +24,9 @@ namespace noc
 	// visualization without coupling MeshPass directly to editor Win32 code.
 	struct RenderDebugSelection
 	{
-		Vec3 boundsMin = Vec3::Zero();
-		Vec3 boundsMax = Vec3::Zero();
+		Vec3 localBoundsMin = Vec3::Zero();
+		Vec3 localBoundsMax = Vec3::Zero();
+		Mat4 world = Mat4::Identity();
 		uint32_t enabled = 0;
 	};
 

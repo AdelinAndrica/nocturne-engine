@@ -250,9 +250,6 @@ namespace noc {
         if (!renderAttached_)
             return false;
 
-        // A minimized/collapsed editor viewport has no valid presentable extent.
-        // Keep the last DXGI buffers alive and suspend frame submission until a
-        // non-zero extent returns.
         renderWidth_ = clientWidth;
         renderHeight_ = clientHeight;
         if (clientWidth == 0 || clientHeight == 0)
@@ -282,15 +279,17 @@ namespace noc {
         return true;
     }
 
-    void Engine::SetDebugSelectionBounds(const AABB& bounds)
+    void Engine::SetDebugSelection(const AABB& localBounds, const Mat4& world)
     {
-        debugSelectionBounds_ = bounds;
+        debugSelectionLocalBounds_ = localBounds;
+        debugSelectionWorld_ = world;
         debugSelectionEnabled_ = true;
     }
 
     void Engine::ClearDebugSelectionBounds()
     {
         debugSelectionEnabled_ = false;
+        debugSelectionWorld_ = Mat4::Identity();
     }
 
     int Engine::Run()
@@ -346,8 +345,9 @@ namespace noc {
             if (debugSelectionEnabled_)
             {
                 rq.debugSelection.enabled = 1;
-                rq.debugSelection.boundsMin = debugSelectionBounds_.min;
-                rq.debugSelection.boundsMax = debugSelectionBounds_.max;
+                rq.debugSelection.localBoundsMin = debugSelectionLocalBounds_.min;
+                rq.debugSelection.localBoundsMax = debugSelectionLocalBounds_.max;
+                rq.debugSelection.world = debugSelectionWorld_;
             }
             render_.SetFrameRenderQueue(&rq);
             render_.EndFramePresent();
@@ -362,7 +362,8 @@ namespace noc {
 
         void* a = FrameArena().Allocate(256, 16);
         void* b = FrameArena().Allocate(1024, 64);
-        (void)a; (void)b;
+        (void)a;
+        (void)b;
 
         GetTime().EndFrame();
 

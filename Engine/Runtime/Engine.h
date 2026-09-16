@@ -74,7 +74,7 @@ namespace noc {
 		// Design choice (not directly from the book): Phase 14 exposes one small
 		// depth-tested debug-selection channel to the renderer. It is deliberately
 		// generic and does not expose editor/Win32 types to rendering code.
-		void SetDebugSelectionBounds(const AABB& bounds);
+		void SetDebugSelection(const AABB& localBounds, const Mat4& world);
 		void ClearDebugSelectionBounds();
 
 	private:
@@ -111,7 +111,8 @@ namespace noc {
 		uint32_t renderHeight_ = 0;
 
 		bool debugSelectionEnabled_ = false;
-		AABB debugSelectionBounds_{};
+		AABB debugSelectionLocalBounds_{};
+		Mat4 debugSelectionWorld_ = Mat4::Identity();
 	};
 
 } // namespace noc

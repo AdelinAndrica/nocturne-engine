@@ -1,8 +1,8 @@
 # Phase 14 — Editor Rendering Viewport — Implementation Report
 
-> **Implementation status:** ACTIVE — DEPTH-AWARE SELECTION + RELIABLE VIEWPORT PICKING PATCH PREPARED ON `phase-14-editor-rendering-viewport`
+> **Implementation status:** ACTIVE — VIEWPORT INPUT + ORIENTED SELECTION FIX IMPLEMENTED ON `phase-14-editor-rendering-viewport`
 >
-> **Validation status:** SOURCE/DIFF VALIDATION REQUIRED; LOCAL WINDOWS BUILD + INTERACTIVE GPU/UI VALIDATION REQUIRED AFTER PULL
+> **Validation status:** SOURCE/DIFF VALIDATED; LOCAL WINDOWS BUILD + INTERACTIVE GPU/UI VALIDATION REQUIRED
 >
 > **Baseline:** `phase-13-editor-framework`
 
@@ -12,185 +12,159 @@
 
 Replace the Phase 13 central placeholder with a real DX12-backed editor viewport while preserving `EditorShellV3`, the approved Phase 13 chrome and the runtime-owned main loop.
 
-The current implementation includes a dedicated child render HWND, resize-aware color/depth targets, procedural sky, a depth-tested validation scene, GPU grid/axes, editor camera, explicit hierarchy rows, nearest-hit picking, depth-aware selection visualization and transform-gizmo foundations.
+This patch specifically addresses the two remaining interaction/visualization defects observed locally after the previous selection patch:
+
+- direct viewport mouse selection did not reliably reach the DX12 render child;
+- selection bounds for rotated objects were generated from a world-space AABB and therefore did not follow the object's actual rotation.
 
 ## 2. Key concepts from the books
 
-The Phase 14 design remains grounded in:
+The fix remains grounded in:
 
 - Jason Gregory, *Game Engine Architecture (3rd Edition)*, §15.4.1.2 — game-world visualization in editor tooling;
 - Gregory §15.4.1.3 — editor viewport navigation;
-- Gregory §15.4.1.4 — object selection and synchronization with list/tree representations;
-- Gregory §15.4.1.7 — transform/placement handles;
-- Frank D. Luna, *Introduction to 3D Game Programming with DirectX 12*, Chapter 4 — swap chain, depth/stencil buffer, viewport/scissor and resize lifecycle;
-- Luna Chapter 17 — screen-to-ray picking, bounding-volume intersection and nearest-hit selection.
+- Gregory §15.4.1.4 — object selection and synchronization;
+- Gregory §15.4.1.7 — object placement and transform aids;
+- Frank D. Luna, *Introduction to 3D Game Programming with DirectX 12*, Chapter 4 — viewport/depth-buffer rendering fundamentals;
+- Luna Chapter 17 — screen-space picking, ray construction, bounding-volume intersection and nearest-hit selection.
 
-The child-HWND composition, procedural sky, GPU editor-line pass, validation-scene layout, explicit Phase 14 hierarchy bridge, render-host input routing and debug-selection bridge are **Design choice (not directly from the book)**.
+The exact Win32 child-control input policy, `SS_NOTIFY`/`WM_NCHITTEST` handling, inverse-TRS picking implementation and debug-selection render bridge are **Design choice (not directly from the book)**.
 
-## 3. Current implementation
+## 3. What changed in this patch
 
-### 3.1 Dedicated viewport + depth lifecycle
+### 3.1 Deterministic render-host mouse input
 
-DX12 is attached only to the dedicated child render host. `noc::MainLoop` remains authoritative. Viewport resize recreates the swap-chain buffers and matching `D24_UNORM_S8_UINT` depth target; zero-size states suspend rendering safely.
+The dedicated DX12 viewport target is currently a Win32 `STATIC` child control. The previous patch subclassed that HWND for mouse handling but created the control without `SS_NOTIFY`. A STATIC control can otherwise behave as a passive/transparent UI element for mouse interaction, making direct viewport input unreliable.
 
-### 3.2 Validation scene and hierarchy
+The render host is now created with:
 
-The deterministic Phase 14 scene currently exposes:
+- `WS_CHILD`;
+- `WS_VISIBLE`;
+- `WS_CLIPSIBLINGS`;
+- `WS_CLIPCHILDREN`;
+- `WS_TABSTOP`;
+- `SS_NOTIFY`.
 
-- `Cube_A`;
-- `Cube_B`;
-- `Cube_C`;
-- `Ground_Plane`;
-- `Main Camera`;
-- `Environment (Procedural Sky)`.
+Its subclass also handles `WM_NCHITTEST` explicitly and returns `HTCLIENT`. The layered visual overlay continues to return `HTTRANSPARENT`.
 
-The hierarchy shows those runtime validation objects explicitly beneath `Runtime Objects (4)`. Synthetic tree clicks were removed, so hierarchy selection no longer feeds back through fake Win32 mouse messages.
+This establishes one explicit input owner:
 
-### 3.3 GPU grid below Ground Plane
+- overlay = visual-only editor layer;
+- render host = authoritative viewport mouse/focus/capture surface.
 
-The editor grid/world axes are DX12 line geometry using the viewport depth buffer. The line PSO uses `LESS_EQUAL` and does not write depth.
+RMB camera capture, LMB selection, wheel speed and gizmo drag therefore all route through the same child HWND.
 
-The previous grid height was `Y = -1.14`, while the flattened Ground Plane top is `Y = -1.15`. That intentionally placed the grid 1 cm *above* the ground and therefore made it visible across the platform.
+### 3.2 Picking remains local-space / inverse-TRS
 
-This patch changes the policy:
-
-- grid plane: `Y = -1.16`, 1 cm below the Ground Plane top;
-- Ground Plane therefore occludes grid lines inside its footprint;
-- world axes remain slightly above the surface as an editor orientation aid.
-
-This exact offset is **Design choice (not directly from the book)**.
-
-### 3.4 Depth-aware selection bounds
-
-The previous selection box was drawn by the color-keyed Win32 overlay. Overlay pixels are composited after DX12 and cannot query the scene depth buffer, so all 12 AABB edges remained visible, including edges physically behind the selected cube.
-
-The new path carries a small `RenderDebugSelection` record with the per-frame `RenderQueue`. `Engine` exposes a narrow generic debug-selection API and `MeshPass` draws the selected bounds through the existing editor LINE PSO:
-
-- depth testing enabled;
-- depth writes disabled;
-- `LESS_EQUAL` comparison;
-- one 24-vertex upload buffer per frame-in-flight;
-- bounds are expanded slightly to keep front edges off the selected surface and avoid z-fighting;
-- rear/occluded edges fail the scene depth test and are not visible through the object.
-
-The Win32 overlay is now reserved for intentionally always-visible gizmo handles only.
-
-The debug-selection handoff is **Design choice (not directly from the book)**.
-
-### 3.5 Reliable viewport input routing
-
-The color-keyed layered overlay previously also owned mouse handling. Transparent/color-keyed pixels can allow hit-testing to fall through to the DX12 child, while the DX12 child had no Phase 14 mouse handler. That made viewport selection intermittent.
-
-The new ownership is explicit:
-
-- overlay returns `HTTRANSPARENT` and is visual-only;
-- `renderHost_` is subclassed as the single viewport input target;
-- RMB camera capture, LMB picking, mouse movement, wheel speed and gizmo dragging are handled from the render host;
-- mouse capture/focus is owned by `renderHost_` rather than the overlay.
-
-This removes compositor transparency from the input path.
-
-### 3.6 Oriented-object picking
-
-Picking still follows the Luna Chapter 17 flow, but the object test is improved.
-
-Old path:
-
-1. construct a world-space ray;
-2. transform each object's local bounds to a world-space AABB;
-3. ray-test that enlarged world AABB.
-
-New path:
+The previous broad world-AABB test remains replaced by object-space testing:
 
 1. viewport pixel -> NDC;
-2. NDC -> view-space ray using viewport FOV/aspect;
-3. rotate ray into world space with the editor camera;
-4. for each candidate object, transform ray origin/direction through inverse translation, inverse rotation and inverse scale;
-5. test the original local AABB in object space;
-6. keep the smallest positive ray parameter.
+2. NDC -> camera/view ray;
+3. ray rotated into world space;
+4. world ray transformed by inverse translation / inverse rotation / inverse scale for each validation object;
+5. local ray tested against the original local AABB;
+6. nearest positive hit wins.
 
-Because the local ray direction is not renormalized after inverse scale, the returned slab parameter remains comparable between differently scaled objects. Rotated cubes therefore no longer depend on their enlarged world AABB for picking.
+The direction is intentionally not re-normalized after inverse scale so the ray parameter remains comparable across objects with different scales.
 
-The exact inverse-TRS implementation is **Design choice (not directly from the book)**; the screen-ray / bounds / nearest-hit structure is grounded in Luna Chapter 17.
+This structure is aligned with Luna Chapter 17; the concrete inverse-TRS implementation is **Design choice (not directly from the book)**.
 
-### 3.7 Visual-quality boundary
+### 3.3 Selection visualization now uses oriented local bounds
 
-The procedural sky and per-face validation colors are intentionally not a finished lighting solution. Real-time shadows, production lighting, material/PBR response and related rendering polish remain later renderer phases in the Nocturne roadmap.
+The previous GPU selection pass was depth-aware, but its geometry still came from `TransformAabb(...)` / world-space AABB data. That is correct for broad-phase bounds, but it is not a correct visual representation of a rotated object's local box: the resulting box stays aligned to world axes and grows to contain the rotated object.
 
-Phase 14 must validate editor viewport mechanics correctly before those systems are introduced. This patch therefore does **not** pretend to implement shadows as an editor-specific shortcut.
+The debug-selection bridge now carries:
+
+- selected object's local `boundsMin` / `boundsMax`;
+- selected object's exact world matrix (`TRS`);
+- enabled flag.
+
+`MeshPass` constructs the eight local corners, applies a very small local-space expansion to avoid z-fighting, and transforms every corner through the selected object's world matrix with `TransformPoint`.
+
+The 12 resulting world-space edges therefore follow:
+
+- translation;
+- rotation;
+- non-uniform scale.
+
+They are still drawn through the existing depth-tested editor LINE PSO (`LESS_EQUAL`, no depth writes), so hidden/rear edges remain occluded by scene depth.
+
+This oriented debug-box implementation is **Design choice (not directly from the book)**.
+
+### 3.4 Scope remains Phase 14
+
+This patch does not introduce:
+
+- ECS;
+- serialization;
+- scene-authoring persistence;
+- PBR/material system;
+- shadow mapping;
+- production lighting.
+
+Those remain later roadmap work. Phase 14 continues to validate editor viewport mechanics first.
 
 ## 4. Files changed by this patch
 
+- `Apps/NocturneEditor/EditorViewportController.cpp`
 - `Engine/Render/RenderQueue.h`
 - `Engine/Runtime/Engine.h`
 - `Engine/Runtime/Engine.cpp`
-- `Engine/Render/DX12/MeshPass.h`
 - `Engine/Render/DX12/MeshPass.cpp`
-- `Apps/NocturneEditor/EditorViewportController.h`
-- `Apps/NocturneEditor/EditorViewportController.cpp`
 - `Docs/Phase 14 — Implementation Report.md`
 
-`EditorShellV3` remains the active editor shell and its Phase 13 panel/layout/chrome is not redesigned.
+`EditorShellV3` remains unchanged and continues to be the active shell.
 
 ## 5. Verification checklist
 
-### Already observed locally before this patch
+### Verified from source/diff
 
-- [x] Procedural sky is visible.
-- [x] Hierarchy displays `Cube_A`, `Cube_B`, `Cube_C`, `Ground_Plane`, camera and environment.
-- [x] Previous `Runtime Objects` hierarchy flicker is no longer observed.
-- [x] Cubes occlude the GPU grid correctly.
-- [x] Grid was still visible over the Ground Plane, motivating this patch.
-- [x] Win32 selection outline showed hidden/rear AABB edges, motivating this patch.
-- [x] Direct viewport picking was intermittent, motivating this patch.
+- [x] Render host uses `SS_NOTIFY`.
+- [x] Render-host subclass returns `HTCLIENT` for `WM_NCHITTEST`.
+- [x] Layered overlay remains hit-transparent.
+- [x] Picking still uses inverse-TRS local-space bounds tests.
+- [x] Debug selection carries local bounds plus the selected world matrix.
+- [x] Selection geometry transforms local corners by the selected object's world matrix.
+- [x] Selection lines remain depth-tested and do not write depth.
+- [x] Grid remains below the Ground Plane.
+- [x] No lighting/PBR/shadow/ECS scope was introduced.
 
-### Verified from source design for this patch
+### Requires local Windows validation
 
-- [x] Overlay no longer owns viewport mouse input.
-- [x] Render host has a dedicated input subclass.
-- [x] Overlay hit-testing is transparent.
-- [x] Picking tests local bounds through inverse TRS.
-- [x] Selection bounds are submitted through a depth-tested GPU line pass.
-- [x] Selection upload memory is duplicated per frame-in-flight.
-- [x] Grid is below the Ground Plane top surface.
-- [x] No ECS/serialization/PBR/shadow-system scope was introduced.
-
-### Requires local Windows validation after pulling this commit
-
-- [ ] `Debug x64` build succeeds with zero compile/link errors.
+- [ ] `Debug x64` builds with zero errors.
 - [ ] DX12 debug layer reports no errors.
-- [ ] Ground Plane hides grid lines inside its footprint.
-- [ ] Grid remains visible outside the Ground Plane.
-- [ ] Selected cube shows only depth-visible selection edges; rear edges do not show through the cube.
-- [ ] Another cube can occlude the selected outline correctly.
-- [ ] Clicking `Cube_A`, `Cube_B` and `Cube_C` directly in the viewport works consistently.
-- [ ] Rotated `Cube_B` / `Cube_C` picking is reliable.
-- [ ] Ground Plane can be selected from the viewport where it is visible.
-- [ ] Empty sky/space click clears selection.
-- [ ] Hierarchy -> viewport selection remains stable and flicker-free.
-- [ ] RMB camera navigation still works through the render host.
-- [ ] Move/Rotate/Scale gizmo drag still receives mouse capture correctly.
+- [ ] Repeated direct clicks select `Cube_A` reliably.
+- [ ] Repeated direct clicks select rotated `Cube_B` reliably.
+- [ ] Repeated direct clicks select rotated `Cube_C` reliably.
+- [ ] Ground Plane can be selected directly from visible areas.
+- [ ] Empty viewport/sky click clears selection.
+- [ ] Viewport selection selects the matching hierarchy row.
+- [ ] Hierarchy selection still selects the matching viewport object without flicker.
+- [ ] Selection outline follows Cube_B/C rotation exactly.
+- [ ] Selection outline follows scale changes exactly.
+- [ ] Rear/occluded outline edges remain hidden by depth testing.
+- [ ] RMB camera capture still works.
+- [ ] Move/Rotate/Scale gizmo mouse capture still works.
 - [ ] Resize/maximize/restore remains stable.
 
-The GitHub connector cannot execute the Windows/MSVC/DX12 binary, so those runtime checks remain intentionally open.
+The GitHub connector cannot execute the Windows/MSVC/DX12 binary, so these runtime checks remain intentionally open.
 
-## 6. Common pitfalls / follow-up risks
+## 6. Common pitfalls
 
-- Do not move depth-dependent selection visualization back into the layered overlay.
-- Keep transform gizmos intentionally visible even when selection bounds obey depth.
-- Do not route viewport input through a color-keyed visual overlay again.
-- The explicit hierarchy objects are Phase 14 validation metadata, not the final ECS/scene authoring model.
-- `MeshPass` still renders one procedural validation geometry instanced N times.
-- Real shadows/lighting/PBR must be added in their renderer phases rather than as Phase 14 editor-only special cases.
+- Do not use `TransformAabb()` output as the editor's oriented selection visualization. A world AABB is appropriate for broad-phase/culling but intentionally loses object orientation.
+- Do not move viewport mouse ownership back to the color-keyed overlay.
+- Keep the render child as the authoritative mouse/focus/capture HWND.
+- Keep gizmo visibility policy separate from depth-aware selection-bound policy.
+- Do not pull shadows/PBR into Phase 14 to compensate for the deliberately simple validation rendering.
 
 ## 7. Next chat handoff
 
 Bring:
 
-1. fresh `Debug x64` build output after pulling the commit;
-2. screenshot with a cube selected from the viewport;
-3. screenshot showing Ground Plane hiding the grid beneath it;
-4. confirmation that all three cubes can be selected repeatedly by direct viewport clicking;
-5. any DX12 debug-layer or gizmo/camera regression.
+1. fresh `Debug x64` build output after pulling this commit;
+2. screenshot with rotated `Cube_B` or `Cube_C` selected;
+3. confirmation whether repeated direct viewport clicks select all three cubes reliably;
+4. confirmation that RMB camera and gizmo dragging still work;
+5. any DX12 debug-layer errors.
 
-Do not mark Phase 14 complete until the post-patch runtime checklist is closed.
+Do not mark Phase 14 complete until these runtime checks pass.

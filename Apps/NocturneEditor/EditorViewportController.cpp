@@ -219,8 +219,10 @@ namespace nocturne::editor
         SetWindowSubclass(sceneTree_, &EditorViewportController::SceneTreeSubclassProc_, kSubclassIdTree,
             reinterpret_cast<DWORD_PTR>(this));
 
+        // STATIC controls require SS_NOTIFY to participate reliably in mouse
+        // interaction. The subclass also returns HTCLIENT explicitly below.
         renderHost_ = CreateWindowExW(0, L"STATIC", L"",
-            WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_TABSTOP,
+            WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_TABSTOP | SS_NOTIFY,
             0, 0, 1, 1, body_, nullptr, GetModuleHandleW(nullptr), nullptr);
         if (!renderHost_)
         {
@@ -434,9 +436,6 @@ namespace nocturne::editor
         if (std::fabs(object.s.x) <= 1e-6f || std::fabs(object.s.y) <= 1e-6f || std::fabs(object.s.z) <= 1e-6f)
             return false;
 
-        // Inverse TRS transforms the world-space ray into the object's local
-        // coordinates. The direction is intentionally not normalized after the
-        // inverse scale, so the returned slab t remains comparable across objects.
         const noc::Quat invRot{ -object.r.x, -object.r.y, -object.r.z, object.r.w };
         noc::Vec3 localOrigin = noc::Rotate(invRot, origin - object.t);
         noc::Vec3 localDir = noc::Rotate(invRot, dir);
@@ -476,9 +475,14 @@ namespace nocturne::editor
         if (!engine_)
             return;
         if (selectedIndex_ >= 0 && selectedIndex_ < kValidationObjectCount)
-            engine_->SetDebugSelectionBounds(ValidationWorldBounds_(selectedIndex_));
+        {
+            const ValidationObject& object = validationObjects_[selectedIndex_];
+            engine_->SetDebugSelection(object.localBounds, noc::TRS(object.t, object.r, object.s));
+        }
         else
+        {
             engine_->ClearDebugSelectionBounds();
+        }
     }
 
     void EditorViewportController::SetSelectedIndex_(int index, bool syncTree)
@@ -637,9 +641,8 @@ namespace nocturne::editor
         FillRect(dc, &rc, keyBrush);
         DeleteObject(keyBrush);
 
-        // Grid and selection bounds are depth-tested DX12 debug geometry now.
-        // The Win32 overlay is intentionally limited to transform gizmo handles,
-        // which remain always visible as an editor interaction affordance.
+        // Grid and oriented selection bounds are depth-tested DX12 debug geometry.
+        // The Win32 overlay is intentionally limited to transform gizmo handles.
         if (selectedIndex_ < 0)
             return;
 
@@ -764,8 +767,6 @@ namespace nocturne::editor
         switch (msg)
         {
         case WM_NCHITTEST:
-            // The layered overlay is visual-only. Returning HTTRANSPARENT makes
-            // the DX12 render host the single deterministic input target.
             return HTTRANSPARENT;
         case WM_ERASEBKGND: return 1;
         case WM_PAINT:
@@ -815,6 +816,10 @@ namespace nocturne::editor
 
         switch (msg)
         {
+        case WM_NCHITTEST:
+            // Do not let the STATIC control default to transparent hit-testing.
+            // This HWND is the authoritative Phase 14 viewport input surface.
+            return HTCLIENT;
         case WM_RBUTTONDOWN: case WM_RBUTTONUP:
         case WM_LBUTTONDOWN: case WM_LBUTTONUP:
         case WM_MOUSEMOVE: case WM_MOUSEWHEEL: case WM_CAPTURECHANGED:

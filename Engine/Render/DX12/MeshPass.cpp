@@ -452,8 +452,8 @@ namespace noc
 
 		std::vector<MeshVertexPC> vertices;
 		vertices.reserve(128);
-		constexpr float gridY = -1.16f; // 1 cm below the ground top (-1.15)
-		constexpr float axisY = -1.14f; // axes remain visible as an editor aid
+		constexpr float gridY = -1.16f;
+		constexpr float axisY = -1.14f;
 		constexpr int minX = -10;
 		constexpr int maxX = 10;
 		constexpr int minZ = -4;
@@ -603,9 +603,6 @@ namespace noc
 
 		const bool linePassReady = EnsureGridPso_(device, rm);
 
-		// The grid is intentionally below the ground top surface. Because it is
-		// drawn after opaque geometry with depth test on and depth writes off, the
-		// Ground_Plane now occludes it instead of showing grid lines through itself.
 		if (linePassReady && EnsureGridUploaded_(device, cmd, deferred, sync, frameIndex))
 		{
 			cmd->SetGraphicsRootSignature(gridRootSig_.Get());
@@ -618,20 +615,29 @@ namespace noc
 			cmd->DrawInstanced(gridVertexCount_, 1, 0, 0);
 		}
 
-		// Selection bounds use the same depth-tested line pass. A tiny expansion
-		// moves front-facing edges off the object's surface to avoid z fighting;
-		// rear edges remain behind the object's depth and are therefore hidden.
+		// Selection geometry is built from the object's local bounds and then
+		// transformed by the selected object's exact world matrix. This produces
+		// an oriented box that follows translation, rotation and scale rather than
+		// a world-space AABB. It uses the same depth-tested line pass, so hidden
+		// edges remain occluded by the selected object and other scene geometry.
 		if (linePassReady && queue->debugSelection.enabled && EnsureSelectionUpload_(device))
 		{
-			const Vec3 center = (queue->debugSelection.boundsMin + queue->debugSelection.boundsMax) * 0.5f;
-			Vec3 half = (queue->debugSelection.boundsMax - queue->debugSelection.boundsMin) * 0.5f;
-			half = half * 1.015f + Vec3(0.008f, 0.008f, 0.008f);
-			const Vec3 mn = center - half;
-			const Vec3 mx = center + half;
-			const Vec3 corners[8] = {
+			const Vec3 localCenter =
+				(queue->debugSelection.localBoundsMin + queue->debugSelection.localBoundsMax) * 0.5f;
+			Vec3 localHalf =
+				(queue->debugSelection.localBoundsMax - queue->debugSelection.localBoundsMin) * 0.5f;
+			localHalf = localHalf * 1.015f + Vec3(0.008f, 0.008f, 0.008f);
+			const Vec3 mn = localCenter - localHalf;
+			const Vec3 mx = localCenter + localHalf;
+
+			const Vec3 localCorners[8] = {
 				{mn.x,mn.y,mn.z},{mx.x,mn.y,mn.z},{mn.x,mx.y,mn.z},{mx.x,mx.y,mn.z},
 				{mn.x,mn.y,mx.z},{mx.x,mn.y,mx.z},{mn.x,mx.y,mx.z},{mx.x,mx.y,mx.z}
 			};
+			Vec3 worldCorners[8]{};
+			for (int i = 0; i < 8; ++i)
+				worldCorners[i] = TransformPoint(queue->debugSelection.world, localCorners[i]);
+
 			const int edges[12][2] = {
 				{0,1},{0,2},{1,3},{2,3},{4,5},{4,6},{5,7},{6,7},{0,4},{1,5},{2,6},{3,7}
 			};
@@ -639,8 +645,8 @@ namespace noc
 			MeshVertexPC* out = reinterpret_cast<MeshVertexPC*>(selectionMapped_[frameIndex]);
 			for (int e = 0; e < 12; ++e)
 			{
-				const Vec3 a = corners[edges[e][0]];
-				const Vec3 b = corners[edges[e][1]];
+				const Vec3 a = worldCorners[edges[e][0]];
+				const Vec3 b = worldCorners[edges[e][1]];
 				out[e * 2 + 0] = { a.x, a.y, a.z, 1.00f, 0.72f, 0.16f, 1.0f };
 				out[e * 2 + 1] = { b.x, b.y, b.z, 1.00f, 0.72f, 0.16f, 1.0f };
 			}
