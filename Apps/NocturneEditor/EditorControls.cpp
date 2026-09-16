@@ -1,4 +1,4 @@
-#include "EditorControls.h"
+﻿#include "EditorControls.h"
 #include "EditorTheme.h"
 
 #include <algorithm>
@@ -248,7 +248,7 @@ namespace nocturne::editor
         {
             RECT rc{};
             GetClientRect(hwnd, &rc);
-            const int height = (std::max)(1, rc.bottom - rc.top);
+            const int height = (std::max)(1, static_cast<int>(rc.bottom - rc.top));
             const int total = (std::max)(1, state.info.maximum - state.info.minimum);
             const int page = (std::max)(1, state.info.page);
             int thumbHeight = (height * page) / (std::max)(page, total);
@@ -263,8 +263,8 @@ namespace nocturne::editor
                     static_cast<double>(maxPos - state.info.minimum);
                 top = static_cast<int>(t * travel + 0.5);
             }
-            return RECT{ 1, top + 1, (std::max)(2, rc.right - 1),
-                (std::min)(rc.bottom - 1, top + thumbHeight - 1) };
+            return RECT{ 1, top + 1, (std::max)(2, static_cast<int>(rc.right - 1)),
+                (std::min)(static_cast<int>(rc.bottom - 1), top + thumbHeight - 1) };
         }
 
         void NotifyScroll(HWND hwnd, ScrollState& state, int position)
@@ -313,8 +313,8 @@ namespace nocturne::editor
                         RECT rc{};
                         GetClientRect(hwnd, &rc);
                         const int thumbHeight = thumb.bottom - thumb.top;
-                        const int travel = (std::max)(1, rc.bottom - thumbHeight);
-                        const int desired = (std::clamp)(p.y - state->dragOffset, 0, travel);
+                        const int travel = (std::max)(1, static_cast<int>(rc.bottom) - thumbHeight);
+                        const int desired = (std::clamp)(static_cast<int>(p.y) - state->dragOffset, 0, travel);
                         const double t = static_cast<double>(desired) / static_cast<double>(travel);
                         const int maxPos = ScrollMaxPos(*state);
                         NotifyScroll(hwnd, *state, state->info.minimum +
@@ -408,7 +408,7 @@ namespace nocturne::editor
             RECT rc{};
             GetClientRect(hwnd, &rc);
             const auto& m = EditorTheme::Metrics();
-            const int visible = (std::max)(1, (rc.bottom - m.tableHeaderHeight) / m.tableRowHeight);
+            const int visible = (std::max)(1, (static_cast<int>(rc.bottom) - m.tableHeaderHeight) / m.tableRowHeight);
             EditorScrollInfo info{};
             info.maximum = static_cast<int>(state.rows.size());
             info.page = visible;
@@ -530,7 +530,7 @@ namespace nocturne::editor
                 SelectObject(dc, oldPen);
                 DeleteObject(separator);
 
-                const int usableW = (std::max)(120, rc.right - m.scrollbarWidth - 6);
+                const int usableW = (std::max)(120, static_cast<int>(rc.right) - m.scrollbarWidth - 6);
                 const int typeW = (std::clamp)(usableW / 3, 90, 150);
                 const int assetW = usableW - typeW;
                 RECT assetHeader{ 12, 0, assetW - 6, m.tableHeaderHeight };
@@ -554,7 +554,7 @@ namespace nocturne::editor
                         row < static_cast<int>(state->rows.size()) && y < rc.bottom;
                         ++row, y += m.tableRowHeight)
                     {
-                        RECT rowRc{ 0, y, usableW, (std::min)(rc.bottom, y + m.tableRowHeight) };
+                        RECT rowRc{ 0, y, usableW, (std::min)(static_cast<int>(rc.bottom), y + m.tableRowHeight) };
                         if (row == state->selected)
                             Fill(dc, rowRc, Blend(c.panelBg, c.accent, 32));
                         else if (row == state->hover)
@@ -625,7 +625,7 @@ namespace nocturne::editor
             RECT rc{};
             GetClientRect(hwnd, &rc);
             const auto& m = EditorTheme::Metrics();
-            const int visibleRows = (std::max)(1, rc.bottom / m.treeRowHeight);
+            const int visibleRows = (std::max)(1, static_cast<int>(rc.bottom) / m.treeRowHeight);
             const auto visible = VisibleTreeIndices(state);
             EditorScrollInfo info{};
             info.maximum = static_cast<int>(visible.size());
@@ -748,7 +748,7 @@ namespace nocturne::editor
                     {
                         const int index = visible[v];
                         const auto& item = state->items[index];
-                        RECT row{ 0, y, (std::max)(0, rc.right - m.scrollbarWidth - 4), y + m.treeRowHeight };
+                        RECT row{ 0, y, (std::max)(0, static_cast<int>(rc.right) - m.scrollbarWidth - 4), y + m.treeRowHeight };
                         if (index == state->selected)
                             Fill(dc, row, Blend(c.panelBg, c.accent, 40));
                         else if (index == state->hover)
@@ -1067,7 +1067,7 @@ namespace nocturne::editor
         GetClientRect(edit, &rc);
         const int lineCount = static_cast<int>(SendMessageW(edit, EM_GETLINECOUNT, 0, 0));
         const int firstLine = static_cast<int>(SendMessageW(edit, EM_GETFIRSTVISIBLELINE, 0, 0));
-        const int visible = (std::max)(1, (rc.bottom - rc.top) / (std::max)(1, lineHeight));
+        const int visible = (std::max)(1, static_cast<int>(rc.bottom - rc.top) / (std::max)(1, lineHeight));
         EditorScrollInfo info{};
         info.maximum = lineCount;
         info.page = visible;
@@ -1075,3 +1075,4 @@ namespace nocturne::editor
         SetEditorScrollInfo(scrollBar, info);
     }
 }
+
