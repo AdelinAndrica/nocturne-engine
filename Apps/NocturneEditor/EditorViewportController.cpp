@@ -91,17 +91,44 @@ namespace nocturne::editor
         engine_ = &engine;
         auto& world = engine.GetWorld();
 
-        // Design choice (not directly from the book): Phase 14 guarantees a small,
-        // deterministic visible scene when the editor opens on an otherwise empty
-        // runtime World. The mesh is the existing Phase 10 triangle resource.
-        demoObject_ = world.CreateObject();
-        cameraObject_ = world.CreateObject();
-        if (!demoObject_.IsValid() || !cameraObject_.IsValid())
-            return false;
+        // Design choice (not directly from the book): Phase 14 opens on a
+        // deterministic spatial validation scene so depth, perspective, picking
+        // and gizmo behavior can be judged immediately. The renderer still uses
+        // one instanced geometry path; its Phase 14 validation geometry is a cube.
+        const noc::ResourceHandle logicalMesh = engine.Resources().RequestBinary("Meshes/triangle.nmsh");
 
-        const noc::ResourceHandle mesh = engine.Resources().RequestBinary("Meshes/triangle.nmsh");
-        world.SetLocalTRS(demoObject_, demoT_, demoR_, demoS_);
-        world.SetRenderable(demoObject_, mesh, demoLocalBounds_);
+        auto createValidationObject = [&](int index, const noc::Vec3& t, const noc::Quat& r,
+            const noc::Vec3& s, bool selectable) -> bool
+        {
+            ValidationObject& object = validationObjects_[index];
+            object.handle = world.CreateObject();
+            if (!object.handle.IsValid())
+                return false;
+            object.t = t;
+            object.r = r;
+            object.s = s;
+            object.selectable = selectable;
+            object.localBounds = { noc::Vec3(-1.0f, -1.0f, -1.0f), noc::Vec3(1.0f, 1.0f, 1.0f) };
+            world.SetLocalTRS(object.handle, object.t, object.r, object.s);
+            world.SetRenderable(object.handle, logicalMesh, object.localBounds);
+            return true;
+        };
+
+        if (!createValidationObject(0, { 0.0f, -0.15f, 6.0f }, noc::Quat::Identity(), { 1.0f, 1.0f, 1.0f }, true) ||
+            !createValidationObject(1, { -2.5f, -0.10f, 9.0f }, AxisAngle({ 0,1,0 }, 0.38f), { 0.8f, 1.05f, 0.8f }, true) ||
+            !createValidationObject(2, { 2.4f, -0.35f, 11.0f }, AxisAngle({ 0,1,0 }, -0.52f), { 1.1f, 0.8f, 1.1f }, true) ||
+            !createValidationObject(3, { 0.0f, -1.25f, 9.0f }, noc::Quat::Identity(), { 6.5f, 0.10f, 7.5f }, false))
+        {
+            NOC_LOG_ERROR("Editor", "Failed to create Phase 14 validation scene objects");
+            return false;
+        }
+
+        cameraObject_ = world.CreateObject();
+        if (!cameraObject_.IsValid())
+        {
+            NOC_LOG_ERROR("Editor", "Failed to create Phase 14 editor camera object");
+            return false;
+        }
 
         cameraRot_ = YawPitch(cameraYaw_, cameraPitch_);
         world.SetLocalTRS(cameraObject_, cameraPos_, cameraRot_, noc::Vec3::One());
@@ -110,6 +137,7 @@ namespace nocturne::editor
         world.Update();
 
         scenePrepared_ = true;
+        NOC_LOG_INFO("Editor", "Phase 14 3D validation scene prepared (3 selectable cubes + ground)");
         return true;
     }
 
@@ -137,7 +165,10 @@ namespace nocturne::editor
         if (!scenePrepared_ && !PrepareScene(engine))
             return false;
         if (!RegisterOverlayClass_())
+        {
+            NOC_LOG_ERROR("Editor", "Phase 14 overlay class registration failed (err=%lu)", GetLastError());
             return false;
+        }
 
         engine_ = &engine;
         window_ = &window;
@@ -146,11 +177,18 @@ namespace nocturne::editor
         body_ = shell.ViewportBody();
         sceneTree_ = shell.SceneTree();
         if (!topLevel_ || !body_ || !sceneTree_)
+        {
+            NOC_LOG_ERROR("Editor", "Phase 14 viewport attach missing HWND (top=%p body=%p tree=%p)",
+                topLevel_, body_, sceneTree_);
             return false;
+        }
 
         if (!SetWindowSubclass(body_, &EditorViewportController::BodySubclassProc_, kSubclassIdBody,
             reinterpret_cast<DWORD_PTR>(this)))
+        {
+            NOC_LOG_ERROR("Editor", "Phase 14 viewport body subclass failed");
             return false;
+        }
         SetWindowSubclass(topLevel_, &EditorViewportController::MainSubclassProc_, kSubclassIdMain,
             reinterpret_cast<DWORD_PTR>(this));
         SetWindowSubclass(sceneTree_, &EditorViewportController::SceneTreeSubclassProc_, kSubclassIdTree,
@@ -160,21 +198,37 @@ namespace nocturne::editor
             WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
             0, 0, 1, 1, body_, nullptr, GetModuleHandleW(nullptr), nullptr);
         if (!renderHost_)
+        {
+            NOC_LOG_ERROR("Editor", "Phase 14 render host creation failed (err=%lu)", GetLastError());
             return false;
+        }
 
         overlay_ = CreateWindowExW(WS_EX_LAYERED, kOverlayClass, L"",
             WS_CHILD | WS_VISIBLE | WS_TABSTOP,
             0, 0, 1, 1, body_, nullptr, GetModuleHandleW(nullptr), this);
         if (!overlay_)
+        {
+            NOC_LOG_ERROR("Editor", "Phase 14 overlay child creation failed (err=%lu)", GetLastError());
             return false;
+        }
 
-        SetLayeredWindowAttributes(overlay_, kOverlayKey, 0, LWA_COLORKEY);
+        if (!SetLayeredWindowAttributes(overlay_, kOverlayKey, 0, LWA_COLORKEY))
+            NOC_LOG_WARN("Editor", "Phase 14 overlay color-key setup failed (err=%lu)", GetLastError());
         SetWindowPos(overlay_, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 
         LayoutChildren_();
+        if (!renderAttached_)
+        {
+            RECT rc{};
+            GetClientRect(body_, &rc);
+            NOC_LOG_ERROR("Editor", "Phase 14 DX12 viewport target attach failed (body=%ldx%ld)",
+                rc.right - rc.left, rc.bottom - rc.top);
+            return false;
+        }
+
         SetTimer(topLevel_, kTimerId, 16, nullptr);
         NOC_LOG_INFO("Editor", "Phase 14 viewport controller attached to dedicated child HWND");
-        return renderAttached_;
+        return true;
     }
 
     void EditorViewportController::Shutdown()
@@ -194,6 +248,8 @@ namespace nocturne::editor
 
         cameraCapturing_ = false;
         gizmoDragging_ = false;
+        selectedIndex_ = -1;
+        dragObjectIndex_ = -1;
         shell_ = nullptr;
         window_ = nullptr;
         topLevel_ = nullptr;
@@ -335,23 +391,50 @@ namespace nocturne::editor
         return tmax >= 0.0f;
     }
 
-    noc::AABB EditorViewportController::DemoWorldBounds_() const
+    noc::AABB EditorViewportController::ValidationWorldBounds_(int index) const
     {
-        return noc::TransformAabb(demoLocalBounds_, noc::TRS(demoT_, demoR_, demoS_));
+        if (index < 0 || index >= kValidationObjectCount)
+            return {};
+        const ValidationObject& object = validationObjects_[index];
+        return noc::TransformAabb(object.localBounds, noc::TRS(object.t, object.r, object.s));
     }
 
-    void EditorViewportController::SetSelected_(bool selected, bool syncTree)
+    int EditorViewportController::PickValidationObject_(const noc::Vec3& origin, const noc::Vec3& dir) const
     {
-        selected_ = selected;
+        int nearestIndex = -1;
+        float nearestT = 1.0e30f;
+        for (int i = 0; i < kValidationObjectCount; ++i)
+        {
+            const ValidationObject& object = validationObjects_[i];
+            if (!object.selectable || !object.handle.IsValid())
+                continue;
+            float t = 0.0f;
+            if (RayAabb_(origin, dir, ValidationWorldBounds_(i), t) && t >= 0.0f && t < nearestT)
+            {
+                nearestT = t;
+                nearestIndex = i;
+            }
+        }
+        return nearestIndex;
+    }
+
+    void EditorViewportController::SetSelectedIndex_(int index, bool syncTree)
+    {
+        if (index < 0 || index >= kValidationObjectCount || !validationObjects_[index].selectable)
+            index = -1;
+        selectedIndex_ = index;
+
         if (syncTree && sceneTree_)
         {
-            // The Phase 13 tree has root row 0 and "Runtime Objects" row 1.
-            // Until Phase 16 introduces authored entity rows, that row is the
-            // selection bridge for the single Phase 14 renderable.
-            const int row = selected ? 1 : 0;
+            // Phase 13 hierarchy exposes only the aggregate Runtime Objects row.
+            // Design choice: any viewport object selection highlights that row;
+            // clicking that row selects the primary validation cube (index 0).
+            const int row = selectedIndex_ >= 0 ? 1 : 0;
             const LPARAM p = MAKELPARAM(56, row * 24 + 12);
+            syncingTree_ = true;
             SendMessageW(sceneTree_, WM_LBUTTONDOWN, MK_LBUTTON, p);
             SendMessageW(sceneTree_, WM_LBUTTONUP, 0, p);
+            syncingTree_ = false;
         }
         if (overlay_) InvalidateRect(overlay_, nullptr, FALSE);
     }
@@ -363,17 +446,18 @@ namespace nocturne::editor
 
     int EditorViewportController::HitGizmoAxis_(POINT p) const
     {
-        if (!selected_) return -1;
+        if (selectedIndex_ < 0) return -1;
+        const ValidationObject& object = validationObjects_[selectedIndex_];
         POINT center{};
-        if (!Project_(demoT_, center)) return -1;
+        if (!Project_(object.t, center)) return -1;
         const noc::Vec3 axes[3] = { {1,0,0},{0,1,0},{0,0,1} };
         float best = 9.0f;
         int bestAxis = -1;
         for (int i = 0; i < 3; ++i)
         {
             POINT end{};
-            const noc::Vec3 axis = noc::Rotate(demoR_, axes[i]);
-            if (!Project_(demoT_ + axis * 1.5f, end)) continue;
+            const noc::Vec3 axis = noc::Rotate(object.r, axes[i]);
+            if (!Project_(object.t + axis * 1.5f, end)) continue;
             const float dist = PointSegmentDistance(p, center, end);
             if (dist < best) { best = dist; bestAxis = i; }
         }
@@ -382,20 +466,25 @@ namespace nocturne::editor
 
     void EditorViewportController::BeginGizmoDrag_(int axis, POINT mouse)
     {
-        if (axis < 0 || axis > 2) return;
+        if (axis < 0 || axis > 2 || selectedIndex_ < 0) return;
         gizmoDragging_ = true;
         gizmoAxis_ = axis;
+        dragObjectIndex_ = selectedIndex_;
         dragStartMouse_ = mouse;
-        dragStartT_ = demoT_;
-        dragStartR_ = demoR_;
-        dragStartS_ = demoS_;
+        const ValidationObject& object = validationObjects_[dragObjectIndex_];
+        dragStartT_ = object.t;
+        dragStartR_ = object.r;
+        dragStartS_ = object.s;
         SetCapture(overlay_);
     }
 
     void EditorViewportController::UpdateGizmoDrag_(POINT mouse)
     {
-        if (!gizmoDragging_ || !engine_ || gizmoAxis_ < 0) return;
+        if (!gizmoDragging_ || !engine_ || gizmoAxis_ < 0 ||
+            dragObjectIndex_ < 0 || dragObjectIndex_ >= kValidationObjectCount)
+            return;
 
+        ValidationObject& object = validationObjects_[dragObjectIndex_];
         const noc::Vec3 unit[3] = { {1,0,0},{0,1,0},{0,0,1} };
         const noc::Vec3 axisWorld = noc::Rotate(dragStartR_, unit[gizmoAxis_]);
         POINT a{}, b{};
@@ -410,21 +499,21 @@ namespace nocturne::editor
         const int tool = ActiveTool_();
         if (tool == kMoveTool)
         {
-            demoT_ = dragStartT_ + axisWorld * (signedPixels * 0.02f);
+            object.t = dragStartT_ + axisWorld * (signedPixels * 0.02f);
         }
         else if (tool == kScaleTool)
         {
-            demoS_ = dragStartS_;
-            float* component = gizmoAxis_ == 0 ? &demoS_.x : (gizmoAxis_ == 1 ? &demoS_.y : &demoS_.z);
+            object.s = dragStartS_;
+            float* component = gizmoAxis_ == 0 ? &object.s.x : (gizmoAxis_ == 1 ? &object.s.y : &object.s.z);
             const float start = gizmoAxis_ == 0 ? dragStartS_.x : (gizmoAxis_ == 1 ? dragStartS_.y : dragStartS_.z);
             *component = (std::max)(0.05f, start + signedPixels * 0.01f);
         }
         else if (tool == kRotateTool)
         {
-            demoR_ = NormalizeQuat(MulQuat(AxisAngle(axisWorld, signedPixels * 0.01f), dragStartR_));
+            object.r = NormalizeQuat(MulQuat(AxisAngle(axisWorld, signedPixels * 0.01f), dragStartR_));
         }
 
-        engine_->GetWorld().SetLocalTRS(demoObject_, demoT_, demoR_, demoS_);
+        engine_->GetWorld().SetLocalTRS(object.handle, object.t, object.r, object.s);
         engine_->GetWorld().Update();
         InvalidateRect(overlay_, nullptr, FALSE);
     }
@@ -434,6 +523,7 @@ namespace nocturne::editor
         if (!gizmoDragging_) return;
         gizmoDragging_ = false;
         gizmoAxis_ = -1;
+        dragObjectIndex_ = -1;
         if (GetCapture() == overlay_) ReleaseCapture();
         if (overlay_) InvalidateRect(overlay_, nullptr, FALSE);
     }
@@ -457,7 +547,7 @@ namespace nocturne::editor
         {
             SetFocus(overlay_);
             const int tool = ActiveTool_();
-            if (selected_ && (tool == kMoveTool || tool == kRotateTool || tool == kScaleTool))
+            if (selectedIndex_ >= 0 && (tool == kMoveTool || tool == kRotateTool || tool == kScaleTool))
             {
                 const int axis = HitGizmoAxis_(mouse);
                 if (axis >= 0)
@@ -466,9 +556,8 @@ namespace nocturne::editor
                     break;
                 }
             }
-            float t = 0.0f;
             const noc::Vec3 ray = MakePickRay_(mouse.x, mouse.y);
-            SetSelected_(RayAabb_(cameraPos_, ray, DemoWorldBounds_(), t));
+            SetSelectedIndex_(PickValidationObject_(cameraPos_, ray));
             break;
         }
         case WM_LBUTTONUP:
@@ -497,6 +586,7 @@ namespace nocturne::editor
             cameraCapturing_ = false;
             gizmoDragging_ = false;
             gizmoAxis_ = -1;
+            dragObjectIndex_ = -1;
             break;
         }
     }
@@ -511,34 +601,33 @@ namespace nocturne::editor
         const COLORREF grid = RGB(63, 70, 82);
         const COLORREF major = RGB(88, 97, 112);
 
-        // Ground grid. This is intentionally editor-only debug drawing layered
-        // above the runtime render target.
+        // Editor-only debug grid projected into the same camera used by runtime rendering.
         for (int i = -10; i <= 10; ++i)
         {
             POINT a{}, b{};
-            if (Project_({ float(i), 0.0f, 0.0f }, a) && Project_({ float(i), 0.0f, 20.0f }, b))
+            if (Project_({ float(i), -1.14f, 0.0f }, a) && Project_({ float(i), -1.14f, 20.0f }, b))
                 DrawLine(dc, a, b, i == 0 ? major : grid);
-            if (Project_({ -10.0f, 0.0f, float(i + 10) }, a) && Project_({ 10.0f, 0.0f, float(i + 10) }, b))
+            if (Project_({ -10.0f, -1.14f, float(i + 10) }, a) && Project_({ 10.0f, -1.14f, float(i + 10) }, b))
                 DrawLine(dc, a, b, i == -10 ? major : grid);
         }
 
         POINT o{}, x{}, y{}, z{};
-        if (Project_({ 0,0,0 }, o))
+        if (Project_({ 0,-1.14f,0 }, o))
         {
-            if (Project_({ 1.5f,0,0 }, x)) DrawLine(dc, o, x, RGB(210, 72, 72), 2);
-            if (Project_({ 0,1.5f,0 }, y)) DrawLine(dc, o, y, RGB(76, 195, 112), 2);
-            if (Project_({ 0,0,1.5f }, z)) DrawLine(dc, o, z, RGB(75, 135, 230), 2);
+            if (Project_({ 1.5f,-1.14f,0 }, x)) DrawLine(dc, o, x, RGB(210, 72, 72), 2);
+            if (Project_({ 0,0.36f,0 }, y)) DrawLine(dc, o, y, RGB(76, 195, 112), 2);
+            if (Project_({ 0,-1.14f,1.5f }, z)) DrawLine(dc, o, z, RGB(75, 135, 230), 2);
         }
 
-        if (!selected_)
+        if (selectedIndex_ < 0)
             return;
 
-        const noc::AABB b = DemoWorldBounds_();
+        const noc::AABB bounds = ValidationWorldBounds_(selectedIndex_);
         const noc::Vec3 c[8] = {
-            {b.min.x,b.min.y,b.min.z},{b.max.x,b.min.y,b.min.z},
-            {b.min.x,b.max.y,b.min.z},{b.max.x,b.max.y,b.min.z},
-            {b.min.x,b.min.y,b.max.z},{b.max.x,b.min.y,b.max.z},
-            {b.min.x,b.max.y,b.max.z},{b.max.x,b.max.y,b.max.z}
+            {bounds.min.x,bounds.min.y,bounds.min.z},{bounds.max.x,bounds.min.y,bounds.min.z},
+            {bounds.min.x,bounds.max.y,bounds.min.z},{bounds.max.x,bounds.max.y,bounds.min.z},
+            {bounds.min.x,bounds.min.y,bounds.max.z},{bounds.max.x,bounds.min.y,bounds.max.z},
+            {bounds.min.x,bounds.max.y,bounds.max.z},{bounds.max.x,bounds.max.y,bounds.max.z}
         };
         const int edges[12][2] = {
             {0,1},{0,2},{1,3},{2,3},{4,5},{4,6},{5,7},{6,7},{0,4},{1,5},{2,6},{3,7}
@@ -553,15 +642,16 @@ namespace nocturne::editor
         const int tool = ActiveTool_();
         if (tool == kMoveTool || tool == kRotateTool || tool == kScaleTool)
         {
+            const ValidationObject& object = validationObjects_[selectedIndex_];
             const noc::Vec3 axes[3] = { {1,0,0},{0,1,0},{0,0,1} };
             const COLORREF colors[3] = { RGB(224,75,75), RGB(74,207,112), RGB(73,139,239) };
             POINT center{};
-            if (Project_(demoT_, center))
+            if (Project_(object.t, center))
             {
                 for (int i = 0; i < 3; ++i)
                 {
                     POINT end{};
-                    if (!Project_(demoT_ + noc::Rotate(demoR_, axes[i]) * 1.5f, end)) continue;
+                    if (!Project_(object.t + noc::Rotate(object.r, axes[i]) * 1.5f, end)) continue;
                     const COLORREF color = (gizmoDragging_ && gizmoAxis_ == i) ? RGB(255,236,130) : colors[i];
                     DrawLine(dc, center, end, color, 3);
                     HBRUSH brush = CreateSolidBrush(color);
@@ -641,12 +731,12 @@ namespace nocturne::editor
         (void)subclassId;
         auto* self = reinterpret_cast<EditorViewportController*>(refData);
         const LRESULT result = DefSubclassProc(hwnd, msg, wParam, lParam);
-        if (self && msg == WM_LBUTTONUP)
+        if (self && msg == WM_LBUTTONUP && !self->syncingTree_)
         {
-            // Phase 13 has a compact, unscrolled four-row hierarchy. Phase 14
-            // maps its Runtime Objects row to the single selectable renderable.
+            // Phase 13 exposes a coarse Runtime Objects row rather than authored
+            // object rows. Until Phase 16, selecting it maps to validation cube 0.
             const int row = GET_Y_LPARAM(lParam) / 24;
-            self->SetSelected_(row == 1, false);
+            self->SetSelectedIndex_(row == 1 ? 0 : -1, false);
         }
         return result;
     }
