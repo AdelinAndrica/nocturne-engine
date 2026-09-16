@@ -8,7 +8,6 @@
 #include "GpuRingConstantBuffer.h"
 #include "MeshFormat.h"
 
-#include "Resources/ResourceHandle.h"
 #include "Resources/Typed/ResourceHandleT.h"
 #include "Resources/Typed/TextResource.h"
 
@@ -42,8 +41,8 @@ namespace noc
 
 	private:
 		bool EnsureRootSigAndPso_(ID3D12Device* device, Dx12PsoCache& cache, ResourceManager* rm);
-		bool EnsureMeshUploaded_(ID3D12Device* device, ID3D12GraphicsCommandList* cmd, Dx12DeferredReleaseQueue& deferred,
-			const Dx12FrameSync& sync, uint32_t frameIndex, ResourceManager* rm);
+		bool EnsureValidationCubeUploaded_(ID3D12Device* device, ID3D12GraphicsCommandList* cmd,
+			Dx12DeferredReleaseQueue& deferred, const Dx12FrameSync& sync, uint32_t frameIndex);
 
 		void EnsurePerFrameCbv_(ID3D12Device* device);
 		void EnsurePerFrameInstanceSrv_(ID3D12Device* device);
@@ -51,12 +50,8 @@ namespace noc
 	private:
 		ResourceHandleT<TextResource> shaderHlsl_;
 
-		// GPU objects
-		dx12::ComPtr<ID3D12RootSignature> rootSig_;
-		dx12::ComPtr<ID3D12PipelineState> pso_;
-
-		// For Phase 10 demo: one mesh upload path (triangle.nmsh), but drawn N times.
-		ResourceHandle meshBin_{};
+		// Phase 14 validation geometry. The general multi-mesh render path remains
+		// future renderer work; this pass still draws one geometry instanced N times.
 		GpuBuffer vb_;
 		GpuBuffer ib_;
 		uint32_t indexCount_ = 0;
