@@ -1,5 +1,8 @@
 #include "EditorShell.h"
 
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+
 #include "Core/Log.h"
 #include "Runtime/Engine.h"
 #include "Runtime/MainLoop.h"
@@ -11,6 +14,10 @@
 
 int main()
 {
+    // Design choice (not directly from the book): make editor UI crisp on mixed-DPI
+    // desktop setups. The runtime/window architecture remains unchanged.
+    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+
     noc::Engine engine;
     engine.SetContentRoot(NOC_CONTENT_ROOT);
 
@@ -27,9 +34,11 @@ int main()
     desc.height = 920;
     desc.resizable = true;
 
-    if (!engine.CreateAndAttachMainWindow(desc, window))
+    // Phase 13 owns only the editor shell. Do not attach the DX12 swap chain to the
+    // top-level editor HWND: Phase 14 will provide a dedicated viewport render target.
+    if (!window.Create(desc))
     {
-        NOC_LOG_FATAL("Editor", "Failed to create and attach editor window");
+        NOC_LOG_FATAL("Editor", "Failed to create editor window");
         engine.Shutdown();
         return 1;
     }
