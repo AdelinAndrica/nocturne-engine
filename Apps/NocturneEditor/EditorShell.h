@@ -4,6 +4,9 @@
 #include <Windows.h>
 
 #include <cstdint>
+#include <cwchar>
+#include <cwctype>
+#include <iterator>
 #include <string>
 #include <vector>
 
