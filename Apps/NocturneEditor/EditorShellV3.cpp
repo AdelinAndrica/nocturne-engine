@@ -1,5 +1,6 @@
 #include "EditorShellV3.h"
 #include "EditorTheme.h"
+#include "EditorIconRenderer.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -116,6 +117,10 @@ namespace nocturne::editor
 
         void DrawIcon(HDC dc, Icon icon, RECT rc, COLORREF color)
         {
+            // Tabler SVG is the primary icon source. Keep the legacy GDI drawing below
+            // only as a fallback if Direct2D SVG initialization or asset lookup fails.
+            if (DrawEditorSvgIcon(dc, static_cast<EditorIconId>(static_cast<int>(icon)), rc, color))
+                return;
             if (icon == Icon::None) return;
             const int cx = static_cast<int>((rc.left + rc.right) / 2);
             const int cy = static_cast<int>((rc.top + rc.bottom) / 2);
