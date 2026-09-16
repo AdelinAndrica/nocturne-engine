@@ -1,0 +1,16 @@
+<Project>
+  <!--
+    Design choice (not directly from the book): keep direct NocturneEngine MSBuild
+    invocations able to resolve engine headers without mutating output-path properties late
+    in evaluation. Output directories remain owned by the project/solution properties.
+  -->
+  <PropertyGroup>
+    <NocturneRepoRoot>$(MSBuildThisFileDirectory)</NocturneRepoRoot>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup Condition="'$(MSBuildProjectName)'=='NocturneEngine'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(NocturneRepoRoot)Engine;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+</Project>
