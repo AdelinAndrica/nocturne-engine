@@ -10,7 +10,9 @@ if (-not (Test-Path $path)) {
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false, $true)
 $content = [System.IO.File]::ReadAllText($path, $utf8NoBom)
 
-$pattern = '(?s)            HBITMAP Rasterize\(EditorIconId icon, int width, int height, COLORREF color\)\s*\{.*?\n            \}\n\n        private:'
+# Match only the Rasterize() function body. Do not depend on LF vs CRLF;
+# the source may have either line ending locally.
+$pattern = '(?s)            HBITMAP Rasterize\(EditorIconId icon, int width, int height, COLORREF color\)\s*\{.*?\r?\n            \}(?=\r?\n\r?\n        private:)'
 
 $replacement = @'
             HBITMAP Rasterize(EditorIconId icon, int width, int height, COLORREF color)
@@ -124,8 +126,6 @@ $replacement = @'
                 readback->Unmap();
                 return bitmap;
             }
-
-        private:
 '@
 
 $patched = [regex]::Replace($content, $pattern, $replacement, 1)
