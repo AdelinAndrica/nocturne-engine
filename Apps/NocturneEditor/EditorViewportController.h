@@ -17,9 +17,8 @@ namespace nocturne::editor
 {
     class EditorShellV3;
 
-    // Phase 14 editor-only viewport behavior. The runtime still owns frame
-    // execution; this controller only provides a child presentation target and
-    // tool interactions layered over the existing runtime World/Render systems.
+    // Phase 14 editor-only viewport behavior. Runtime still owns frame execution;
+    // this controller owns editor camera/input/selection/gizmo integration only.
     class EditorViewportController final
     {
     public:
@@ -32,6 +31,17 @@ namespace nocturne::editor
         static constexpr UINT_PTR kSubclassIdMain = 0x1402;
         static constexpr UINT_PTR kSubclassIdTree = 0x1403;
         static constexpr UINT_PTR kTimerId = 0x1410;
+        static constexpr int kValidationObjectCount = 4;
+
+        struct ValidationObject
+        {
+            noc::SceneObjectHandle handle{};
+            noc::Vec3 t = noc::Vec3::Zero();
+            noc::Quat r = noc::Quat::Identity();
+            noc::Vec3 s = noc::Vec3::One();
+            noc::AABB localBounds{ noc::Vec3(-1.0f, -1.0f, -1.0f), noc::Vec3(1.0f, 1.0f, 1.0f) };
+            bool selectable = true;
+        };
 
         static LRESULT CALLBACK OverlayProc_(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
         static LRESULT CALLBACK BodySubclassProc_(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam,
@@ -50,9 +60,10 @@ namespace nocturne::editor
         bool Project_(const noc::Vec3& world, POINT& out) const;
         noc::Vec3 MakePickRay_(int x, int y) const;
         bool RayAabb_(const noc::Vec3& origin, const noc::Vec3& dir, const noc::AABB& box, float& outT) const;
-        noc::AABB DemoWorldBounds_() const;
+        noc::AABB ValidationWorldBounds_(int index) const;
+        int PickValidationObject_(const noc::Vec3& origin, const noc::Vec3& dir) const;
 
-        void SetSelected_(bool selected, bool syncTree = true);
+        void SetSelectedIndex_(int index, bool syncTree = true);
         int HitGizmoAxis_(POINT p) const;
         void BeginGizmoDrag_(int axis, POINT mouse);
         void UpdateGizmoDrag_(POINT mouse);
@@ -74,26 +85,24 @@ namespace nocturne::editor
 
         bool scenePrepared_ = false;
         bool renderAttached_ = false;
-        bool selected_ = false;
         bool cameraCapturing_ = false;
         bool gizmoDragging_ = false;
+        bool syncingTree_ = false;
+        int selectedIndex_ = -1;
+        int dragObjectIndex_ = -1;
         int gizmoAxis_ = -1;
 
         POINT lastMouse_{};
         POINT dragStartMouse_{};
 
-        noc::SceneObjectHandle demoObject_{};
+        ValidationObject validationObjects_[kValidationObjectCount]{};
         noc::SceneObjectHandle cameraObject_{};
-        noc::AABB demoLocalBounds_{ noc::Vec3(-1.0f, -1.0f, -0.08f), noc::Vec3(1.0f, 1.0f, 0.08f) };
 
-        noc::Vec3 demoT_{ 0.0f, 0.0f, 6.0f };
-        noc::Quat demoR_ = noc::Quat::Identity();
-        noc::Vec3 demoS_ = noc::Vec3::One();
         noc::Vec3 dragStartT_{};
         noc::Quat dragStartR_ = noc::Quat::Identity();
         noc::Vec3 dragStartS_ = noc::Vec3::One();
 
-        noc::Vec3 cameraPos_{ 0.0f, 1.25f, -6.0f };
+        noc::Vec3 cameraPos_{ 0.0f, 1.4f, -6.0f };
         noc::Quat cameraRot_ = noc::Quat::Identity();
         float cameraYaw_ = 0.0f;
         float cameraPitch_ = -0.08f;
