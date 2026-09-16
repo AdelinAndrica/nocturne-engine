@@ -2,14 +2,12 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-#include <CommCtrl.h>
 
 #include <cstdint>
-#include <cwctype>
-#include <iterator>
 #include <string>
 #include <vector>
 
+#include "EditorControls.h"
 #include "Platform/Win32/WinWindow.h"
 
 namespace noc { class Engine; }
@@ -17,9 +15,8 @@ namespace noc { class Engine; }
 namespace nocturne::editor
 {
     // Phase 13 editor shell.
-    // Design choice (not directly from the book): native Win32 controls are retained for
-    // the bootstrap, but custom drawing and centralized theme tokens remove the default
-    // Win32 visual language. True docking remains deferred to a dedicated editor UI layer.
+    // Design choice (not directly from the book): the editor uses a small custom Win32
+    // tooling-control layer so stock Windows chrome is not exposed in the Nocturne UI.
     class EditorShell final : public noc::platform::IWindowMessageSink
     {
     public:
@@ -49,10 +46,14 @@ namespace nocturne::editor
             IdContentList,
             IdContentSearch,
             IdConsole,
+            IdConsoleScroll,
             IdInspector,
             IdPlay,
             IdBuild,
             IdStatus,
+            IdViewportPerspective,
+            IdViewportLit,
+            IdViewportShow,
 
             IdMenuFile = 9001,
             IdMenuEdit,
@@ -75,15 +76,14 @@ namespace nocturne::editor
         void CreatePanels_();
         void PopulateSceneTree_();
         void PopulateContentBrowser_();
-        void ApplyThemeToCommonControls_();
         void Layout_(int clientW, int clientH);
         void AppendConsole_(const wchar_t* text);
         void UpdateStatus_();
         void HandleCommand_(int id);
         void ShowPopupMenu_(int menuId, HWND anchor);
+        void SyncConsoleScroll_();
 
         void DrawOwnerControl_(DRAWITEMSTRUCT* dis);
-        void DrawButton_(DRAWITEMSTRUCT* dis);
         void DrawHeader_(DRAWITEMSTRUCT* dis);
         void DrawViewport_(DRAWITEMSTRUCT* dis);
         void DrawInspector_(DRAWITEMSTRUCT* dis);
@@ -93,10 +93,6 @@ namespace nocturne::editor
 
         HWND MakeOwnerStatic_(const wchar_t* text, int id = 0);
         HWND MakeHeader_(const wchar_t* text);
-        HWND MakeButton_(const wchar_t* text, int id);
-        HWND MakeEdit_(DWORD extraStyle, int id);
-        HWND MakeTree_(int id);
-        HWND MakeList_(int id);
 
         static std::wstring Utf8ToWide_(const char* text);
 
@@ -108,15 +104,13 @@ namespace nocturne::editor
         HFONT uiFont_ = nullptr;
         HFONT uiFontBold_ = nullptr;
         HFONT titleFont_ = nullptr;
+        HFONT mutedFont_ = nullptr;
         HFONT consoleFont_ = nullptr;
         HFONT brandFont_ = nullptr;
 
         HBRUSH windowBrush_ = nullptr;
         HBRUSH panelBrush_ = nullptr;
-        HBRUSH panelAltBrush_ = nullptr;
-        HBRUSH viewportBrush_ = nullptr;
         HBRUSH consoleBrush_ = nullptr;
-        HBRUSH inputBrush_ = nullptr;
 
         HWND menuBand_ = nullptr;
         HWND toolbarBand_ = nullptr;
@@ -134,11 +128,14 @@ namespace nocturne::editor
         Panel buildPlay_;
 
         HWND sceneTree_ = nullptr;
+        HWND viewportPerspective_ = nullptr;
+        HWND viewportLit_ = nullptr;
+        HWND viewportShow_ = nullptr;
         HWND contentTree_ = nullptr;
         HWND contentList_ = nullptr;
         HWND contentSearch_ = nullptr;
         HWND consoleEdit_ = nullptr;
-        HWND inspectorText_ = nullptr;
+        HWND consoleScroll_ = nullptr;
         HWND playButton_ = nullptr;
         HWND buildButton_ = nullptr;
         HWND status_ = nullptr;
