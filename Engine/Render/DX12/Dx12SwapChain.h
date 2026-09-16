@@ -11,6 +11,7 @@ namespace noc
 		void Shutdown();
 
 		bool CreateRtvHeapAndViews(ID3D12Device* device);
+		bool Resize(ID3D12Device* device, uint32_t clientWidth, uint32_t clientHeight);
 
 		void Present();
 		uint32_t FrameIndex() const { return frameIndex_; }
@@ -24,6 +25,9 @@ namespace noc
 		D3D12_CPU_DESCRIPTOR_HANDLE CurrentRtv(uint32_t frameIndex) const;
 
 		void TransitionTo(ID3D12GraphicsCommandList* cmd, uint32_t frameIndex, D3D12_RESOURCE_STATES to);
+
+	private:
+		bool CreateBackBufferViews_(ID3D12Device* device);
 
 	private:
 		uint32_t width_ = 0, height_ = 0;
