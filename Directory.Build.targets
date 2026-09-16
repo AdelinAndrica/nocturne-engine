@@ -1,0 +1,21 @@
+<Project>
+  <!--
+    Design choice (not directly from the book): keep direct MSBuild invocations independent
+    from $(SolutionDir). Directory.Build.targets is imported late enough to override project-
+    local defaults when a .vcxproj is built without opening the solution.
+  -->
+  <PropertyGroup>
+    <NocturneRepoRoot>$(MSBuildThisFileDirectory)</NocturneRepoRoot>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)'=='NocturneEngine' and '$(Platform)'=='x64'">
+    <OutDir>$(NocturneRepoRoot)Build\bin\$(ConfigurationName)\</OutDir>
+    <IntDir>$(NocturneRepoRoot)Build\obj\$(MSBuildProjectName)\$(ConfigurationName)\</IntDir>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup Condition="'$(MSBuildProjectName)'=='NocturneEngine'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(NocturneRepoRoot)Engine;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+</Project>
