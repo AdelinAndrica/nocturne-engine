@@ -1,118 +1,350 @@
 # Phase 13 — Editor Framework Bootstrap
 
-> **Status:** IMPLEMENTED ON `phase-13-editor-framework`; the base shell was built successfully in Debug x64 before the modernization pass. Rebuild is required after the modern skin changes.
+> **Status:** ✅ COMPLETE + BUILD/RUNTIME/VISUAL VALIDATED on `phase-13-editor-framework`.
 >
-> **Reference UI:** Nocturne Editor wireframe + ultra-modern dark-theme concept generated for this phase.
+> **Final active shell:** `Apps/NocturneEditor/EditorShellV3.*`
+>
+> **Visual baseline:** the validated Nocturne Editor build after the Tabler SVG scaling/readback fixes.
+>
+> **Phase 14 readiness:** READY — the top-level editor window deliberately has no DX12 swap chain attached; Phase 14 can add a dedicated rendering surface inside the Viewport panel.
 
 ## 1. Phase name + objective
 
-Create the first standalone **Nocturne Editor** application shell while preserving the locked Editor ↔ Runtime boundary: the editor is a client of the runtime engine and does not own or fork the engine main loop.
+Phase 13 established the first standalone **Nocturne Editor** executable and the editor/runtime boundary needed by all later tooling phases.
 
-## 2. Key concepts from the books
+The core architectural rule is now locked:
+
+- the editor is a client of the existing engine/runtime;
+- `noc::MainLoop` remains the single application loop;
+- editor-specific UI code stays in `Apps/NocturneEditor`;
+- the top-level editor HWND is a tooling shell, not the final DX12 render target;
+- the Viewport panel is a Phase 13 placeholder and is the insertion point for the dedicated Phase 14 rendering surface.
+
+## 2. Book grounding
 
 Primary reference: Jason Gregory, *Game Engine Architecture (3rd Edition)*.
 
-- Chapter 15.4 describes the **game world editor** as the gameplay-side authoring tool used to define and populate game worlds.
-- Section 15.4.1 describes common editor facilities including world visualization, selection/tree views, property grids, placement tools and saving/loading.
-- Section 15.4.2 discusses integrated asset management in world editors.
-- Gregory stresses rapid iteration and warns against overcomplicated data-driven tooling; Phase 13 therefore implements only the shell needed by later phases.
+- §15.4 defines the **game world editor** as the gameplay-side tool used to define and populate game worlds.
+- §15.4.1.2 discusses world visualization through perspective/orthographic views and notes that editors may use a rendering engine integrated into the tool, communicate with the game engine, or be integrated into the engine itself.
+- §15.4.1.3 discusses 3D editor navigation and camera-control modes.
+- §15.4.1.4 discusses object selection, including 3D picking and list/tree selection.
+- §15.4.1.6 discusses property-grid presentation for the current selection.
+- §15.4.1.7 discusses translation/rotation/scale handles and other alignment aids.
+- §15.4.2 discusses integrated asset-management tools and the value of unified editor access to assets.
 
-The project architecture additionally locks the rule that the editor shares runtime engine modules and that Runtime retains ownership of the main loop.
+These sections ground the existence and broad responsibilities of the Nocturne Editor.
 
-## 3. What we implement now
+Everything about the exact Win32 implementation, theme, spacing, Tabler icon set, Direct2D SVG raster path and fixed panel composition is **Design choice (not directly from the book)**.
 
-- `NocturneEditor` executable project.
-- Native Windows desktop shell titled **Nocturne Editor**.
-- Custom dark client-area menu bar and editor toolbar.
-- Scene Hierarchy panel backed by current runtime `World` summary data.
-- Central Viewport placeholder with grid/axis/branding treatment.
-- Inspector / Properties placeholder with guidance content.
-- Content Browser reading the configured physical content root.
-- Console / Output panel with timestamped editor messages.
-- Build / Play panel.
-- Custom status bar.
-- Build button connected to the existing Phase 11 `AssetImportPipeline::ImportAll()` mechanism.
-- Runtime-owned `MainLoop` remains the only main loop.
-- Minimal optional `IWindowMessageSink` extension point in `WinWindow` for tool UI messages.
-- Centralized `EditorTheme` visual tokens for colors and metrics.
-- Direct `.vcxproj` builds no longer depend on a correct externally supplied `$(SolutionDir)`.
+## 3. Final Phase 13 implementation
 
-### Explicit non-goals
+### 3.1 Standalone editor executable
 
-- No viewport camera/navigation implementation.
-- No transform gizmos.
-- No viewport picking/selection.
-- No ECS/component editing.
-- No scene serialization.
-- No Play-In-Editor runtime bridge.
-- No user-driven docking/persistence yet.
+Phase 13 added a separate `NocturneEditor` application/project. `main.cpp` initializes the same engine used by runtime applications, creates a resizable editor window, initializes `EditorShellV3`, then runs the existing `noc::MainLoop`.
 
-Those remain assigned to later roadmap phases.
+`main.cpp` intentionally uses:
 
-## 4. Implementation steps
+```cpp
+window.Create(desc)
+```
 
-1. Add `Apps/NocturneEditor` application entry point.
-2. Initialize the existing `noc::Engine` and create the editor shell window without attaching the DX12 swap chain to the top-level HWND.
-3. Add `EditorShell`, which creates and lays out the editor panels.
-4. Add an optional native-window message sink to `WinWindow`; `WinWindow` continues to own `WndProc`.
-5. Populate Content Browser from `EngineConfig::contentRoot`.
-6. Populate Scene Hierarchy from the current runtime `World` summary.
-7. Route toolbar/menu actions to Phase-appropriate behavior or clearly logged later-phase placeholders.
-8. Run the editor through `noc::MainLoop::Run()`.
-9. Add `NocturneEditor.vcxproj` and register it in `Nocturne.slnx`.
-10. Add `EditorTheme` and owner-drawn controls for the Phase 13 visual modernization pass.
-11. Keep Phase 13 rendering detached from the top-level editor window; Phase 14 will provide a dedicated viewport render target.
+rather than attaching the runtime DX12 swap chain to the top-level editor HWND.
 
-## 5. Modernization pass
+This was a critical Phase 13 correction: attaching DX12 to the top-level shell caused the renderer to paint across/over native editor child controls. The dedicated Viewport render target is therefore explicitly Phase 14 scope.
 
-The modern UI concept is implemented as a native Win32 skin rather than a new editor framework dependency. The visual system now uses a near-black/slate base, restrained electric-blue accent, high-contrast typography, increased spacing, owner-drawn toolbar/menu buttons, custom panel headers, a dark viewport placeholder, dark tree/list surfaces, a monospace console, modern Build/Play presentation and a custom segmented status bar.
+### 3.2 Runtime ownership preserved
 
-The goal is to make the Phase 13 shell visually credible while keeping its architecture replaceable. The implementation deliberately does not turn the editor shell into an engine-level UI dependency.
+No second editor loop was introduced. `noc::MainLoop::Run(engine, window)` remains the application loop.
 
-## 6. Verification checklist
+`EditorShellV3` implements `noc::platform::IWindowMessageSink`, allowing editor-specific window/message handling while preserving `WinWindow` ownership of the Win32 window procedure.
 
-- [ ] Pull latest `phase-13-editor-framework`.
-- [ ] Build `NocturneEditor` Debug x64 from the terminal or Visual Studio 2026.
-- [ ] Build completes with 0 errors.
-- [ ] Start `Build/bin/Debug/NocturneEditor.exe` from the repository root.
-- [ ] Window title is `Nocturne Editor` and receives the dark native title-bar treatment where supported by Windows.
-- [ ] Client-area menu and toolbar use the dark theme.
-- [ ] Scene Hierarchy is visible with a blue selection state.
-- [ ] Viewport placeholder shows the Nocturne grid, branding, axis and Phase 14 message.
-- [ ] Inspector is visible on the right with the empty-selection guidance state.
-- [ ] Content Browser lists entries from `Data/` and uses dark tree/list surfaces.
-- [ ] Console shows timestamped editor bootstrap messages.
-- [ ] Build button invokes the asset import pipeline without crashing.
-- [ ] F5 logs the Play request without starting a second runtime loop.
-- [ ] Resizing the editor relayouts the panels.
-- [ ] Closing the editor shuts down the engine cleanly.
+### 3.3 Final editor layout
 
-## 7. Common pitfalls
+The active shell contains:
 
-- Do not attach the DX12 swap chain to the top-level Phase 13 editor HWND; it paints over the native editor controls. Phase 14 needs a dedicated viewport render target.
-- Do not implement a separate editor game loop; Runtime owns orchestration.
-- Do not move viewport/gizmo implementation into this phase.
-- Do not add a second serialization implementation for the editor.
-- Do not let editor-specific code leak into Render, Physics, Audio or Gameplay modules.
-- Keep the native Win32 shell replaceable; it is not an engine-level UI dependency.
+- custom client-area menu strip;
+- compact grouped toolbar;
+- Scene Hierarchy;
+- central Viewport placeholder;
+- Inspector / Properties;
+- Content Browser;
+- Console / Output;
+- Build / Play panel;
+- custom status bar.
 
-## 8. Design choices (not directly from the book)
+The layout is fixed/dock-like for Phase 13. **Design choice (not directly from the book):** user-driven docking and layout persistence are not implemented yet. The Phase 13 goal was to prove the editor composition and subsystem boundaries before introducing a larger UI framework or docking system.
 
-- **Native Win32 controls for the Phase 13 bootstrap.** This avoids introducing a third-party GUI dependency before the editor architecture is proven.
-- **Custom owner-drawn dark skin.** Colors, font choices, spacing, rounded button treatment, grid placeholder and icon-like glyphs are product/UI decisions derived from the Nocturne Editor concept image, not game-engine architecture requirements from the books.
-- **Centralized `EditorTheme`.** Visual tokens are kept out of engine modules so the editor skin remains replaceable.
-- **Fixed dock-like default layout.** User-driven docking/persistence is postponed until a dedicated editor UI layer is selected.
-- **Native dark title bar through DWM where supported.** This is Windows tooling polish, not a book-level architecture requirement.
-- **Per-monitor DPI awareness for Nocturne Editor.** This is a Windows desktop tooling choice.
-- **`IWindowMessageSink` extension point.** This allows tool UI messages without duplicating `WndProc` or the engine window abstraction.
-- **Top-level editor window is not the Phase 13 DX12 render target.** Phase 14 will own a dedicated viewport rendering surface.
-- **Build button invokes `AssetImportPipeline::ImportAll()`.** Full Phase 12 cook/pack workflow remains a host/tooling concern until it is deliberately exposed to the editor.
-- **MSBuild repo-root normalization.** Direct `.vcxproj` builds use repo-relative paths rather than relying on `$(SolutionDir)` being supplied by a solution build.
+### 3.4 Scene Hierarchy
 
-## 9. Next chat handoff
+The Scene Hierarchy displays current runtime-world summary information and establishes the selection-oriented tree presentation required by later editor phases.
 
-After the modernization build and runtime checks pass, say:
+Phase 13 does not implement real viewport/world selection synchronization or scene mutation. Those remain later-phase responsibilities.
 
-> `Phase 13 este build-uit și verificat cu UI-ul modern. Începem Phase 14 — Editor Rendering Viewport folosind Nocturne Editor existent.`
+### 3.5 Inspector / Properties
 
-Bring the terminal build output and a screenshot if any Phase 13 compile/runtime or visual issue remains.
+The Inspector provides the final visual shell and empty-selection state, including guidance copy and the design language future property rows must use.
+
+Actual component/property editing is not Phase 13 scope. Gregory's property-grid model is the architectural reference, but real editable properties depend on later entity/component and scene-editing phases.
+
+### 3.6 Viewport placeholder
+
+The central Viewport panel is intentionally a non-rendering placeholder containing:
+
+- `Perspective / Lit / Show` controls;
+- Nocturne watermark/branding;
+- perspective-style grid;
+- axis marker;
+- grid-size badge;
+- explicit Phase 14 message.
+
+It exists to lock layout, input/UI ownership and visual composition before a dedicated DX12 child rendering surface is introduced.
+
+### 3.7 Content Browser
+
+The Content Browser was upgraded from stock/native controls into a fully Nocturne-styled editor surface:
+
+- robust content-root resolution;
+- folder tree;
+- custom asset table;
+- `Asset` / `Type` columns;
+- list/grid/settings compact controls;
+- semantic asset icons;
+- dark custom selection/hover treatment;
+- no exposed stock ListView header or native horizontal scrollbar.
+
+Relative content roots are resolved from the process context and, when necessary, by walking parent directories from the executable so `Data/` resolves correctly when launching from build output.
+
+### 3.8 Console / Output
+
+The Console uses a dark borderless RichEdit-based output surface with smaller `Cascadia Mono` typography and themed log coloring. Timestamps are muted and `[Editor]` uses the Nocturne accent.
+
+The console remains selectable/copyable while avoiding visible stock Win32 editor chrome.
+
+### 3.9 Build / Play
+
+The Build / Play panel establishes the future run/build workflow visually and provides Phase-appropriate behavior:
+
+- Build is connected to the existing asset import/build-side tooling path available at this stage;
+- Play/F5 remains a logged/editor-shell request and does not introduce a second runtime loop or PIE implementation.
+
+Play-In-Editor remains Phase 27 in the roadmap.
+
+### 3.10 Status bar
+
+The status bar is custom painted and visually secondary. It exposes ready/issues/branch/object/version-style status information without stock Win32 status-bar bevels.
+
+## 4. UI fidelity progression
+
+Phase 13 was intentionally iterative. The final editor came from four visual/tooling passes.
+
+### Pass 1 — modern skin foundation
+
+The initial functional Win32 shell was restyled with:
+
+- near-black/slate palette;
+- electric-blue accent;
+- `Segoe UI Variable Text` UI typography;
+- `Cascadia Mono` console typography;
+- owner-drawn toolbar/menu treatment;
+- panel headers;
+- modern viewport placeholder;
+- custom status presentation.
+
+This pass proved that the native shell could reach the intended visual direction without introducing a large GUI dependency.
+
+### Pass 2 — remove stock Win32 chrome
+
+Pass 2 introduced/reworked editor-only custom controls and removed the largest native-Windows artifacts:
+
+- smaller typography and tighter metrics;
+- custom buttons and focus states;
+- flat idle menu items;
+- narrow custom scrollbars;
+- custom data table;
+- custom tree presentation;
+- custom dark inputs;
+- RichEdit console integration;
+- quieter Inspector / Build / status styling;
+- corrected MSBuild repo-root handling.
+
+A compile failure in this pass exposed `LONG`/`int` template-deduction mismatches in `std::min`, `std::max` and `std::clamp`; Win32 `RECT`/`POINT` values were explicitly converted at the boundary.
+
+### Pass 3 — toolbar rhythm and Content Browser composition
+
+Pass 3 moved the active implementation to `EditorShellV3` and refined:
+
+- menu/toolbar height;
+- toolbar grouping: File / History / Transform / Run-Build;
+- button spacing;
+- panel-header semantics;
+- Scene Hierarchy icon slots;
+- Content Browser proportions;
+- list/grid/settings controls;
+- custom table rows and asset categories;
+- content-root resolution;
+- startup redraw behavior.
+
+The editor initially used hand-drawn GDI vector icons. This was a useful integration prototype but not the final icon system.
+
+### Pass 4 — Tabler SVG icon system
+
+The hand-drawn icon vocabulary was replaced by a commercially usable, coherent Tabler Icons subset vendored under:
+
+`ThirdParty/TablerIcons/`
+
+The upstream MIT license is included.
+
+**Design choice (not directly from the book):** Tabler is the locked general-purpose editor icon vocabulary. Custom Nocturne art should be limited to Nocturne-specific concepts/branding.
+
+The final icon path is:
+
+`Tabler SVG (24x24 logical viewBox) -> Direct2D scale transform -> D2D target bitmap -> CPU-readable staging bitmap -> cached HBITMAP -> AlphaBlend`
+
+Important fixes made while validating this path:
+
+1. **Transparent icons after first SVG integration.** The initial implementation rendered into a D2D bitmap created from WIC, then read the original WIC backing store. Those pixels were not the rendered D2D result. The final implementation explicitly copies to a CPU-readable D2D staging bitmap and maps that bitmap.
+2. **Icons looked like cropped corners.** Creating the SVG document directly at 11–12 px changed the SVG viewport rather than scaling the full 24x24 Tabler geometry. The final renderer keeps a 24x24 logical document and applies a Direct2D transform into the requested glyph size.
+3. **Oversized optical weight.** Final glyph sizes are smaller than their layout slots so the icons have breathing room.
+4. **C4244 overload warning.** Transparent clear color uses the explicit four-component `D2D1::ColorF(r,g,b,a)` overload.
+
+Locked optical sizes:
+
+- 16 px toolbar/action slot -> 12 px rendered glyph;
+- panel header -> 11 px glyph;
+- Scene Hierarchy -> 11 px glyph;
+- Content Browser tree/table -> 11 px glyph;
+- compact icon-only controls -> 11–12 px depending on slot.
+
+## 5. Final icon mappings
+
+The final Phase 13 semantic mapping is:
+
+- New -> `file.svg`
+- Open/folder -> `folder.svg`
+- Save -> `device-floppy.svg`
+- Undo / Redo -> `arrow-back-up.svg` / `arrow-forward-up.svg`
+- Select -> `pointer.svg`
+- Move -> `arrows-move.svg`
+- Rotate -> `rotate.svg`
+- Scale -> `maximize.svg`
+- Play / Stop -> `player-play.svg` / `player-stop.svg`
+- Build/general 3D asset -> `box.svg`
+- List / Grid / Settings -> `list.svg` / `layout-grid.svg` / `settings.svg`
+- Scene Hierarchy -> `hierarchy-2.svg`
+- Viewport -> `device-desktop.svg`
+- Inspector -> `adjustments-horizontal.svg`
+- Console -> `terminal-2.svg`
+- World -> `world.svg`
+- Camera -> `camera.svg`
+- Texture -> `photo.svg`
+- Material -> `sphere.svg`
+- Text -> `file-text.svg`
+- Metadata -> `braces.svg`
+
+The older GDI drawings remain only as an emergency fallback and are not part of the approved visual language.
+
+## 6. Build-system work completed during Phase 13
+
+Phase 13 also hardened direct editor builds:
+
+- `NocturneEditor.vcxproj` uses repository-relative paths rather than depending on an externally supplied `$(SolutionDir)`;
+- editor sources compile as UTF-8;
+- `Directory.Build.targets` supplies the engine include root for direct `NocturneEngine` project builds without late output-directory mutation;
+- the previous MSB8012 target/output mismatch source was removed;
+- the editor project includes the libraries required by its current Win32/DWM/RichEdit/Direct2D/D3D11/WIC/Shlwapi/AlphaBlend tooling path.
+
+The D3D11 dependency here is editor-only support for Direct2D SVG rasterization; it is not the game renderer and does not replace the engine's DX12 renderer.
+
+## 7. Bugs discovered and resolved
+
+The following concrete issues were found during Phase 13 and are part of the phase history:
+
+- DX12 attached to the top-level editor HWND painted over editor controls -> top-level attachment removed.
+- Direct `.vcxproj` builds resolved engine paths under the IDE directory -> project paths normalized to the repository root.
+- Late MSBuild output mutation produced MSB8012 -> late `OutDir` override removed.
+- Custom-control compilation failed on mixed Win32 `LONG` and C++ `int` template arguments -> explicit conversions added at Win32 boundaries.
+- Initial editor frame showed white/unpainted panel gaps until resize -> forced complete redraw after initial layout.
+- Custom button labels disappeared -> labels stored in custom button state rather than relying on fragile window-text retrieval during owner drawing.
+- Content Browser failed when launch working directory differed from repository root -> robust content-root discovery added.
+- PowerShell patching temporarily corrupted UTF-8 punctuation -> migration script changed to explicit UTF-8 without BOM; final canonical sources are stored correctly.
+- First Tabler SVG attempt produced invisible icons -> explicit D2D staging readback added.
+- First small-glyph attempt cropped 24x24 SVG geometry -> fixed logical viewBox + Direct2D transform added.
+- Initial Tabler optical scale was too heavy -> 12/11 px glyph baseline locked.
+
+## 8. Files and ownership
+
+### Active Phase 13 editor files
+
+- `Apps/NocturneEditor/main.cpp`
+- `Apps/NocturneEditor/EditorShellV3.h`
+- `Apps/NocturneEditor/EditorShellV3.cpp`
+- `Apps/NocturneEditor/EditorIconRenderer.h`
+- `Apps/NocturneEditor/EditorIconRenderer.cpp`
+- `Apps/NocturneEditor/EditorTheme.h`
+- `Apps/NocturneEditor/EditorTheme.cpp`
+- `Ide/VS2026/NocturneEditor/NocturneEditor.vcxproj`
+- `Directory.Build.targets`
+- `ThirdParty/TablerIcons/`
+
+### Historical/fallback Phase 13 implementation
+
+`EditorShell.*` / `EditorControls.*` represent earlier Phase 13 UI passes. `main.cpp` uses **EditorShellV3**. Phase 14 must not accidentally wire the rendering viewport into the older shell.
+
+**Design choice (not directly from the book):** the older files are retained for now as Phase 13 history/fallback. They can be consolidated in a deliberate cleanup change, but that cleanup is not required to begin Phase 14.
+
+## 9. Final verification
+
+Phase 13 is considered complete because the following were exercised during the phase:
+
+- [x] standalone Nocturne Editor builds and launches on Windows;
+- [x] editor uses the runtime-owned main loop;
+- [x] top-level shell does not attach the engine DX12 swap chain;
+- [x] editor resizes and relayouts correctly;
+- [x] initial paint no longer requires a manual resize to remove unpainted gaps;
+- [x] Scene Hierarchy, Viewport, Inspector, Content Browser, Console and Build/Play panels are visible and styled consistently;
+- [x] Content Browser resolves and lists `Data/` content;
+- [x] Content table/tree no longer expose stock white/native chrome;
+- [x] toolbar/menu no longer expose the original Vista-era white outline treatment;
+- [x] Tabler SVG icons render visibly and completely;
+- [x] final icon scaling was visually accepted as the Nocturne baseline;
+- [x] Phase 13 stayed out of Phase 14 real viewport rendering;
+- [x] no second main loop or PIE runtime was introduced.
+
+The final visually approved icon/UI baseline was locked in commit `cfc06ed` (`chore(editor): lock validated Phase 13 icon baseline`).
+
+## 10. Explicit Phase 13 non-goals / deferred work
+
+The following are deliberately **not** part of Phase 13 completion:
+
+- real DX12 rendering inside the editor viewport;
+- editor camera/navigation;
+- ray-pick selection;
+- transform gizmos operating on scene objects;
+- editor debug draw;
+- ECS/component authoring;
+- scene create/delete/edit workflows;
+- scene serialization/save/load;
+- true user-configurable docking and layout persistence;
+- full project-file/project-manager abstraction;
+- Play-In-Editor.
+
+The roadmap assigns viewport camera/gizmos/selection/debug draw to Phase 14, entity/component infrastructure to Phase 15, scene editing to Phase 16, serialization to Phase 17 and PIE to Phase 27.
+
+## 11. Common pitfalls carried into Phase 14
+
+- Do **not** attach a renderer/swap chain to the top-level editor HWND.
+- Do **not** create a second application main loop for the viewport.
+- Do **not** wire Phase 14 into legacy `EditorShell`; use `EditorShellV3`.
+- Do **not** let editor-only UI/Direct2D icon code leak into runtime rendering modules.
+- Do **not** implement ECS, serialization or PIE while adding the viewport.
+- Preserve the Phase 13 visual baseline unless a Phase 14 requirement directly needs a local viewport-control adjustment.
+
+## 12. Next chat handoff
+
+Use the dedicated document:
+
+`Docs/Phase 14 — Editor Rendering Viewport Handoff.md`
+
+Start the next chat with:
+
+> `Phase 13 este COMPLETE. Începem Phase 14 — Editor Rendering Viewport. Studiază toate Phase Files și folosește Docs/Phase 14 — Editor Rendering Viewport Handoff.md ca punct de pornire. Păstrează baseline-ul UI din Phase 13 și implementează viewport camera, selection/picking, transform gizmos și debug draw fără să introduci Phase 15/16/17/27.`

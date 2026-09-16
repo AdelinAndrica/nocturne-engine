@@ -1,89 +1,109 @@
 # Phase 13 — UI Fidelity Pass 3: Icons, Toolbar Rhythm & Content Browser
 
-> **Status:** IMPLEMENTED ON `phase-13-editor-framework`; local Windows build/visual verification required.
+> **Status:** ✅ COMPLETE + VALIDATED on `phase-13-editor-framework`.
 >
-> **Scope:** continuation of Phase 13 editor-shell polish only. No Phase 14 viewport rendering, gizmos, picking, scene editing, ECS authoring, serialization or PIE behavior is introduced.
+> **Scope:** continuation of Phase 13 editor-shell polish only. No Phase 14 viewport rendering, gizmos, picking, scene editing, ECS authoring, serialization or PIE behavior was introduced.
+>
+> **Final active shell introduced here:** `Apps/NocturneEditor/EditorShellV3.*`
 
 ## 1. Objective
 
-Bring the current Nocturne Editor shell closer to the approved visual target by removing the remaining generic-control feel and improving visual hierarchy in the toolbar and Content Browser.
+Bring the Nocturne Editor shell closer to the approved visual target by improving visual hierarchy, toolbar grouping, panel chrome and Content Browser composition, while preserving the editor/runtime boundary established earlier in Phase 13.
 
 ## 2. Implemented changes
 
-### 2.1 Icon system
+### 2.1 `EditorShellV3`
 
-**Design choice (not directly from the book):** editor icons are lightweight GDI vector primitives drawn by Nocturne tooling code so they scale cleanly with DPI and do not depend on Unicode glyph fallback or raster assets.
+Pass 3 introduced a dedicated `EditorShellV3` implementation and switched `main.cpp` to use it.
 
-Implemented an editor-only icon vocabulary for:
+The previous `EditorShell` / `EditorControls` implementation remains in the branch as historical/fallback code, but it is not the active shell used by the editor executable.
 
-- New / document
-- Open / folder
-- Save
-- Undo / Redo
-- Select / cursor
-- Move
-- Rotate
-- Scale
-- Play
-- Stop
-- Build / cube
-- List view
-- Grid view
-- Settings
-- panel-header categories
-- Scene Hierarchy categories
-- common Content Browser asset categories
-
-Button labels remain real text and are stored separately from icon state.
+**Important for future phases:** modify `EditorShellV3`, not the older shell, unless a deliberate consolidation refactor is being performed.
 
 ### 2.2 Toolbar rhythm
 
-- Menu height reduced to ~26 px.
-- Toolbar reduced to ~48 px with ~34 px button hit targets.
-- Ordinary button gap reduced to ~4 px.
-- File, History, Transform and Run/Build groups receive larger spacing without bright separator lines.
-- Idle borders are intentionally low contrast.
-- Hover, active and keyboard-focus states remain custom and theme-controlled.
+- Menu height reduced to roughly 26 px.
+- Toolbar reduced to roughly 48 px.
+- Main toolbar hit targets remain roughly 34 px high.
+- Ordinary button gaps reduced.
+- Larger optical spacing separates File, History, Transform and Run/Build groups.
+- Idle borders are low contrast.
+- Hover, active and keyboard-focus states remain custom.
 - Menu items are flat/text-first when idle.
+
+The final conceptual grouping is:
+
+`New Open Save | Undo Redo | Select Move Rotate Scale | Play Stop Build`
 
 ### 2.3 Content Browser composition
 
-- Folder tree target width reduced to roughly 30%, clamped to a compact range.
-- Asset table receives the majority of Content Browser horizontal space.
-- Search row is now `Search | List | Grid | Settings`.
-- List mode is active; Grid and Settings remain explicit Phase 13 tooling-shell stubs.
-- Asset table is fully custom painted and includes category icons.
-- Asset-row selection uses a restrained accent tint.
-- No native ListView header, border or horizontal scrollbar is used.
+- Folder tree reduced to roughly 30% of Content Browser width with compact clamping.
+- Asset table receives the majority of horizontal space.
+- Compact action row established for list/grid/settings modes.
+- List mode is the Phase 13 active mode.
+- Grid and Settings remain tooling-shell stubs.
+- Asset table remains fully custom painted.
+- Selection/hover treatment uses restrained theme colors.
+- Stock ListView header/chrome/horizontal scrollbar are not used.
 
 ### 2.4 Hierarchy and panel chrome
 
-- Generic colored header markers are replaced in Pass 3 by semantic vector icons.
-- Scene Hierarchy uses semantic icons for world, object, camera and environment/folder entries.
-- Existing custom disclosure behavior is preserved.
+- Generic panel markers were replaced with semantic icon slots.
+- Scene Hierarchy rows gained semantic world/object/camera/folder roles.
+- Existing custom disclosure behavior was preserved.
+- Panel headers were made quieter and more consistent with the target mockup.
 
 ### 2.5 Content-root robustness
 
-**Design choice (not directly from the book):** a relative content root is resolved from the current process location first and, when needed, by walking parent directories from the built executable path. This prevents the Content Browser from silently depending on being launched from the repository root.
+A relative content root is now resolved robustly from the process context and, when required, by walking parent directories from the built executable.
+
+This prevents the editor from depending on the repository root being the current working directory.
+
+**Design choice (not directly from the book):** this is editor/tooling path-resolution behavior.
 
 ### 2.6 Startup paint fix
 
-The Pass 3 shell forces one complete parent/child redraw after initial layout so uncovered panel gaps do not retain the previous Win32 background until the first resize.
+The shell performs a complete parent/child redraw after initial layout.
 
-## 3. Implementation structure
+This fixed the visual defect where white/unpainted gaps could remain between panels until the first manual window resize.
 
-Pass 3 is implemented as a dedicated `EditorShellV3` while the previous Phase 13 shell remains in the branch for comparison and rollback during visual iteration.
+### 2.7 Button-label reliability
 
-Files added/changed:
+Custom button labels are stored in the button state and painted from that stored state.
+
+This fixed the regression where the compact custom buttons could render with no visible text after owner-drawing changes.
+
+## 3. Icon history in Pass 3
+
+Pass 3 initially used lightweight hand-drawn GDI vector icons as a fast way to validate:
+
+- icon placement;
+- text/icon spacing;
+- toolbar grouping;
+- panel-header icon slots;
+- Scene Hierarchy icon slots;
+- Content Browser asset icon slots.
+
+That icon implementation was intentionally superseded in Pass 4.
+
+The final Phase 13 icon system is **Tabler SVG**, documented in:
+
+`Docs/Phase 13 — UI Fidelity Pass 4 Tabler Icons.md`
+
+The Pass 3 GDI drawings remain only as emergency fallback code and are not the approved visual language.
+
+## 4. Files added/changed
 
 - `Apps/NocturneEditor/EditorShellV3.h`
 - `Apps/NocturneEditor/EditorShellV3.cpp`
 - `Apps/NocturneEditor/main.cpp`
 - `Ide/VS2026/NocturneEditor/NocturneEditor.vcxproj`
 
-**Design choice (not directly from the book):** keeping the prior shell temporarily allows visual A/B iteration without discarding the already validated Pass 2 implementation. Once Pass 3 is build- and visually validated, the duplicate shell should be consolidated rather than retained indefinitely.
+Later Pass 4 integration added the SVG renderer and Tabler assets without changing the role of `EditorShellV3` as the active shell.
 
-## 4. Visual metrics target
+## 5. Locked layout metrics from this pass
+
+Approximate baseline established here:
 
 - Menu height: ~26 px
 - Toolbar height: ~48 px
@@ -92,29 +112,31 @@ Files added/changed:
 - Toolbar group gap: ~14 px effective spacing
 - Content search/input height: ~30 px
 - Content action buttons: ~30×30 px
-- Content tree target width: ~30%, clamped around 110–145 px at typical editor widths
+- Content tree target width: ~30%, compactly clamped
 - Table header: ~26 px
 - Table rows: ~25 px
 
-## 5. Verification checklist
+Later icon optical sizes are documented separately in Pass 4.
 
-- [ ] Debug x64 build succeeds with zero errors.
-- [ ] Button text remains visible immediately on startup.
-- [ ] Initial frame has no white/unpainted panel gaps; resize is not required to clean the UI.
-- [ ] Toolbar has semantic icons separated from labels.
-- [ ] Toolbar groups read clearly without bright separator lines.
-- [ ] Menu strip is flat when idle.
-- [ ] Content Browser gives more width to the asset table than the folder tree.
-- [ ] Search row includes compact list/grid/settings controls.
-- [ ] Asset table remains fully dark/custom and has no native ListView chrome.
-- [ ] Panel headers use semantic icons instead of generic square markers.
-- [ ] Scene Hierarchy entries use semantic icons.
-- [ ] Content Browser resolves `Data` when editor is launched from the built executable location.
-- [ ] Resize behavior remains stable.
-- [ ] No Phase 14 functionality is introduced.
+## 6. Validation
 
-## 6. Book grounding
+- [x] Debug x64 editor executable built and launched.
+- [x] Button text remains visible immediately on startup.
+- [x] Initial frame no longer requires resize to remove white/unpainted gaps.
+- [x] Toolbar groups read clearly without bright separators.
+- [x] Menu strip is flat when idle.
+- [x] Content Browser gives most horizontal space to the asset table.
+- [x] Compact list/grid/settings controls are present.
+- [x] Asset table remains fully dark/custom.
+- [x] Panel headers use semantic icon slots.
+- [x] Scene Hierarchy entries use semantic icon slots.
+- [x] Content Browser resolves `Data` when launched from build output.
+- [x] Resize behavior is stable.
+- [x] No Phase 14 functionality was introduced.
+- [x] Temporary GDI icon system was successfully replaced by the validated Pass 4 Tabler system.
 
-The editor/world-tooling role remains grounded in Jason Gregory, *Game Engine Architecture (3rd Edition)*, Chapter 15.4 and its discussion of game-world editors and integrated asset/tool workflows.
+## 7. Book grounding
 
-All iconography, layout density, color treatment, custom GDI control rendering and Content Browser proportions in this document are **Design choice (not directly from the book)**.
+The editor/world-tooling role remains grounded in Jason Gregory, *Game Engine Architecture (3rd Edition)*, Chapter 15.4 and its discussion of game-world visualization, selection/tree views and integrated asset workflows.
+
+Toolbar density, panel proportions, Content Browser composition, custom Win32 drawing and temporary/final icon choices are **Design choice (not directly from the book)**.
