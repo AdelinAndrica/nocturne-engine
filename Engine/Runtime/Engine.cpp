@@ -282,6 +282,17 @@ namespace noc {
         return true;
     }
 
+    void Engine::SetDebugSelectionBounds(const AABB& bounds)
+    {
+        debugSelectionBounds_ = bounds;
+        debugSelectionEnabled_ = true;
+    }
+
+    void Engine::ClearDebugSelectionBounds()
+    {
+        debugSelectionEnabled_ = false;
+    }
+
     int Engine::Run()
     {
         WinWindow window;
@@ -332,6 +343,12 @@ namespace noc {
         if (renderAttached_ && renderWidth_ > 0 && renderHeight_ > 0)
         {
             RenderQueue rq = world_.BuildRenderQueue(FrameArena(), renderWidth_, renderHeight_);
+            if (debugSelectionEnabled_)
+            {
+                rq.debugSelection.enabled = 1;
+                rq.debugSelection.boundsMin = debugSelectionBounds_.min;
+                rq.debugSelection.boundsMax = debugSelectionBounds_.max;
+            }
             render_.SetFrameRenderQueue(&rq);
             render_.EndFramePresent();
         }
@@ -356,6 +373,7 @@ namespace noc {
 
     void Engine::Shutdown()
     {
+        ClearDebugSelectionBounds();
         render_.Shutdown();
         renderAttached_ = false;
         renderWidth_ = renderHeight_ = 0;

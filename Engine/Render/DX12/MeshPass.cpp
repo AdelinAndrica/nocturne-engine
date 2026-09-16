@@ -76,6 +76,12 @@ namespace noc
 				instanceBuf_[i]->Unmap(0, nullptr);
 			instanceMapped_[i] = nullptr;
 			instanceBuf_[i].Reset();
+
+			if (selectionUpload_[i] && selectionMapped_[i])
+				selectionUpload_[i]->Unmap(0, nullptr);
+			selectionMapped_[i] = nullptr;
+			selectionUpload_[i].Reset();
+			selectionVbv_[i] = {};
 		}
 
 		perFrameCB_.Shutdown();
@@ -388,7 +394,7 @@ namespace noc
 			return false;
 
 		gridPsoReady_ = true;
-		NOC_LOG_INFO("Render", "Phase 14 depth-tested GPU editor grid ready");
+		NOC_LOG_INFO("Render", "Phase 14 depth-tested GPU editor line pass ready");
 		return true;
 	}
 
@@ -446,7 +452,8 @@ namespace noc
 
 		std::vector<MeshVertexPC> vertices;
 		vertices.reserve(128);
-		constexpr float y = -1.14f;
+		constexpr float gridY = -1.16f; // 1 cm below the ground top (-1.15)
+		constexpr float axisY = -1.14f; // axes remain visible as an editor aid
 		constexpr int minX = -10;
 		constexpr int maxX = 10;
 		constexpr int minZ = -4;
@@ -463,19 +470,18 @@ namespace noc
 		{
 			const bool major = (x % 5) == 0;
 			const float c = major ? 0.34f : 0.20f;
-			addLine((float)x, y, (float)minZ, (float)x, y, (float)maxZ, c, c + 0.02f, c + 0.06f);
+			addLine((float)x, gridY, (float)minZ, (float)x, gridY, (float)maxZ, c, c + 0.02f, c + 0.06f);
 		}
 		for (int z = minZ; z <= maxZ; ++z)
 		{
 			const bool major = (z % 5) == 0;
 			const float c = major ? 0.34f : 0.20f;
-			addLine((float)minX, y, (float)z, (float)maxX, y, (float)z, c, c + 0.02f, c + 0.06f);
+			addLine((float)minX, gridY, (float)z, (float)maxX, gridY, (float)z, c, c + 0.02f, c + 0.06f);
 		}
 
-		// World axes are submitted through the same depth-tested pass.
-		addLine(0.0f, y, 0.0f, 2.0f, y, 0.0f, 0.90f, 0.18f, 0.20f);
-		addLine(0.0f, y, 0.0f, 0.0f, y + 2.0f, 0.0f, 0.22f, 0.86f, 0.38f);
-		addLine(0.0f, y, 0.0f, 0.0f, y, 2.0f, 0.22f, 0.48f, 0.96f);
+		addLine(0.0f, axisY, 0.0f, 2.0f, axisY, 0.0f, 0.90f, 0.18f, 0.20f);
+		addLine(0.0f, axisY, 0.0f, 0.0f, axisY + 2.0f, 0.0f, 0.22f, 0.86f, 0.38f);
+		addLine(0.0f, axisY, 0.0f, 0.0f, axisY, 2.0f, 0.22f, 0.48f, 0.96f);
 
 		gridVertexCount_ = static_cast<uint32_t>(vertices.size());
 		if (!gridVb_.CreateStatic(device, cmd, deferred, sync, frameIndex, GpuBuffer::Kind::Vertex,
@@ -483,6 +489,36 @@ namespace noc
 			return false;
 
 		gridReady_ = true;
+		return true;
+	}
+
+	bool MeshPass::EnsureSelectionUpload_(ID3D12Device* device)
+	{
+		if (!device)
+			return false;
+		if (selectionUpload_[0])
+			return true;
+
+		constexpr UINT64 bytes = sizeof(MeshVertexPC) * 24u;
+		for (uint32_t i = 0; i < dx12::kFrameCount; ++i)
+		{
+			D3D12_HEAP_PROPERTIES hp{};
+			hp.Type = D3D12_HEAP_TYPE_UPLOAD;
+			D3D12_RESOURCE_DESC desc = dx12::BufferDesc(bytes);
+			if (!dx12::HrOk(device->CreateCommittedResource(
+				&hp, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ,
+				nullptr, IID_PPV_ARGS(&selectionUpload_[i])), "CreateCommittedResource(EditorSelectionUpload)"))
+				return false;
+
+			void* mapped = nullptr;
+			D3D12_RANGE noRead{ 0, 0 };
+			if (!dx12::HrOk(selectionUpload_[i]->Map(0, &noRead, &mapped), "EditorSelectionUpload.Map"))
+				return false;
+			selectionMapped_[i] = static_cast<uint8_t*>(mapped);
+			selectionVbv_[i].BufferLocation = selectionUpload_[i]->GetGPUVirtualAddress();
+			selectionVbv_[i].SizeInBytes = static_cast<UINT>(bytes);
+			selectionVbv_[i].StrideInBytes = sizeof(MeshVertexPC);
+		}
 		return true;
 	}
 
@@ -565,10 +601,12 @@ namespace noc
 			cmd->DrawIndexedInstanced(indexCount_, count, 0, 0, 0);
 		}
 
-		// Draw the grid after opaque scene geometry. Because it depth-tests with
-		// LESS_EQUAL and does not write depth, cubes occlude it while its 1 cm lift
-		// above the validation ground prevents z-fighting with the platform top.
-		if (EnsureGridPso_(device, rm) && EnsureGridUploaded_(device, cmd, deferred, sync, frameIndex))
+		const bool linePassReady = EnsureGridPso_(device, rm);
+
+		// The grid is intentionally below the ground top surface. Because it is
+		// drawn after opaque geometry with depth test on and depth writes off, the
+		// Ground_Plane now occludes it instead of showing grid lines through itself.
+		if (linePassReady && EnsureGridUploaded_(device, cmd, deferred, sync, frameIndex))
 		{
 			cmd->SetGraphicsRootSignature(gridRootSig_.Get());
 			cmd->SetPipelineState(gridPso_.Get());
@@ -578,6 +616,42 @@ namespace noc
 			cmd->IASetVertexBuffers(0, 1, &gridVbv);
 			cmd->IASetIndexBuffer(nullptr);
 			cmd->DrawInstanced(gridVertexCount_, 1, 0, 0);
+		}
+
+		// Selection bounds use the same depth-tested line pass. A tiny expansion
+		// moves front-facing edges off the object's surface to avoid z fighting;
+		// rear edges remain behind the object's depth and are therefore hidden.
+		if (linePassReady && queue->debugSelection.enabled && EnsureSelectionUpload_(device))
+		{
+			const Vec3 center = (queue->debugSelection.boundsMin + queue->debugSelection.boundsMax) * 0.5f;
+			Vec3 half = (queue->debugSelection.boundsMax - queue->debugSelection.boundsMin) * 0.5f;
+			half = half * 1.015f + Vec3(0.008f, 0.008f, 0.008f);
+			const Vec3 mn = center - half;
+			const Vec3 mx = center + half;
+			const Vec3 corners[8] = {
+				{mn.x,mn.y,mn.z},{mx.x,mn.y,mn.z},{mn.x,mx.y,mn.z},{mx.x,mx.y,mn.z},
+				{mn.x,mn.y,mx.z},{mx.x,mn.y,mx.z},{mn.x,mx.y,mx.z},{mx.x,mx.y,mx.z}
+			};
+			const int edges[12][2] = {
+				{0,1},{0,2},{1,3},{2,3},{4,5},{4,6},{5,7},{6,7},{0,4},{1,5},{2,6},{3,7}
+			};
+
+			MeshVertexPC* out = reinterpret_cast<MeshVertexPC*>(selectionMapped_[frameIndex]);
+			for (int e = 0; e < 12; ++e)
+			{
+				const Vec3 a = corners[edges[e][0]];
+				const Vec3 b = corners[edges[e][1]];
+				out[e * 2 + 0] = { a.x, a.y, a.z, 1.00f, 0.72f, 0.16f, 1.0f };
+				out[e * 2 + 1] = { b.x, b.y, b.z, 1.00f, 0.72f, 0.16f, 1.0f };
+			}
+
+			cmd->SetGraphicsRootSignature(gridRootSig_.Get());
+			cmd->SetPipelineState(gridPso_.Get());
+			cmd->SetGraphicsRootDescriptorTable(0, perFrameCbv_[frameIndex].gpu);
+			cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+			cmd->IASetVertexBuffers(0, 1, &selectionVbv_[frameIndex]);
+			cmd->IASetIndexBuffer(nullptr);
+			cmd->DrawInstanced(24, 1, 0, 0);
 		}
 	}
 }

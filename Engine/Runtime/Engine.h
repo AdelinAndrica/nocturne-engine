@@ -20,7 +20,6 @@
 
 #include "Assets/AssetImportPipeline.h"
 
-
 namespace noc {
 
 	class WinWindow;
@@ -72,6 +71,11 @@ namespace noc {
 		bool ResizeRenderWindow(uint32_t clientWidth, uint32_t clientHeight);
 		bool CreateAndAttachMainWindow(WinWindowDesc desc, WinWindow& outWindow);
 
+		// Design choice (not directly from the book): Phase 14 exposes one small
+		// depth-tested debug-selection channel to the renderer. It is deliberately
+		// generic and does not expose editor/Win32 types to rendering code.
+		void SetDebugSelectionBounds(const AABB& bounds);
+		void ClearDebugSelectionBounds();
 
 	private:
 		bool IsConfigMutable() const { return !initialized_; }
@@ -105,6 +109,9 @@ namespace noc {
 		bool renderAttached_ = false;
 		uint32_t renderWidth_ = 0;
 		uint32_t renderHeight_ = 0;
+
+		bool debugSelectionEnabled_ = false;
+		AABB debugSelectionBounds_{};
 	};
 
 } // namespace noc

@@ -47,6 +47,7 @@ namespace noc
 			Dx12DeferredReleaseQueue& deferred, const Dx12FrameSync& sync, uint32_t frameIndex);
 		bool EnsureGridUploaded_(ID3D12Device* device, ID3D12GraphicsCommandList* cmd,
 			Dx12DeferredReleaseQueue& deferred, const Dx12FrameSync& sync, uint32_t frameIndex);
+		bool EnsureSelectionUpload_(ID3D12Device* device);
 
 		void EnsurePerFrameCbv_(ID3D12Device* device);
 		void EnsurePerFrameInstanceSrv_(ID3D12Device* device);
@@ -66,9 +67,9 @@ namespace noc
 		dx12::ComPtr<ID3D12RootSignature> rootSig_;
 		dx12::ComPtr<ID3D12PipelineState> pso_;
 
-		// Design choice (not directly from the book): the editor grid is real GPU
-		// line geometry with its own small shader/root signature. It depth-tests
-		// against the scene but does not write depth, so objects occlude it correctly.
+		// Design choice (not directly from the book): grid, axes and selection
+		// bounds share one LINE PSO. It depth-tests against scene geometry and does
+		// not write depth, so debug lines cannot reveal hidden cube edges.
 		dx12::ComPtr<ID3D12RootSignature> gridRootSig_;
 		dx12::ComPtr<ID3D12PipelineState> gridPso_;
 
@@ -80,6 +81,12 @@ namespace noc
 
 		GpuBuffer gridVb_;
 		uint32_t gridVertexCount_ = 0;
+
+		// One persistently mapped 12-line selection VB per frame-in-flight avoids
+		// CPU/GPU overwrite hazards while selection/gizmos update every frame.
+		dx12::ComPtr<ID3D12Resource> selectionUpload_[dx12::kFrameCount];
+		uint8_t* selectionMapped_[dx12::kFrameCount]{};
+		D3D12_VERTEX_BUFFER_VIEW selectionVbv_[dx12::kFrameCount]{};
 
 		// Per-frame constants
 		GpuRingConstantBuffer perFrameCB_;

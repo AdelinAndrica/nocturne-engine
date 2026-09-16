@@ -30,6 +30,7 @@ namespace nocturne::editor
         static constexpr UINT_PTR kSubclassIdBody = 0x1401;
         static constexpr UINT_PTR kSubclassIdMain = 0x1402;
         static constexpr UINT_PTR kSubclassIdTree = 0x1403;
+        static constexpr UINT_PTR kSubclassIdRenderHost = 0x1404;
         static constexpr UINT_PTR kTimerId = 0x1410;
         static constexpr int kValidationObjectCount = 4;
 
@@ -50,6 +51,8 @@ namespace nocturne::editor
             UINT_PTR subclassId, DWORD_PTR refData);
         static LRESULT CALLBACK SceneTreeSubclassProc_(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam,
             UINT_PTR subclassId, DWORD_PTR refData);
+        static LRESULT CALLBACK RenderHostSubclassProc_(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam,
+            UINT_PTR subclassId, DWORD_PTR refData);
 
         static bool RegisterOverlayClass_();
         void LayoutChildren_();
@@ -63,15 +66,17 @@ namespace nocturne::editor
         bool Project_(const noc::Vec3& world, POINT& out) const;
         noc::Vec3 MakePickRay_(int x, int y) const;
         bool RayAabb_(const noc::Vec3& origin, const noc::Vec3& dir, const noc::AABB& box, float& outT) const;
+        bool RayValidationObject_(int index, const noc::Vec3& origin, const noc::Vec3& dir, float& outT) const;
         noc::AABB ValidationWorldBounds_(int index) const;
         int PickValidationObject_(const noc::Vec3& origin, const noc::Vec3& dir) const;
 
         void SetSelectedIndex_(int index, bool syncTree = true);
+        void RefreshDebugSelection_();
         int HitGizmoAxis_(POINT p) const;
         void BeginGizmoDrag_(int axis, POINT mouse);
         void UpdateGizmoDrag_(POINT mouse);
         void EndGizmoDrag_();
-        void HandleOverlayMouse_(UINT msg, WPARAM wParam, LPARAM lParam);
+        void HandleViewportMouse_(UINT msg, WPARAM wParam, LPARAM lParam);
 
         int ActiveTool_() const;
 

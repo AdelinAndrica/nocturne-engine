@@ -138,7 +138,7 @@ namespace nocturne::editor
         };
 
         // Design choice (not directly from the book): deterministic Phase 14
-        // viewport scene. Ground is selectable now because it is exposed as a real
+        // viewport scene. Ground is selectable because it is exposed as a real
         // hierarchy object alongside the three validation cubes.
         if (!createValidationObject(0, { 0.0f, -0.15f, 6.0f }, noc::Quat::Identity(), { 1.0f, 1.0f, 1.0f }, true) ||
             !createValidationObject(1, { -2.5f, -0.10f, 9.0f }, AxisAngle({ 0,1,0 }, 0.38f), { 0.8f, 1.05f, 0.8f }, true) ||
@@ -220,16 +220,22 @@ namespace nocturne::editor
             reinterpret_cast<DWORD_PTR>(this));
 
         renderHost_ = CreateWindowExW(0, L"STATIC", L"",
-            WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
+            WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_TABSTOP,
             0, 0, 1, 1, body_, nullptr, GetModuleHandleW(nullptr), nullptr);
         if (!renderHost_)
         {
             NOC_LOG_ERROR("Editor", "Phase 14 render host creation failed (err=%lu)", GetLastError());
             return false;
         }
+        if (!SetWindowSubclass(renderHost_, &EditorViewportController::RenderHostSubclassProc_, kSubclassIdRenderHost,
+            reinterpret_cast<DWORD_PTR>(this)))
+        {
+            NOC_LOG_ERROR("Editor", "Phase 14 render-host input subclass failed");
+            return false;
+        }
 
         overlay_ = CreateWindowExW(WS_EX_LAYERED, kOverlayClass, L"",
-            WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+            WS_CHILD | WS_VISIBLE,
             0, 0, 1, 1, body_, nullptr, GetModuleHandleW(nullptr), this);
         if (!overlay_)
         {
@@ -253,12 +259,14 @@ namespace nocturne::editor
         hierarchySelectedRow_ = 0;
         InvalidateRect(sceneTree_, nullptr, FALSE);
         SetTimer(topLevel_, kTimerId, 16, nullptr);
-        NOC_LOG_INFO("Editor", "Phase 14 viewport controller attached; explicit scene hierarchy bridge active");
+        NOC_LOG_INFO("Editor", "Phase 14 viewport controller attached; render-host input routing active");
         return true;
     }
 
     void EditorViewportController::Shutdown()
     {
+        if (engine_)
+            engine_->ClearDebugSelectionBounds();
         if (topLevel_)
         {
             KillTimer(topLevel_, kTimerId);
@@ -268,7 +276,9 @@ namespace nocturne::editor
             RemoveWindowSubclass(body_, &EditorViewportController::BodySubclassProc_, kSubclassIdBody);
         if (sceneTree_)
             RemoveWindowSubclass(sceneTree_, &EditorViewportController::SceneTreeSubclassProc_, kSubclassIdTree);
-        if (GetCapture() == overlay_)
+        if (renderHost_)
+            RemoveWindowSubclass(renderHost_, &EditorViewportController::RenderHostSubclassProc_, kSubclassIdRenderHost);
+        if (GetCapture() == renderHost_)
             ReleaseCapture();
 
         cameraCapturing_ = false;
@@ -284,6 +294,7 @@ namespace nocturne::editor
         overlay_ = nullptr;
         renderHost_ = nullptr;
         sceneTree_ = nullptr;
+        engine_ = nullptr;
     }
 
     void EditorViewportController::LayoutChildren_()
@@ -351,8 +362,8 @@ namespace nocturne::editor
 
     bool EditorViewportController::Project_(const noc::Vec3& world, POINT& out) const
     {
-        if (!overlay_) return false;
-        RECT rc{}; GetClientRect(overlay_, &rc);
+        if (!renderHost_) return false;
+        RECT rc{}; GetClientRect(renderHost_, &rc);
         const float w = float(rc.right - rc.left), h = float(rc.bottom - rc.top);
         if (w <= 1.0f || h <= 1.0f) return false;
 
@@ -376,7 +387,7 @@ namespace nocturne::editor
 
     noc::Vec3 EditorViewportController::MakePickRay_(int x, int y) const
     {
-        RECT rc{}; GetClientRect(overlay_, &rc);
+        RECT rc{}; GetClientRect(renderHost_, &rc);
         const float w = float((std::max)(1L, rc.right - rc.left));
         const float h = float((std::max)(1L, rc.bottom - rc.top));
         const float ndcX = 2.0f * float(x) / w - 1.0f;
@@ -414,6 +425,26 @@ namespace nocturne::editor
         return tmax >= 0.0f;
     }
 
+    bool EditorViewportController::RayValidationObject_(int index, const noc::Vec3& origin,
+        const noc::Vec3& dir, float& outT) const
+    {
+        if (index < 0 || index >= kValidationObjectCount)
+            return false;
+        const ValidationObject& object = validationObjects_[index];
+        if (std::fabs(object.s.x) <= 1e-6f || std::fabs(object.s.y) <= 1e-6f || std::fabs(object.s.z) <= 1e-6f)
+            return false;
+
+        // Inverse TRS transforms the world-space ray into the object's local
+        // coordinates. The direction is intentionally not normalized after the
+        // inverse scale, so the returned slab t remains comparable across objects.
+        const noc::Quat invRot{ -object.r.x, -object.r.y, -object.r.z, object.r.w };
+        noc::Vec3 localOrigin = noc::Rotate(invRot, origin - object.t);
+        noc::Vec3 localDir = noc::Rotate(invRot, dir);
+        localOrigin.x /= object.s.x; localOrigin.y /= object.s.y; localOrigin.z /= object.s.z;
+        localDir.x /= object.s.x; localDir.y /= object.s.y; localDir.z /= object.s.z;
+        return RayAabb_(localOrigin, localDir, object.localBounds, outT);
+    }
+
     noc::AABB EditorViewportController::ValidationWorldBounds_(int index) const
     {
         if (index < 0 || index >= kValidationObjectCount)
@@ -431,7 +462,7 @@ namespace nocturne::editor
             const ValidationObject& object = validationObjects_[i];
             if (!object.selectable || !object.handle.IsValid()) continue;
             float t = 0.0f;
-            if (RayAabb_(origin, dir, ValidationWorldBounds_(i), t) && t >= 0.0f && t < nearestT)
+            if (RayValidationObject_(i, origin, dir, t) && t >= 0.0f && t < nearestT)
             {
                 nearestT = t;
                 nearestIndex = i;
@@ -440,11 +471,22 @@ namespace nocturne::editor
         return nearestIndex;
     }
 
+    void EditorViewportController::RefreshDebugSelection_()
+    {
+        if (!engine_)
+            return;
+        if (selectedIndex_ >= 0 && selectedIndex_ < kValidationObjectCount)
+            engine_->SetDebugSelectionBounds(ValidationWorldBounds_(selectedIndex_));
+        else
+            engine_->ClearDebugSelectionBounds();
+    }
+
     void EditorViewportController::SetSelectedIndex_(int index, bool syncTree)
     {
         if (index < 0 || index >= kValidationObjectCount || !validationObjects_[index].selectable)
             index = -1;
         selectedIndex_ = index;
+        RefreshDebugSelection_();
 
         if (syncTree)
         {
@@ -498,7 +540,7 @@ namespace nocturne::editor
         dragStartT_ = object.t;
         dragStartR_ = object.r;
         dragStartS_ = object.s;
-        SetCapture(overlay_);
+        SetCapture(renderHost_);
     }
 
     void EditorViewportController::UpdateGizmoDrag_(POINT mouse)
@@ -533,6 +575,7 @@ namespace nocturne::editor
 
         engine_->GetWorld().SetLocalTRS(object.handle, object.t, object.r, object.s);
         engine_->GetWorld().Update();
+        RefreshDebugSelection_();
         InvalidateRect(overlay_, nullptr, FALSE);
     }
 
@@ -542,22 +585,22 @@ namespace nocturne::editor
         gizmoDragging_ = false;
         gizmoAxis_ = -1;
         dragObjectIndex_ = -1;
-        if (GetCapture() == overlay_) ReleaseCapture();
+        if (GetCapture() == renderHost_) ReleaseCapture();
         if (overlay_) InvalidateRect(overlay_, nullptr, FALSE);
     }
 
-    void EditorViewportController::HandleOverlayMouse_(UINT msg, WPARAM wParam, LPARAM lParam)
+    void EditorViewportController::HandleViewportMouse_(UINT msg, WPARAM wParam, LPARAM lParam)
     {
         const POINT mouse{ GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
         switch (msg)
         {
         case WM_RBUTTONDOWN:
-            SetFocus(overlay_); cameraCapturing_ = true; lastMouse_ = mouse; SetCapture(overlay_); break;
+            SetFocus(renderHost_); cameraCapturing_ = true; lastMouse_ = mouse; SetCapture(renderHost_); break;
         case WM_RBUTTONUP:
-            cameraCapturing_ = false; if (GetCapture() == overlay_) ReleaseCapture(); break;
+            cameraCapturing_ = false; if (GetCapture() == renderHost_) ReleaseCapture(); break;
         case WM_LBUTTONDOWN:
         {
-            SetFocus(overlay_);
+            SetFocus(renderHost_);
             const int tool = ActiveTool_();
             if (selectedIndex_ >= 0 && (tool == kMoveTool || tool == kRotateTool || tool == kScaleTool))
             {
@@ -594,29 +637,11 @@ namespace nocturne::editor
         FillRect(dc, &rc, keyBrush);
         DeleteObject(keyBrush);
 
-        // Grid + world axes moved to the DX12 pass so they participate in depth.
-        // The layered overlay now contains only intentionally always-visible editor
-        // feedback: selection bounds and transform gizmo handles.
+        // Grid and selection bounds are depth-tested DX12 debug geometry now.
+        // The Win32 overlay is intentionally limited to transform gizmo handles,
+        // which remain always visible as an editor interaction affordance.
         if (selectedIndex_ < 0)
             return;
-
-        const auto& theme = EditorTheme::Colors();
-        const noc::AABB bounds = ValidationWorldBounds_(selectedIndex_);
-        const noc::Vec3 c[8] = {
-            {bounds.min.x,bounds.min.y,bounds.min.z},{bounds.max.x,bounds.min.y,bounds.min.z},
-            {bounds.min.x,bounds.max.y,bounds.min.z},{bounds.max.x,bounds.max.y,bounds.min.z},
-            {bounds.min.x,bounds.min.y,bounds.max.z},{bounds.max.x,bounds.min.y,bounds.max.z},
-            {bounds.min.x,bounds.max.y,bounds.max.z},{bounds.max.x,bounds.max.y,bounds.max.z}
-        };
-        const int edges[12][2] = {
-            {0,1},{0,2},{1,3},{2,3},{4,5},{4,6},{5,7},{6,7},{0,4},{1,5},{2,6},{3,7}
-        };
-        for (const auto& edge : edges)
-        {
-            POINT a{}, e{};
-            if (Project_(c[edge[0]], a) && Project_(c[edge[1]], e))
-                DrawLine(dc, a, e, theme.warning, 2);
-        }
 
         const int tool = ActiveTool_();
         if (tool == kMoveTool || tool == kRotateTool || tool == kScaleTool)
@@ -738,6 +763,10 @@ namespace nocturne::editor
 
         switch (msg)
         {
+        case WM_NCHITTEST:
+            // The layered overlay is visual-only. Returning HTTRANSPARENT makes
+            // the DX12 render host the single deterministic input target.
+            return HTTRANSPARENT;
         case WM_ERASEBKGND: return 1;
         case WM_PAINT:
         {
@@ -748,15 +777,6 @@ namespace nocturne::editor
             EndPaint(hwnd, &ps);
             return 0;
         }
-        case WM_RBUTTONDOWN: case WM_RBUTTONUP:
-        case WM_LBUTTONDOWN: case WM_LBUTTONUP:
-        case WM_MOUSEMOVE: case WM_MOUSEWHEEL: case WM_CAPTURECHANGED:
-            self->HandleOverlayMouse_(msg, wParam, lParam);
-            return 0;
-        case WM_KILLFOCUS:
-            self->cameraCapturing_ = false;
-            self->EndGizmoDrag_();
-            return 0;
         }
         return DefWindowProcW(hwnd, msg, wParam, lParam);
     }
@@ -781,6 +801,29 @@ namespace nocturne::editor
         {
             self->UpdateCamera_();
             if (self->overlay_) InvalidateRect(self->overlay_, nullptr, FALSE);
+        }
+        return DefSubclassProc(hwnd, msg, wParam, lParam);
+    }
+
+    LRESULT CALLBACK EditorViewportController::RenderHostSubclassProc_(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam,
+        UINT_PTR subclassId, DWORD_PTR refData)
+    {
+        (void)subclassId;
+        auto* self = reinterpret_cast<EditorViewportController*>(refData);
+        if (!self)
+            return DefSubclassProc(hwnd, msg, wParam, lParam);
+
+        switch (msg)
+        {
+        case WM_RBUTTONDOWN: case WM_RBUTTONUP:
+        case WM_LBUTTONDOWN: case WM_LBUTTONUP:
+        case WM_MOUSEMOVE: case WM_MOUSEWHEEL: case WM_CAPTURECHANGED:
+            self->HandleViewportMouse_(msg, wParam, lParam);
+            return 0;
+        case WM_KILLFOCUS:
+            self->cameraCapturing_ = false;
+            self->EndGizmoDrag_();
+            return 0;
         }
         return DefSubclassProc(hwnd, msg, wParam, lParam);
     }
@@ -828,9 +871,6 @@ namespace nocturne::editor
             const int row = self->HierarchyRowFromY_(GET_Y_LPARAM(lParam));
             if (row < 0) return 0;
 
-            // Runtime Objects is a real grouping row. Clicking its arrow only
-            // expands/collapses it; selecting the row itself no longer maps to a
-            // synthetic cube click, removing the Phase 14 hierarchy flicker.
             if (row == 1)
             {
                 const int x = GET_X_LPARAM(lParam);
