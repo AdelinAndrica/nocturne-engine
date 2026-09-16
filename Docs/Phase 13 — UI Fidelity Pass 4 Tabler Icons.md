@@ -1,6 +1,6 @@
 # Phase 13 — UI Fidelity Pass 4: Tabler Icon System
 
-> **Status:** RENDERER + ASSETS IMPLEMENTED on `phase-13-editor-framework`; one small `EditorShellV3.cpp` integration patch and local Windows build/visual verification remain.
+> **Status:** IMPLEMENTED + VISUALLY VALIDATED on `phase-13-editor-framework`.
 >
 > **Scope:** Phase 13 editor-shell polish only. No Phase 14 viewport rendering, picking or gizmo behavior is introduced.
 
@@ -20,15 +20,33 @@ The upstream visual contract is retained: 24x24 SVG viewBox, 2px outline stroke,
 
 Custom Nocturne-specific art should be limited to the Nocturne mark and concepts for which the selected set has no suitable semantic icon.
 
-## Implementation
+## Final implementation
 
-`EditorIconRenderer.h/.cpp` adds an editor-only SVG asset layer. SVG remains the source of truth. On Windows, icons are rasterized through the Direct2D SVG API into transparent premultiplied BGRA bitmaps, cached by icon/size/color, and alpha-blended into the existing Phase 13 GDI controls.
+`EditorIconRenderer.h/.cpp` provides an editor-only SVG asset layer. SVG remains the source of truth. On Windows, icons are rasterized through the Direct2D SVG API into transparent premultiplied BGRA bitmaps, cached by icon/size/color, and alpha-blended into the existing Phase 13 GDI controls.
 
-This preserves the current editor shell while eliminating Unicode-glyph fallback and the improvised per-icon GDI geometry.
+The validated raster path is:
+
+`Tabler SVG (24x24 logical coordinates) -> Direct2D scale transform -> D2D render target -> CPU-readable staging bitmap -> cached HBITMAP -> AlphaBlend`
+
+The explicit 24x24 logical viewport is important: shrinking the SVG viewport itself clipped the geometry instead of scaling the full glyph. The final renderer preserves the full Tabler viewBox and applies a Direct2D transform to the requested glyph size.
 
 The renderer searches for `ThirdParty/TablerIcons/icons/outline` from the current repository working directory and by walking parent directories from the built executable, so Debug/Development builds launched from `Build/bin` can still resolve editor icon assets.
 
-## Selected mappings
+## Locked icon sizing
+
+**Design choice (not directly from the book):** the following values are now the Phase 13 visual baseline:
+
+- toolbar / primary action slots: 16px slot, **12px rendered glyph**;
+- panel headers: **11px rendered glyph**;
+- Scene Hierarchy rows: **11px rendered glyph**;
+- Content Browser tree/table rows: **11px rendered glyph**;
+- compact icon-only buttons: 11-12px depending on slot size.
+
+The slot remains larger than the glyph so text alignment and spacing stay stable while the icon receives optical breathing room.
+
+## Locked semantic mappings
+
+The final visual review explicitly re-checked the potentially ambiguous mappings and retained the following because they remain readable at 11-12px and fit the Nocturne tooling vocabulary:
 
 - New -> `file.svg`
 - Open/folder -> `folder.svg`
@@ -52,35 +70,35 @@ The renderer searches for `ThirdParty/TablerIcons/icons/outline` from the curren
 - Text -> `file-text.svg`
 - Metadata -> `braces.svg`
 
-## Final integration step
+No additional semantic substitutions are required for the Phase 13 baseline.
 
-Because the GitHub connector only replaces complete files and `EditorShellV3.cpp` is intentionally kept intact for Phase 13 A/B iteration, the repository contains an idempotent integration script:
+## Legacy fallback policy
 
-```powershell
-.\Tools\Phase13\ApplyTablerIconRenderer.ps1
-```
+The old hand-drawn GDI icon code is no longer part of the approved visual language. It remains only as an emergency fallback if SVG initialization or asset lookup fails. Normal editor rendering must use the Tabler SVG path.
 
-It performs only two changes to `EditorShellV3.cpp`:
-
-1. adds `#include "EditorIconRenderer.h"`;
-2. makes `DrawIcon()` try the Tabler SVG renderer first and fall back to the validated Pass 3 GDI icon only if SVG rendering is unavailable.
-
-After local build and visual validation, commit that small generated diff to `phase-13-editor-framework`.
+The one-off PowerShell migration/repair scripts used while integrating the renderer have been removed after validation; the canonical implementation now lives directly in the editor source.
 
 ## Verification checklist
 
-- [ ] Run `Tools/Phase13/ApplyTablerIconRenderer.ps1` once.
-- [ ] Debug x64 builds with zero errors.
-- [ ] Toolbar icons use consistent Tabler geometry/stroke weight.
-- [ ] Panel-header icons use the same Tabler vocabulary.
-- [ ] Scene Hierarchy and Content Browser icons render cleanly at 14-16px.
-- [ ] Active/hover tinting still follows the Nocturne theme.
-- [ ] Icons resolve when launched from `Build/bin`.
-- [ ] If SVG initialization fails, the existing GDI icon fallback remains usable.
-- [ ] No Phase 14 functionality is introduced.
+- [x] Tabler SVG subset and MIT license are vendored in the repository.
+- [x] `EditorShellV3` calls the SVG renderer directly.
+- [x] Full 24x24 Tabler geometry is scaled rather than clipped.
+- [x] Toolbar glyphs render at the locked 12px optical size.
+- [x] Header/tree/table glyphs render at the locked 11px optical size.
+- [x] Toolbar icons use consistent Tabler geometry/stroke weight.
+- [x] Panel-header icons use the same Tabler vocabulary.
+- [x] Scene Hierarchy and Content Browser icons render cleanly at compact sizes.
+- [x] Active/hover tinting follows the Nocturne theme.
+- [x] Icons resolve when the editor is launched from the build output.
+- [x] Windows runtime visual validation completed against the approved Phase 13 editor shell.
+- [x] No Phase 14 functionality is introduced.
+
+## Phase 13 visual baseline
+
+The current editor screenshot after the Direct2D viewBox/scaling fix is the baseline for future editor phases. Phase 14+ work should preserve this icon sizing, spacing and visual hierarchy unless a later editor-specific design pass explicitly replaces it.
 
 ## Book grounding
 
 The editor/tooling role remains grounded in Jason Gregory, *Game Engine Architecture (3rd Edition)*, Chapter 15.4 and its discussion of game-world editors and integrated asset/tool workflows.
 
-Tabler selection, SVG rendering, Direct2D integration, icon caching, tinting and exact UI styling are **Design choice (not directly from the book)**.
+Tabler selection, SVG rendering, Direct2D integration, icon caching, tinting, glyph sizing and exact UI styling are **Design choice (not directly from the book)**.
