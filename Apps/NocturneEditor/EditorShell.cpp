@@ -37,7 +37,7 @@ namespace nocturne::editor
                 (GetBValue(a) * aPercent + GetBValue(b) * bPercent) / 100);
         }
 
-        void Fill(HDC dc, const RECT& rc, COLORREF color)
+        void Fill(HDC dc, const RECT &rc, COLORREF color)
         {
             HBRUSH brush = CreateSolidBrush(color);
             FillRect(dc, &rc, brush);
@@ -57,34 +57,42 @@ namespace nocturne::editor
             DeleteObject(pen);
         }
 
-        void Text(HDC dc, const wchar_t* text, RECT rc, COLORREF color, HFONT font, UINT flags)
+        void Text(HDC dc, const wchar_t *text, RECT rc, COLORREF color, HFONT font, UINT flags)
         {
             SetBkMode(dc, TRANSPARENT);
             SetTextColor(dc, color);
             HGDIOBJ oldFont = nullptr;
-            if (font) oldFont = SelectObject(dc, font);
+            if (font)
+                oldFont = SelectObject(dc, font);
             DrawTextW(dc, text, -1, &rc, flags);
-            if (oldFont) SelectObject(dc, oldFont);
+            if (oldFont)
+                SelectObject(dc, oldFont);
         }
 
-        std::wstring AssetTypeForPath(const std::filesystem::path& path, bool directory)
+        std::wstring AssetTypeForPath(const std::filesystem::path &path, bool directory)
         {
-            if (directory) return L"Folder";
+            if (directory)
+                return L"Folder";
             std::wstring ext = path.extension().wstring();
             std::transform(ext.begin(), ext.end(), ext.begin(), ::towlower);
-            if (ext == L".obj" || ext == L".nmsh") return L"Mesh";
-            if (ext == L".bmp" || ext == L".png" || ext == L".jpg" || ext == L".jpeg" || ext == L".ntx") return L"Texture";
-            if (ext == L".txt") return L"Text";
-            if (ext == L".json") return L"Metadata";
-            if (ext == L".nmat") return L"Material";
+            if (ext == L".obj" || ext == L".nmsh")
+                return L"Mesh";
+            if (ext == L".bmp" || ext == L".png" || ext == L".jpg" || ext == L".jpeg" || ext == L".ntx")
+                return L"Texture";
+            if (ext == L".txt")
+                return L"Text";
+            if (ext == L".json")
+                return L"Metadata";
+            if (ext == L".nmat")
+                return L"Material";
             return L"Asset";
         }
 
-        HFONT CreateUiFont(int pixelHeight, int weight, const wchar_t* face)
+        HFONT CreateUiFont(int pixelHeight, int weight, const wchar_t *face)
         {
             return CreateFontW(-pixelHeight, 0, 0, 0, weight, FALSE, FALSE, FALSE,
-                DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, face);
+                               DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                               CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, face);
         }
 
         void SetRichTextColor(HWND richEdit, COLORREF color)
@@ -96,7 +104,7 @@ namespace nocturne::editor
             SendMessageW(richEdit, EM_SETCHARFORMAT, SCF_SELECTION, reinterpret_cast<LPARAM>(&format));
         }
 
-        void RichAppend(HWND richEdit, const std::wstring& text, COLORREF color)
+        void RichAppend(HWND richEdit, const std::wstring &text, COLORREF color)
         {
             const LRESULT len = SendMessageW(richEdit, WM_GETTEXTLENGTH, 0, 0);
             SendMessageW(richEdit, EM_SETSEL, len, len);
@@ -105,12 +113,13 @@ namespace nocturne::editor
         }
     }
 
-    bool EditorShell::Init(noc::Engine& engine, noc::WinWindow& window)
+    bool EditorShell::Init(noc::Engine &engine, noc::WinWindow &window)
     {
         engine_ = &engine;
         window_ = &window;
         hwnd_ = static_cast<HWND>(window.Handle());
-        if (!hwnd_) return false;
+        if (!hwnd_)
+            return false;
 
         INITCOMMONCONTROLSEX icc{};
         icc.dwSize = sizeof(icc);
@@ -134,12 +143,12 @@ namespace nocturne::editor
         consoleFont_ = CreateUiFont(12, FW_NORMAL, L"Cascadia Mono");
         brandFont_ = CreateUiFont(46, FW_SEMIBOLD, L"Segoe UI Variable Display");
 
-        const auto& c = EditorTheme::Colors();
+        const auto &c = EditorTheme::Colors();
         windowBrush_ = CreateSolidBrush(c.windowBg);
         panelBrush_ = CreateSolidBrush(c.panelBg);
         consoleBrush_ = CreateSolidBrush(c.inputBg);
 
-        const auto& cfg = engine.Config();
+        const auto &cfg = engine.Config();
         if (cfg.contentRoot && cfg.contentRoot[0] != '\0')
             contentRoot_ = Utf8ToWide_(cfg.contentRoot);
 
@@ -155,6 +164,18 @@ namespace nocturne::editor
         GetClientRect(hwnd_, &rc);
         Layout_(rc.right - rc.left, rc.bottom - rc.top);
 
+        // Force the complete editor client area to be painted after the
+        // initial child-window layout. Without this, the uncovered panel
+        // gaps may retain the window class' previous background until resize.
+        RedrawWindow(
+            hwnd_,
+            nullptr,
+            nullptr,
+            RDW_INVALIDATE |
+                RDW_ERASE |
+                RDW_ALLCHILDREN |
+                RDW_UPDATENOW);
+
         AppendConsole_(L"Nocturne Editor initialized.");
         AppendConsole_(L"Phase 13: UI Fidelity Pass 2 active.");
         AppendConsole_(L"Custom controls enabled; viewport rendering remains Phase 14 scope.");
@@ -165,22 +186,34 @@ namespace nocturne::editor
 
     void EditorShell::Shutdown()
     {
-        if (window_) window_->SetMessageSink(nullptr);
+        if (window_)
+            window_->SetMessageSink(nullptr);
 
-        if (fileMenu_) DestroyMenu(fileMenu_);
-        if (buildMenu_) DestroyMenu(buildMenu_);
+        if (fileMenu_)
+            DestroyMenu(fileMenu_);
+        if (buildMenu_)
+            DestroyMenu(buildMenu_);
         fileMenu_ = nullptr;
         buildMenu_ = nullptr;
 
-        if (uiFont_) DeleteObject(uiFont_);
-        if (mutedFont_) DeleteObject(mutedFont_);
-        if (uiFontBold_) DeleteObject(uiFontBold_);
-        if (titleFont_) DeleteObject(titleFont_);
-        if (consoleFont_) DeleteObject(consoleFont_);
-        if (brandFont_) DeleteObject(brandFont_);
-        if (windowBrush_) DeleteObject(windowBrush_);
-        if (panelBrush_) DeleteObject(panelBrush_);
-        if (consoleBrush_) DeleteObject(consoleBrush_);
+        if (uiFont_)
+            DeleteObject(uiFont_);
+        if (mutedFont_)
+            DeleteObject(mutedFont_);
+        if (uiFontBold_)
+            DeleteObject(uiFontBold_);
+        if (titleFont_)
+            DeleteObject(titleFont_);
+        if (consoleFont_)
+            DeleteObject(consoleFont_);
+        if (brandFont_)
+            DeleteObject(brandFont_);
+        if (windowBrush_)
+            DeleteObject(windowBrush_);
+        if (panelBrush_)
+            DeleteObject(panelBrush_);
+        if (consoleBrush_)
+            DeleteObject(consoleBrush_);
 
         uiFont_ = mutedFont_ = uiFontBold_ = titleFont_ = consoleFont_ = brandFont_ = nullptr;
         windowBrush_ = panelBrush_ = consoleBrush_ = nullptr;
@@ -193,13 +226,14 @@ namespace nocturne::editor
     {
         menuBand_ = MakeOwnerStatic_(L"");
 
-        const struct MenuDef { const wchar_t* text; int id; } defs[] = {
-            { L"File", IdMenuFile }, { L"Edit", IdMenuEdit }, { L"Window", IdMenuWindow },
-            { L"Tools", IdMenuTools }, { L"Build", IdMenuBuild }, { L"Select", IdMenuSelect },
-            { L"Actor", IdMenuActor }, { L"Help", IdMenuHelp }
-        };
+        const struct MenuDef
+        {
+            const wchar_t *text;
+            int id;
+        } defs[] = {
+            {L"File", IdMenuFile}, {L"Edit", IdMenuEdit}, {L"Window", IdMenuWindow}, {L"Tools", IdMenuTools}, {L"Build", IdMenuBuild}, {L"Select", IdMenuSelect}, {L"Actor", IdMenuActor}, {L"Help", IdMenuHelp}};
 
-        for (const auto& def : defs)
+        for (const auto &def : defs)
         {
             HWND button = CreateEditorButton(hwnd_, def.id, def.text, EditorButtonKind::Menu);
             SetFont(button, uiFont_);
@@ -222,26 +256,31 @@ namespace nocturne::editor
     {
         toolbarBand_ = MakeOwnerStatic_(L"");
 
-        const struct ToolDef { const wchar_t* text; int id; EditorButtonKind kind; } defs[] = {
-            { L"＋  New", IdToolbarNew, EditorButtonKind::Neutral },
-            { L"Open", IdToolbarOpen, EditorButtonKind::Neutral },
-            { L"Save", IdToolbarSave, EditorButtonKind::Neutral },
-            { L"Undo", IdToolbarUndo, EditorButtonKind::Neutral },
-            { L"Redo", IdToolbarRedo, EditorButtonKind::Neutral },
-            { L"Select", IdToolbarSelect, EditorButtonKind::Tool },
-            { L"Move", IdToolbarMove, EditorButtonKind::Tool },
-            { L"Rotate", IdToolbarRotate, EditorButtonKind::Tool },
-            { L"Scale", IdToolbarScale, EditorButtonKind::Tool },
-            { L"▶  Play", IdToolbarPlay, EditorButtonKind::Success },
-            { L"Stop", IdToolbarStop, EditorButtonKind::Neutral },
-            { L"Build", IdToolbarBuild, EditorButtonKind::Neutral }
-        };
+        const struct ToolDef
+        {
+            const wchar_t *text;
+            int id;
+            EditorButtonKind kind;
+        } defs[] = {
+            {L"＋  New", IdToolbarNew, EditorButtonKind::Neutral},
+            {L"Open", IdToolbarOpen, EditorButtonKind::Neutral},
+            {L"Save", IdToolbarSave, EditorButtonKind::Neutral},
+            {L"Undo", IdToolbarUndo, EditorButtonKind::Neutral},
+            {L"Redo", IdToolbarRedo, EditorButtonKind::Neutral},
+            {L"Select", IdToolbarSelect, EditorButtonKind::Tool},
+            {L"Move", IdToolbarMove, EditorButtonKind::Tool},
+            {L"Rotate", IdToolbarRotate, EditorButtonKind::Tool},
+            {L"Scale", IdToolbarScale, EditorButtonKind::Tool},
+            {L"▶  Play", IdToolbarPlay, EditorButtonKind::Success},
+            {L"Stop", IdToolbarStop, EditorButtonKind::Neutral},
+            {L"Build", IdToolbarBuild, EditorButtonKind::Neutral}};
 
-        for (const auto& def : defs)
+        for (const auto &def : defs)
         {
             HWND button = CreateEditorButton(hwnd_, def.id, def.text, def.kind);
             SetFont(button, uiFontBold_);
-            if (def.id == activeToolId_) SetEditorButtonActive(button, true);
+            if (def.id == activeToolId_)
+                SetEditorButtonActive(button, true);
             toolbarButtons_.push_back(button);
         }
     }
@@ -282,10 +321,10 @@ namespace nocturne::editor
         // and copyable while custom Nocturne scrolling removes native scrollbar chrome.
         LoadLibraryW(L"Msftedit.dll");
         consoleEdit_ = CreateWindowExW(0, MSFTEDIT_CLASS, L"",
-            WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_MULTILINE | ES_AUTOVSCROLL |
-            ES_READONLY | ES_NOHIDESEL,
-            0, 0, 0, 0, hwnd_, reinterpret_cast<HMENU>(IdConsole),
-            GetModuleHandleW(nullptr), nullptr);
+                                       WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_MULTILINE | ES_AUTOVSCROLL |
+                                           ES_READONLY | ES_NOHIDESEL,
+                                       0, 0, 0, 0, hwnd_, reinterpret_cast<HMENU>(IdConsole),
+                                       GetModuleHandleW(nullptr), nullptr);
         SetFont(consoleEdit_, consoleFont_);
         SendMessageW(consoleEdit_, EM_SETBKGNDCOLOR, 0, EditorTheme::Colors().inputBg);
         SendMessageW(consoleEdit_, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(8, 8));
@@ -332,21 +371,21 @@ namespace nocturne::editor
         }
 
         std::vector<fs::directory_entry> entries;
-        for (const auto& entry : fs::directory_iterator(rootPath, ec))
+        for (const auto &entry : fs::directory_iterator(rootPath, ec))
         {
-            if (ec) break;
+            if (ec)
+                break;
             entries.push_back(entry);
         }
-        std::sort(entries.begin(), entries.end(), [](const auto& a, const auto& b)
-        {
-            return a.path().filename().wstring() < b.path().filename().wstring();
-        });
+        std::sort(entries.begin(), entries.end(), [](const auto &a, const auto &b)
+                  { return a.path().filename().wstring() < b.path().filename().wstring(); });
 
-        for (const auto& entry : entries)
+        for (const auto &entry : entries)
         {
             const std::wstring name = entry.path().filename().wstring();
             const bool isDir = entry.is_directory(ec);
-            if (isDir) EditorTreeAddItem(contentTree_, name, 1, false);
+            if (isDir)
+                EditorTreeAddItem(contentTree_, name, 1, false);
             const std::wstring type = AssetTypeForPath(entry.path(), isDir);
             EditorDataTableAddRow(contentList_, name, type);
         }
@@ -354,12 +393,13 @@ namespace nocturne::editor
 
     void EditorShell::Layout_(int clientW, int clientH)
     {
-        if (clientW <= 0 || clientH <= 0) return;
-        const auto& m = EditorTheme::Metrics();
+        if (clientW <= 0 || clientH <= 0)
+            return;
+        const auto &m = EditorTheme::Metrics();
 
         MoveWindow(menuBand_, 0, 0, clientW, m.menuHeight, TRUE);
         int menuX = 12;
-        const int menuWidths[] = { 42, 42, 62, 48, 48, 54, 48, 44 };
+        const int menuWidths[] = {42, 42, 62, 48, 48, 54, 48, 44};
         for (size_t i = 0; i < menuButtons_.size(); ++i)
         {
             const int w = i < std::size(menuWidths) ? menuWidths[i] : 48;
@@ -370,13 +410,14 @@ namespace nocturne::editor
         MoveWindow(toolbarBand_, 0, m.menuHeight, clientW, m.toolbarHeight, TRUE);
         int x = 14;
         const int toolbarY = m.menuHeight + (m.toolbarHeight - m.buttonHeight) / 2;
-        const int widths[] = { 84, 78, 76, 78, 78, 86, 78, 84, 78, 90, 76, 80 };
+        const int widths[] = {84, 78, 76, 78, 78, 86, 78, 84, 78, 90, 76, 80};
         for (size_t i = 0; i < toolbarButtons_.size(); ++i)
         {
             const int w = i < std::size(widths) ? widths[i] : 80;
             MoveWindow(toolbarButtons_[i], x, toolbarY, w, m.buttonHeight, TRUE);
             x += w + 6;
-            if (i == 2 || i == 4 || i == 8) x += 10;
+            if (i == 2 || i == 4 || i == 8)
+                x += 10;
         }
 
         const int top = m.menuHeight + m.toolbarHeight + m.gap;
@@ -397,7 +438,7 @@ namespace nocturne::editor
         {
             MoveWindow(panel.title, px, py, (std::max)(0, pw), m.panelHeaderHeight, TRUE);
             MoveWindow(panel.body, px, py + m.panelHeaderHeight, (std::max)(0, pw),
-                (std::max)(0, ph - m.panelHeaderHeight), TRUE);
+                       (std::max)(0, ph - m.panelHeaderHeight), TRUE);
         };
 
         placePanel(scene_, m.gap, top, leftW, topH);
@@ -424,23 +465,23 @@ namespace nocturne::editor
         const int contentPad = m.innerPadding;
         const int searchH = 32;
         MoveWindow(contentSearch_, m.gap + contentPad, contentBodyY + contentPad,
-            (std::max)(0, bottomLeftW - 2 * contentPad), searchH, TRUE);
+                   (std::max)(0, bottomLeftW - 2 * contentPad), searchH, TRUE);
 
         const int browserY = contentBodyY + contentPad + searchH + 8;
         const int browserH = (std::max)(0, contentBodyH - (2 * contentPad + searchH + 8));
         const int treeW = (std::clamp)(bottomLeftW * 35 / 100, 125, 170);
         MoveWindow(contentTree_, m.gap + contentPad, browserY, treeW, browserH, TRUE);
         MoveWindow(contentList_, m.gap + contentPad + treeW + 8, browserY,
-            (std::max)(0, bottomLeftW - 2 * contentPad - treeW - 8), browserH, TRUE);
+                   (std::max)(0, bottomLeftW - 2 * contentPad - treeW - 8), browserH, TRUE);
 
         const int consoleBodyY = bottomY + m.panelHeaderHeight;
         const int consoleBodyH = (std::max)(0, actualBottomH - m.panelHeaderHeight);
         const int scrollW = m.scrollbarWidth;
         MoveWindow(consoleEdit_, bottomCenterX + 8, consoleBodyY + 7,
-            (std::max)(0, bottomCenterW - 8 - 7 - scrollW - 4),
-            (std::max)(0, consoleBodyH - 14), TRUE);
+                   (std::max)(0, bottomCenterW - 8 - 7 - scrollW - 4),
+                   (std::max)(0, consoleBodyH - 14), TRUE);
         MoveWindow(consoleScroll_, bottomCenterX + bottomCenterW - scrollW - 7,
-            consoleBodyY + 8, scrollW, (std::max)(0, consoleBodyH - 16), TRUE);
+                   consoleBodyY + 8, scrollW, (std::max)(0, consoleBodyH - 16), TRUE);
         SyncConsoleScroll_();
 
         const int buildBodyY = bottomY + m.panelHeaderHeight;
@@ -449,7 +490,7 @@ namespace nocturne::editor
         const int actionW = (std::max)(100, (bottomRightW - 2 * 12 - actionGap) / 2);
         MoveWindow(playButton_, bottomRightX + 12, buttonY, actionW, m.buttonHeight, TRUE);
         MoveWindow(buildButton_, bottomRightX + 12 + actionW + actionGap, buttonY,
-            actionW, m.buttonHeight, TRUE);
+                   actionW, m.buttonHeight, TRUE);
 
         MoveWindow(status_, 0, statusY, clientW, m.statusHeight, TRUE);
         InvalidateRect(buildPlay_.body, nullptr, FALSE);
@@ -457,9 +498,10 @@ namespace nocturne::editor
         InvalidateRect(status_, nullptr, FALSE);
     }
 
-    void EditorShell::AppendConsole_(const wchar_t* text)
+    void EditorShell::AppendConsole_(const wchar_t *text)
     {
-        if (!consoleEdit_ || !text) return;
+        if (!consoleEdit_ || !text)
+            return;
 
         SendMessageW(consoleEdit_, EM_SETREADONLY, FALSE, 0);
         SYSTEMTIME st{};
@@ -467,7 +509,7 @@ namespace nocturne::editor
         wchar_t timestamp[32]{};
         swprintf_s(timestamp, L"[%02u:%02u:%02u] ", st.wHour, st.wMinute, st.wSecond);
 
-        const auto& c = EditorTheme::Colors();
+        const auto &c = EditorTheme::Colors();
         RichAppend(consoleEdit_, timestamp, c.textMuted);
         RichAppend(consoleEdit_, L"[Editor] ", c.accent);
 
@@ -494,7 +536,8 @@ namespace nocturne::editor
 
     void EditorShell::UpdateStatus_()
     {
-        if (status_) InvalidateRect(status_, nullptr, FALSE);
+        if (status_)
+            InvalidateRect(status_, nullptr, FALSE);
     }
 
     void EditorShell::HandleCommand_(int id)
@@ -559,8 +602,10 @@ namespace nocturne::editor
     void EditorShell::ShowPopupMenu_(int menuId, HWND anchor)
     {
         HMENU menu = nullptr;
-        if (menuId == IdMenuFile) menu = fileMenu_;
-        else if (menuId == IdMenuBuild) menu = buildMenu_;
+        if (menuId == IdMenuFile)
+            menu = fileMenu_;
+        else if (menuId == IdMenuBuild)
+            menu = buildMenu_;
 
         if (!menu)
         {
@@ -571,14 +616,16 @@ namespace nocturne::editor
         RECT rc{};
         GetWindowRect(anchor, &rc);
         const int command = TrackPopupMenuEx(menu, TPM_RETURNCMD | TPM_LEFTALIGN | TPM_TOPALIGN,
-            rc.left, rc.bottom + 2, hwnd_, nullptr);
-        if (command != 0) HandleCommand_(command);
+                                             rc.left, rc.bottom + 2, hwnd_, nullptr);
+        if (command != 0)
+            HandleCommand_(command);
 
-        if (menu != fileMenu_ && menu != buildMenu_) DestroyMenu(menu);
+        if (menu != fileMenu_ && menu != buildMenu_)
+            DestroyMenu(menu);
     }
 
-    bool EditorShell::OnWindowMessage(void* hwnd, uint32_t msg, uintptr_t wParam,
-        intptr_t lParam, intptr_t& result)
+    bool EditorShell::OnWindowMessage(void *hwnd, uint32_t msg, uintptr_t wParam,
+                                      intptr_t lParam, intptr_t &result)
     {
         const HWND native = static_cast<HWND>(hwnd);
         switch (msg)
@@ -598,7 +645,7 @@ namespace nocturne::editor
         }
 
         case WM_DRAWITEM:
-            DrawOwnerControl_(reinterpret_cast<DRAWITEMSTRUCT*>(lParam));
+            DrawOwnerControl_(reinterpret_cast<DRAWITEMSTRUCT *>(lParam));
             result = TRUE;
             return true;
 
@@ -614,7 +661,8 @@ namespace nocturne::editor
             }
             if (id == IDCANCEL)
             {
-                if (window_) window_->RequestQuit();
+                if (window_)
+                    window_->RequestQuit();
                 result = 0;
                 return true;
             }
@@ -649,7 +697,7 @@ namespace nocturne::editor
             if (reinterpret_cast<HWND>(lParam) == consoleEdit_)
             {
                 HDC dc = reinterpret_cast<HDC>(wParam);
-                const auto& c = EditorTheme::Colors();
+                const auto &c = EditorTheme::Colors();
                 SetTextColor(dc, c.textPrimary);
                 SetBkColor(dc, c.inputBg);
                 result = reinterpret_cast<intptr_t>(consoleBrush_);
@@ -660,27 +708,32 @@ namespace nocturne::editor
         return false;
     }
 
-    HWND EditorShell::MakeOwnerStatic_(const wchar_t* text, int id)
+    HWND EditorShell::MakeOwnerStatic_(const wchar_t *text, int id)
     {
         HWND h = CreateWindowExW(0, L"STATIC", text,
-            WS_CHILD | WS_VISIBLE | SS_OWNERDRAW,
-            0, 0, 0, 0, hwnd_, id ? reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)) : nullptr,
-            GetModuleHandleW(nullptr), nullptr);
+                                 WS_CHILD | WS_VISIBLE | SS_OWNERDRAW,
+                                 0, 0, 0, 0, hwnd_, id ? reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)) : nullptr,
+                                 GetModuleHandleW(nullptr), nullptr);
         SetFont(h, uiFont_);
         return h;
     }
 
-    HWND EditorShell::MakeHeader_(const wchar_t* text)
+    HWND EditorShell::MakeHeader_(const wchar_t *text)
     {
         HWND h = MakeOwnerStatic_(text);
         SetFont(h, titleFont_);
         return h;
     }
 
-    void EditorShell::DrawOwnerControl_(DRAWITEMSTRUCT* dis)
+    void EditorShell::DrawOwnerControl_(DRAWITEMSTRUCT *dis)
     {
-        if (!dis) return;
-        if (dis->hwndItem == menuBand_ || dis->hwndItem == toolbarBand_) { DrawBand_(dis); return; }
+        if (!dis)
+            return;
+        if (dis->hwndItem == menuBand_ || dis->hwndItem == toolbarBand_)
+        {
+            DrawBand_(dis);
+            return;
+        }
         if (dis->hwndItem == scene_.title || dis->hwndItem == viewport_.title ||
             dis->hwndItem == inspector_.title || dis->hwndItem == content_.title ||
             dis->hwndItem == console_.title || dis->hwndItem == buildPlay_.title)
@@ -688,20 +741,36 @@ namespace nocturne::editor
             DrawHeader_(dis);
             return;
         }
-        if (dis->hwndItem == viewport_.body) { DrawViewport_(dis); return; }
-        if (dis->hwndItem == inspector_.body) { DrawInspector_(dis); return; }
-        if (dis->hwndItem == buildPlay_.body) { DrawBuildPlay_(dis); return; }
-        if (dis->hwndItem == status_) { DrawStatus_(dis); return; }
+        if (dis->hwndItem == viewport_.body)
+        {
+            DrawViewport_(dis);
+            return;
+        }
+        if (dis->hwndItem == inspector_.body)
+        {
+            DrawInspector_(dis);
+            return;
+        }
+        if (dis->hwndItem == buildPlay_.body)
+        {
+            DrawBuildPlay_(dis);
+            return;
+        }
+        if (dis->hwndItem == status_)
+        {
+            DrawStatus_(dis);
+            return;
+        }
 
         Fill(dis->hDC, dis->rcItem, EditorTheme::Colors().panelBg);
     }
 
-    void EditorShell::DrawHeader_(DRAWITEMSTRUCT* dis)
+    void EditorShell::DrawHeader_(DRAWITEMSTRUCT *dis)
     {
-        const auto& c = EditorTheme::Colors();
+        const auto &c = EditorTheme::Colors();
         Fill(dis->hDC, dis->rcItem, c.panelBgAlt);
 
-        RECT dot{ 12, (dis->rcItem.bottom - 6) / 2, 18, (dis->rcItem.bottom - 6) / 2 + 6 };
+        RECT dot{12, (dis->rcItem.bottom - 6) / 2, 18, (dis->rcItem.bottom - 6) / 2 + 6};
         HBRUSH dotBrush = CreateSolidBrush(Blend(c.accent, c.textMuted, 18));
         FillRect(dis->hDC, &dot, dotBrush);
         DeleteObject(dotBrush);
@@ -720,9 +789,9 @@ namespace nocturne::editor
         DeleteObject(pen);
     }
 
-    void EditorShell::DrawViewport_(DRAWITEMSTRUCT* dis)
+    void EditorShell::DrawViewport_(DRAWITEMSTRUCT *dis)
     {
-        const auto& c = EditorTheme::Colors();
+        const auto &c = EditorTheme::Colors();
         RECT rc = dis->rcItem;
         Fill(dis->hDC, rc, c.viewportBg);
 
@@ -746,49 +815,52 @@ namespace nocturne::editor
         SelectObject(dis->hDC, oldPen);
         DeleteObject(pen);
 
-        RECT brandRc{ rc.left, horizon - 36, rc.right, horizon + 22 };
+        RECT brandRc{rc.left, horizon - 36, rc.right, horizon + 22};
         Text(dis->hDC, L"N", brandRc, Blend(c.viewportBg, c.textMuted, 38), brandFont_,
-            DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-        RECT titleRc{ rc.left, horizon + 22, rc.right, horizon + 48 };
+             DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        RECT titleRc{rc.left, horizon + 22, rc.right, horizon + 48};
         Text(dis->hDC, L"NOCTURNE VIEWPORT", titleRc, c.textPrimary, uiFontBold_,
-            DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-        RECT subRc{ rc.left + 40, horizon + 45, rc.right - 40, horizon + 69 };
+             DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        RECT subRc{rc.left + 40, horizon + 45, rc.right - 40, horizon + 69};
         Text(dis->hDC, L"Phase 14 — rendering viewport, camera navigation, selection and gizmos",
-            subRc, c.textMuted, mutedFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+             subRc, c.textMuted, mutedFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
         const int axisX = rc.left + 34;
         const int axisY = rc.bottom - 34;
         HPEN xPen = CreatePen(PS_SOLID, 2, RGB(230, 73, 78));
         HPEN yPen = CreatePen(PS_SOLID, 2, RGB(94, 211, 111));
         oldPen = SelectObject(dis->hDC, xPen);
-        MoveToEx(dis->hDC, axisX, axisY, nullptr); LineTo(dis->hDC, axisX + 31, axisY);
+        MoveToEx(dis->hDC, axisX, axisY, nullptr);
+        LineTo(dis->hDC, axisX + 31, axisY);
         SelectObject(dis->hDC, yPen);
-        MoveToEx(dis->hDC, axisX, axisY, nullptr); LineTo(dis->hDC, axisX, axisY - 31);
+        MoveToEx(dis->hDC, axisX, axisY, nullptr);
+        LineTo(dis->hDC, axisX, axisY - 31);
         SelectObject(dis->hDC, oldPen);
-        DeleteObject(xPen); DeleteObject(yPen);
-        RECT xLabel{ axisX + 34, axisY - 8, axisX + 50, axisY + 10 };
-        RECT yLabel{ axisX - 5, axisY - 48, axisX + 10, axisY - 31 };
+        DeleteObject(xPen);
+        DeleteObject(yPen);
+        RECT xLabel{axisX + 34, axisY - 8, axisX + 50, axisY + 10};
+        RECT yLabel{axisX - 5, axisY - 48, axisX + 10, axisY - 31};
         Text(dis->hDC, L"X", xLabel, RGB(230, 73, 78), uiFontBold_, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
         Text(dis->hDC, L"Y", yLabel, RGB(94, 211, 111), uiFontBold_, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
-        RECT badge{ rc.right - 120, rc.bottom - 42, rc.right - 16, rc.bottom - 12 };
+        RECT badge{rc.right - 120, rc.bottom - 42, rc.right - 16, rc.bottom - 12};
         RoundBox(dis->hDC, badge, Blend(c.viewportBg, c.panelBgAlt, 60), c.border, 6);
         Text(dis->hDC, L"Grid: 1.0 m", badge, c.textMuted, mutedFont_,
-            DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+             DT_CENTER | DT_VCENTER | DT_SINGLELINE);
     }
 
-    void EditorShell::DrawInspector_(DRAWITEMSTRUCT* dis)
+    void EditorShell::DrawInspector_(DRAWITEMSTRUCT *dis)
     {
-        const auto& c = EditorTheme::Colors();
+        const auto &c = EditorTheme::Colors();
         RECT rc = dis->rcItem;
         Fill(dis->hDC, rc, c.panelBg);
 
-        RECT title{ rc.left + 18, rc.top + 56, rc.right - 18, rc.top + 82 };
+        RECT title{rc.left + 18, rc.top + 56, rc.right - 18, rc.top + 82};
         Text(dis->hDC, L"No object selected", title, c.textPrimary, uiFontBold_,
-            DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-        RECT helper{ rc.left + 24, rc.top + 86, rc.right - 24, rc.top + 132 };
+             DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        RECT helper{rc.left + 24, rc.top + 86, rc.right - 24, rc.top + 132};
         Text(dis->hDC, L"Select an object in the scene to inspect its properties.", helper,
-            c.textMuted, mutedFont_, DT_CENTER | DT_WORDBREAK);
+             c.textMuted, mutedFont_, DT_CENTER | DT_WORDBREAK);
 
         HPEN pen = CreatePen(PS_SOLID, 1, c.border);
         HGDIOBJ oldPen = SelectObject(dis->hDC, pen);
@@ -797,53 +869,55 @@ namespace nocturne::editor
         SelectObject(dis->hDC, oldPen);
         DeleteObject(pen);
 
-        RECT tipsTitle{ rc.left + 20, rc.top + 170, rc.right - 20, rc.top + 196 };
+        RECT tipsTitle{rc.left + 20, rc.top + 170, rc.right - 20, rc.top + 196};
         Text(dis->hDC, L"Tips", tipsTitle, c.textPrimary, uiFontBold_, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
-        const wchar_t* tips[] = {
+        const wchar_t *tips[] = {
             L"•  Select an object in Scene Hierarchy or click in the viewport.",
             L"•  Use Select / Move / Rotate / Scale from the toolbar.",
-            L"•  Inspector components arrive with scene editing."
-        };
+            L"•  Inspector components arrive with scene editing."};
         int y = rc.top + 203;
-        for (const wchar_t* tip : tips)
+        for (const wchar_t *tip : tips)
         {
-            RECT tr{ rc.left + 22, y, rc.right - 18, y + 44 };
+            RECT tr{rc.left + 22, y, rc.right - 18, y + 44};
             Text(dis->hDC, tip, tr, c.textMuted, mutedFont_, DT_LEFT | DT_WORDBREAK);
             y += 56;
         }
     }
 
-    void EditorShell::DrawBuildPlay_(DRAWITEMSTRUCT* dis)
+    void EditorShell::DrawBuildPlay_(DRAWITEMSTRUCT *dis)
     {
-        const auto& c = EditorTheme::Colors();
+        const auto &c = EditorTheme::Colors();
         RECT rc = dis->rcItem;
         Fill(dis->hDC, rc, c.panelBg);
 
-        RECT heading{ rc.left + 16, rc.top + 12, rc.right - 16, rc.top + 36 };
+        RECT heading{rc.left + 16, rc.top + 12, rc.right - 16, rc.top + 36};
         Text(dis->hDC, L"Play Options", heading, c.textPrimary, uiFontBold_,
-            DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+             DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
-        struct Row { const wchar_t* label; const wchar_t* value; } rows[] = {
-            { L"Play Mode", L"Selected Viewport" },
-            { L"Start Map", L"Current Scene" }
-        };
+        struct Row
+        {
+            const wchar_t *label;
+            const wchar_t *value;
+        } rows[] = {
+            {L"Play Mode", L"Selected Viewport"},
+            {L"Start Map", L"Current Scene"}};
 
         int y = rc.top + 46;
-        for (const auto& row : rows)
+        for (const auto &row : rows)
         {
-            RECT label{ rc.left + 16, y, rc.left + 108, y + 31 };
+            RECT label{rc.left + 16, y, rc.left + 108, y + 31};
             Text(dis->hDC, row.label, label, c.textMuted, mutedFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-            RECT field{ rc.left + 118, y + 1, rc.right - 16, y + 30 };
+            RECT field{rc.left + 118, y + 1, rc.right - 16, y + 30};
             RoundBox(dis->hDC, field, c.inputBg, c.border, EditorTheme::Metrics().inputRadius);
             field.left += 10;
             Text(dis->hDC, row.value, field, c.textPrimary, uiFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
             y += 40;
         }
 
-        RECT vsyncLabel{ rc.left + 16, y + 2, rc.left + 108, y + 31 };
+        RECT vsyncLabel{rc.left + 16, y + 2, rc.left + 108, y + 31};
         Text(dis->hDC, L"VSync", vsyncLabel, c.textMuted, mutedFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-        RECT toggle{ rc.left + 118, y + 6, rc.left + 160, y + 26 };
+        RECT toggle{rc.left + 118, y + 6, rc.left + 160, y + 26};
         RoundBox(dis->hDC, toggle, c.accent, c.accent, 10);
         HBRUSH knob = CreateSolidBrush(RGB(235, 243, 252));
         HGDIOBJ oldBrush = SelectObject(dis->hDC, knob);
@@ -852,19 +926,20 @@ namespace nocturne::editor
         SelectObject(dis->hDC, oldPen);
         SelectObject(dis->hDC, oldBrush);
         DeleteObject(knob);
-        RECT enabled{ rc.left + 170, y + 1, rc.right - 16, y + 31 };
+        RECT enabled{rc.left + 170, y + 1, rc.right - 16, y + 31};
         Text(dis->hDC, L"Enabled", enabled, c.textPrimary, uiFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
     }
 
-    void EditorShell::DrawStatus_(DRAWITEMSTRUCT* dis)
+    void EditorShell::DrawStatus_(DRAWITEMSTRUCT *dis)
     {
-        const auto& c = EditorTheme::Colors();
+        const auto &c = EditorTheme::Colors();
         RECT rc = dis->rcItem;
         Fill(dis->hDC, rc, c.toolbarBg);
 
         HPEN pen = CreatePen(PS_SOLID, 1, c.border);
         HGDIOBJ oldPen = SelectObject(dis->hDC, pen);
-        MoveToEx(dis->hDC, 0, 0, nullptr); LineTo(dis->hDC, rc.right, 0);
+        MoveToEx(dis->hDC, 0, 0, nullptr);
+        LineTo(dis->hDC, rc.right, 0);
         SelectObject(dis->hDC, oldPen);
         DeleteObject(pen);
 
@@ -872,28 +947,28 @@ namespace nocturne::editor
         std::wstringstream objectText;
         objectText << L"Objects: " << objects;
 
-        RECT ready{ 18, 0, 145, rc.bottom };
+        RECT ready{18, 0, 145, rc.bottom};
         Text(dis->hDC, L"●  Ready", ready, c.success, mutedFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-        RECT issues{ 155, 0, 290, rc.bottom };
+        RECT issues{155, 0, 290, rc.bottom};
         Text(dis->hDC, L"✓  No Issues", issues, c.success, mutedFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-        RECT branch{ 305, 0, rc.right - 410, rc.bottom };
+        RECT branch{305, 0, rc.right - 410, rc.bottom};
         Text(dis->hDC, L"Branch: phase-13-editor-framework", branch, c.textMuted, mutedFont_,
-            DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
-        RECT objectsRc{ (std::max)(rc.left, rc.right - 390), 0, rc.right - 250, rc.bottom };
+             DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+        RECT objectsRc{(std::max)(rc.left, rc.right - 390), 0, rc.right - 250, rc.bottom};
         const std::wstring objectsString = objectText.str();
         Text(dis->hDC, objectsString.c_str(), objectsRc, c.textMuted, mutedFont_,
-            DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-        RECT engineRc{ rc.right - 235, 0, rc.right - 62, rc.bottom };
+             DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+        RECT engineRc{rc.right - 235, 0, rc.right - 62, rc.bottom};
         Text(dis->hDC, L"Nocturne Engine", engineRc, c.textPrimary, mutedFont_,
-            DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
-        RECT versionRc{ rc.right - 56, 0, rc.right - 12, rc.bottom };
+             DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+        RECT versionRc{rc.right - 56, 0, rc.right - 12, rc.bottom};
         Text(dis->hDC, L"v0.1.0", versionRc, c.textMuted, mutedFont_,
-            DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+             DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
     }
 
-    void EditorShell::DrawBand_(DRAWITEMSTRUCT* dis)
+    void EditorShell::DrawBand_(DRAWITEMSTRUCT *dis)
     {
-        const auto& c = EditorTheme::Colors();
+        const auto &c = EditorTheme::Colors();
         Fill(dis->hDC, dis->rcItem, c.toolbarBg);
         HPEN pen = CreatePen(PS_SOLID, 1, c.border);
         HGDIOBJ oldPen = SelectObject(dis->hDC, pen);
@@ -903,11 +978,13 @@ namespace nocturne::editor
         DeleteObject(pen);
     }
 
-    std::wstring EditorShell::Utf8ToWide_(const char* text)
+    std::wstring EditorShell::Utf8ToWide_(const char *text)
     {
-        if (!text || !*text) return {};
+        if (!text || !*text)
+            return {};
         const int size = MultiByteToWideChar(CP_UTF8, 0, text, -1, nullptr, 0);
-        if (size <= 1) return {};
+        if (size <= 1)
+            return {};
         std::wstring out(static_cast<size_t>(size - 1), L'\0');
         MultiByteToWideChar(CP_UTF8, 0, text, -1, out.data(), size);
         return out;
