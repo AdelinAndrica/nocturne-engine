@@ -11,11 +11,14 @@ namespace noc
 		const void* ps = nullptr;
 		ID3D12RootSignature* rootSig = nullptr;
 		DXGI_FORMAT rtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+		DXGI_FORMAT dsvFormat = DXGI_FORMAT_UNKNOWN;
 		uint64_t inputLayoutHash = 0;
 
 		bool operator==(const Dx12PsoKey& o) const
 		{
-			return vs == o.vs && ps == o.ps && rootSig == o.rootSig && rtvFormat == o.rtvFormat && inputLayoutHash == o.inputLayoutHash;
+			return vs == o.vs && ps == o.ps && rootSig == o.rootSig &&
+				rtvFormat == o.rtvFormat && dsvFormat == o.dsvFormat &&
+				inputLayoutHash == o.inputLayoutHash;
 		}
 	};
 
@@ -29,6 +32,7 @@ namespace noc
 			mix((size_t)k.ps);
 			mix((size_t)k.rootSig);
 			mix((size_t)k.rtvFormat);
+			mix((size_t)k.dsvFormat);
 			mix((size_t)k.inputLayoutHash);
 			return h;
 		}
