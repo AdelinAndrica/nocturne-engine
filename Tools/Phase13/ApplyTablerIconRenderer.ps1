@@ -7,7 +7,12 @@ if (-not (Test-Path $path)) {
     throw "EditorShellV3.cpp not found: $path"
 }
 
-$content = Get-Content $path -Raw
+# Preserve EditorShellV3.cpp as UTF-8 without BOM. Windows PowerShell 5.1
+# otherwise treats UTF-8-without-BOM input as the active ANSI codepage and
+# Set-Content -Encoding UTF8 writes a BOM, which corrupts characters such as
+# em dashes, bullets and status symbols.
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false, $true)
+$content = [System.IO.File]::ReadAllText($path, $utf8NoBom)
 
 if ($content -notmatch '#include "EditorIconRenderer\.h"') {
     $content = [regex]::Replace(
@@ -35,6 +40,6 @@ void DrawIcon(HDC dc, Icon icon, RECT rc, COLORREF color)
     $content = $patched
 }
 
-Set-Content -Path $path -Value $content -Encoding UTF8
+[System.IO.File]::WriteAllText($path, $content, $utf8NoBom)
 Write-Host "Patched: $path"
 Write-Host 'Review with: git diff -- Apps/NocturneEditor/EditorShellV3.cpp'
