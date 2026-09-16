@@ -2,7 +2,6 @@
 #include "EditorTheme.h"
 
 #include <algorithm>
-#include <memory>
 #include <string>
 #include <vector>
 
@@ -39,8 +38,8 @@ namespace nocturne::editor
         {
             HBRUSH brush = CreateSolidBrush(fill);
             HPEN pen = CreatePen(PS_SOLID, 1, border);
-            const HGDIOBJ oldBrush = SelectObject(dc, brush);
-            const HGDIOBJ oldPen = SelectObject(dc, pen);
+            HGDIOBJ oldBrush = SelectObject(dc, brush);
+            HGDIOBJ oldPen = SelectObject(dc, pen);
             RoundRect(dc, rc.left, rc.top, rc.right, rc.bottom, radius, radius);
             SelectObject(dc, oldBrush);
             SelectObject(dc, oldPen);
@@ -133,9 +132,9 @@ namespace nocturne::editor
                     const bool wasPressed = state->pressed;
                     state->pressed = false;
                     ReleaseCapture();
-                    POINT p{ GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
                     RECT rc{};
                     GetClientRect(hwnd, &rc);
+                    POINT p{ GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
                     if (wasPressed && PtInRect(&rc, p))
                     {
                         SendMessageW(GetParent(hwnd), WM_COMMAND,
@@ -180,7 +179,7 @@ namespace nocturne::editor
                     }
                     else if (state->kind == EditorButtonKind::Success)
                     {
-                        bg = state->pressed ? Blend(c.panelBgAlt, c.success, 12)
+                        bg = state->pressed ? Blend(c.buttonBg, c.windowBg, 24)
                             : state->hovered ? Blend(c.buttonBg, c.success, 10) : c.buttonBg;
                         border = state->hovered ? Blend(c.border, c.success, 28) : c.border;
                         text = c.success;
@@ -190,7 +189,7 @@ namespace nocturne::editor
                         bg = state->pressed ? Blend(c.accent, c.windowBg, 24)
                             : state->hovered ? c.accentHover : c.accent;
                         border = bg;
-                        text = RGB(240, 247, 255);
+                        text = RGB(238, 246, 255);
                     }
                     else
                     {
@@ -239,29 +238,33 @@ namespace nocturne::editor
             int dragOffset = 0;
         };
 
-        int ScrollMaxPos(const ScrollState& s)
+        int ScrollMaxPos(const ScrollState& state)
         {
-            return (std::max)(s.info.minimum, s.info.maximum - (std::max)(1, s.info.page));
+            return (std::max)(state.info.minimum,
+                state.info.maximum - (std::max)(1, state.info.page));
         }
 
-        RECT ScrollThumbRect(HWND hwnd, const ScrollState& s)
+        RECT ScrollThumbRect(HWND hwnd, const ScrollState& state)
         {
             RECT rc{};
             GetClientRect(hwnd, &rc);
             const int height = (std::max)(1, rc.bottom - rc.top);
-            const int total = (std::max)(1, s.info.maximum - s.info.minimum);
-            const int page = (std::max)(1, s.info.page);
-            int thumbH = (height * page) / (std::max)(page, total);
-            thumbH = (std::clamp)(thumbH, 24, height);
-            const int maxPos = ScrollMaxPos(s);
-            const int travel = (std::max)(0, height - thumbH);
+            const int total = (std::max)(1, state.info.maximum - state.info.minimum);
+            const int page = (std::max)(1, state.info.page);
+            int thumbHeight = (height * page) / (std::max)(page, total);
+            thumbHeight = (std::clamp)(thumbHeight, 24, height);
+
+            const int maxPos = ScrollMaxPos(state);
+            const int travel = (std::max)(0, height - thumbHeight);
             int top = 0;
-            if (maxPos > s.info.minimum && travel > 0)
+            if (maxPos > state.info.minimum && travel > 0)
             {
-                const double t = double(s.info.position - s.info.minimum) / double(maxPos - s.info.minimum);
+                const double t = static_cast<double>(state.info.position - state.info.minimum) /
+                    static_cast<double>(maxPos - state.info.minimum);
                 top = static_cast<int>(t * travel + 0.5);
             }
-            return RECT{ 1, top + 1, (std::max)(2, rc.right - 1), (std::min)(rc.bottom - 1, top + thumbH - 1) };
+            return RECT{ 1, top + 1, (std::max)(2, rc.right - 1),
+                (std::min)(rc.bottom - 1, top + thumbHeight - 1) };
         }
 
         void NotifyScroll(HWND hwnd, ScrollState& state, int position)
@@ -298,7 +301,8 @@ namespace nocturne::editor
                         TrackMouseEvent(&tme);
                     }
                     POINT p{ GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
-                    const bool overThumb = PtInRect(&ScrollThumbRect(hwnd, *state), p) != FALSE;
+                    const RECT thumb = ScrollThumbRect(hwnd, *state);
+                    const bool overThumb = PtInRect(&thumb, p) != FALSE;
                     if (overThumb != state->thumbHovered)
                     {
                         state->thumbHovered = overThumb;
@@ -308,14 +312,13 @@ namespace nocturne::editor
                     {
                         RECT rc{};
                         GetClientRect(hwnd, &rc);
-                        RECT thumb = ScrollThumbRect(hwnd, *state);
-                        const int thumbH = thumb.bottom - thumb.top;
-                        const int travel = (std::max)(1, (rc.bottom - rc.top) - thumbH);
-                        const int y = p.y - state->dragOffset;
-                        const double t = double((std::clamp)(y, 0, travel)) / double(travel);
+                        const int thumbHeight = thumb.bottom - thumb.top;
+                        const int travel = (std::max)(1, rc.bottom - thumbHeight);
+                        const int desired = (std::clamp)(p.y - state->dragOffset, 0, travel);
+                        const double t = static_cast<double>(desired) / static_cast<double>(travel);
                         const int maxPos = ScrollMaxPos(*state);
-                        NotifyScroll(hwnd, *state,
-                            state->info.minimum + static_cast<int>(t * (maxPos - state->info.minimum) + 0.5));
+                        NotifyScroll(hwnd, *state, state->info.minimum +
+                            static_cast<int>(t * (maxPos - state->info.minimum) + 0.5));
                     }
                 }
                 return 0;
@@ -331,7 +334,7 @@ namespace nocturne::editor
                 if (state)
                 {
                     POINT p{ GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
-                    RECT thumb = ScrollThumbRect(hwnd, *state);
+                    const RECT thumb = ScrollThumbRect(hwnd, *state);
                     if (PtInRect(&thumb, p))
                     {
                         state->dragging = true;
@@ -366,10 +369,10 @@ namespace nocturne::editor
                 if (state && ScrollMaxPos(*state) > state->info.minimum)
                 {
                     RECT thumb = ScrollThumbRect(hwnd, *state);
-                    const COLORREF thumbColor = state->dragging ? Blend(c.textMuted, c.accent, 42)
+                    const COLORREF color = state->dragging ? Blend(c.textMuted, c.accent, 42)
                         : state->thumbHovered ? Blend(c.border, c.textMuted, 45)
                         : Blend(c.border, c.textMuted, 25);
-                    HBRUSH brush = CreateSolidBrush(thumbColor);
+                    HBRUSH brush = CreateSolidBrush(color);
                     HGDIOBJ oldBrush = SelectObject(dc, brush);
                     HGDIOBJ oldPen = SelectObject(dc, GetStockObject(NULL_PEN));
                     RoundRect(dc, thumb.left, thumb.top, thumb.right, thumb.bottom, 8, 8);
@@ -395,25 +398,23 @@ namespace nocturne::editor
             std::vector<TableRow> rows;
             HWND scroll = nullptr;
             HFONT font = nullptr;
-            HFONT headerFont = nullptr;
             int firstRow = 0;
             int selected = -1;
             int hover = -1;
         };
 
-        void SyncTableScroll(HWND hwnd, TableState& s)
+        void SyncTableScroll(HWND hwnd, TableState& state)
         {
             RECT rc{};
             GetClientRect(hwnd, &rc);
             const auto& m = EditorTheme::Metrics();
             const int visible = (std::max)(1, (rc.bottom - m.tableHeaderHeight) / m.tableRowHeight);
             EditorScrollInfo info{};
-            info.minimum = 0;
-            info.maximum = static_cast<int>(s.rows.size());
+            info.maximum = static_cast<int>(state.rows.size());
             info.page = visible;
-            info.position = s.firstRow;
-            SetEditorScrollInfo(s.scroll, info);
-            s.firstRow = GetEditorScrollPosition(s.scroll);
+            info.position = state.firstRow;
+            SetEditorScrollInfo(state.scroll, info);
+            state.firstRow = GetEditorScrollPosition(state.scroll);
         }
 
         LRESULT CALLBACK TableProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -428,30 +429,23 @@ namespace nocturne::editor
                 return TRUE;
             }
             case WM_CREATE:
-                if (state)
-                    state->scroll = CreateEditorScrollBar(hwnd, 1);
+                if (state) state->scroll = CreateEditorScrollBar(hwnd, 1);
                 return 0;
             case WM_NCDESTROY:
                 delete state;
                 SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
                 return 0;
             case WM_SETFONT:
-                if (state)
-                {
-                    state->font = reinterpret_cast<HFONT>(wParam);
-                    state->headerFont = state->font;
-                }
+                if (state) state->font = reinterpret_cast<HFONT>(wParam);
                 if (lParam) InvalidateRect(hwnd, nullptr, TRUE);
                 return 0;
             case WM_SIZE:
                 if (state && state->scroll)
                 {
                     const auto& m = EditorTheme::Metrics();
-                    const int w = LOWORD(lParam);
-                    const int h = HIWORD(lParam);
-                    MoveWindow(state->scroll, (std::max)(0, w - m.scrollbarWidth - 2),
+                    MoveWindow(state->scroll, (std::max)(0, LOWORD(lParam) - m.scrollbarWidth - 2),
                         m.tableHeaderHeight + 2, m.scrollbarWidth,
-                        (std::max)(0, h - m.tableHeaderHeight - 4), TRUE);
+                        (std::max)(0, HIWORD(lParam) - m.tableHeaderHeight - 4), TRUE);
                     SyncTableScroll(hwnd, *state);
                 }
                 return 0;
@@ -475,12 +469,11 @@ namespace nocturne::editor
                 if (state)
                 {
                     const auto& m = EditorTheme::Metrics();
-                    const int y = GET_Y_LPARAM(lParam);
                     int hover = -1;
+                    const int y = GET_Y_LPARAM(lParam);
                     if (y >= m.tableHeaderHeight)
                     {
-                        const int local = (y - m.tableHeaderHeight) / m.tableRowHeight;
-                        const int row = state->firstRow + local;
+                        const int row = state->firstRow + (y - m.tableHeaderHeight) / m.tableRowHeight;
                         if (row >= 0 && row < static_cast<int>(state->rows.size())) hover = row;
                     }
                     if (hover != state->hover)
@@ -530,22 +523,21 @@ namespace nocturne::editor
 
                 RECT header{ 0, 0, rc.right, m.tableHeaderHeight };
                 Fill(dc, header, c.panelBgAlt);
-                HPEN linePen = CreatePen(PS_SOLID, 1, c.border);
-                HGDIOBJ oldPen = SelectObject(dc, linePen);
+                HPEN separator = CreatePen(PS_SOLID, 1, c.border);
+                HGDIOBJ oldPen = SelectObject(dc, separator);
                 MoveToEx(dc, 0, m.tableHeaderHeight - 1, nullptr);
                 LineTo(dc, rc.right, m.tableHeaderHeight - 1);
                 SelectObject(dc, oldPen);
-                DeleteObject(linePen);
+                DeleteObject(separator);
 
-                const int scrollW = m.scrollbarWidth + 6;
-                const int usableW = (std::max)(120, rc.right - scrollW);
+                const int usableW = (std::max)(120, rc.right - m.scrollbarWidth - 6);
                 const int typeW = (std::clamp)(usableW / 3, 90, 150);
                 const int assetW = usableW - typeW;
                 RECT assetHeader{ 12, 0, assetW - 6, m.tableHeaderHeight };
                 RECT typeHeader{ assetW + 8, 0, usableW - 8, m.tableHeaderHeight };
-                DrawTextSimple(dc, L"Asset", assetHeader, c.textMuted, state ? state->headerFont : nullptr,
+                DrawTextSimple(dc, L"Asset", assetHeader, c.textMuted, state ? state->font : nullptr,
                     DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-                DrawTextSimple(dc, L"Type", typeHeader, c.textMuted, state ? state->headerFont : nullptr,
+                DrawTextSimple(dc, L"Type", typeHeader, c.textMuted, state ? state->font : nullptr,
                     DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
                 if (state && state->rows.empty())
@@ -597,21 +589,25 @@ namespace nocturne::editor
             HWND scroll = nullptr;
             HFONT font = nullptr;
             int firstRow = 0;
-            int selected = 0;
+            int selected = -1;
             int hover = -1;
         };
 
-        std::vector<int> VisibleTreeIndices(const TreeState& s)
+        std::vector<int> VisibleTreeIndices(const TreeState& state)
         {
             std::vector<int> result;
             std::vector<bool> expandedAtDepth(16, true);
-            for (int i = 0; i < static_cast<int>(s.items.size()); ++i)
+            for (int i = 0; i < static_cast<int>(state.items.size()); ++i)
             {
-                const auto& item = s.items[i];
+                const auto& item = state.items[i];
                 bool visible = true;
                 for (int d = 0; d < item.depth && d < static_cast<int>(expandedAtDepth.size()); ++d)
                 {
-                    if (!expandedAtDepth[d]) { visible = false; break; }
+                    if (!expandedAtDepth[d])
+                    {
+                        visible = false;
+                        break;
+                    }
                 }
                 if (visible) result.push_back(i);
                 if (item.depth < static_cast<int>(expandedAtDepth.size()))
@@ -624,20 +620,19 @@ namespace nocturne::editor
             return result;
         }
 
-        void SyncTreeScroll(HWND hwnd, TreeState& s)
+        void SyncTreeScroll(HWND hwnd, TreeState& state)
         {
             RECT rc{};
             GetClientRect(hwnd, &rc);
             const auto& m = EditorTheme::Metrics();
             const int visibleRows = (std::max)(1, rc.bottom / m.treeRowHeight);
-            const auto visible = VisibleTreeIndices(s);
+            const auto visible = VisibleTreeIndices(state);
             EditorScrollInfo info{};
-            info.minimum = 0;
             info.maximum = static_cast<int>(visible.size());
             info.page = visibleRows;
-            info.position = s.firstRow;
-            SetEditorScrollInfo(s.scroll, info);
-            s.firstRow = GetEditorScrollPosition(s.scroll);
+            info.position = state.firstRow;
+            SetEditorScrollInfo(state.scroll, info);
+            state.firstRow = GetEditorScrollPosition(state.scroll);
         }
 
         LRESULT CALLBACK TreeProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -692,8 +687,9 @@ namespace nocturne::editor
                 {
                     const auto visible = VisibleTreeIndices(*state);
                     const int localRow = GET_Y_LPARAM(lParam) / EditorTheme::Metrics().treeRowHeight;
-                    const int v = state->firstRow + localRow;
-                    const int hover = (v >= 0 && v < static_cast<int>(visible.size())) ? visible[v] : -1;
+                    const int visibleIndex = state->firstRow + localRow;
+                    const int hover = visibleIndex >= 0 && visibleIndex < static_cast<int>(visible.size())
+                        ? visible[visibleIndex] : -1;
                     if (hover != state->hover)
                     {
                         state->hover = hover;
@@ -715,13 +711,13 @@ namespace nocturne::editor
                 {
                     const auto& m = EditorTheme::Metrics();
                     const auto visible = VisibleTreeIndices(*state);
-                    const int v = state->firstRow + GET_Y_LPARAM(lParam) / m.treeRowHeight;
-                    if (v >= 0 && v < static_cast<int>(visible.size()))
+                    const int visibleIndex = state->firstRow + GET_Y_LPARAM(lParam) / m.treeRowHeight;
+                    if (visibleIndex >= 0 && visibleIndex < static_cast<int>(visible.size()))
                     {
-                        const int index = visible[v];
+                        const int index = visible[visibleIndex];
                         state->selected = index;
-                        const int x = GET_X_LPARAM(lParam);
                         const int arrowLeft = 10 + state->items[index].depth * 18;
+                        const int x = GET_X_LPARAM(lParam);
                         if (state->items[index].expandable && x >= arrowLeft && x <= arrowLeft + 18)
                             state->items[index].expanded = !state->items[index].expanded;
                         SyncTreeScroll(hwnd, *state);
@@ -741,6 +737,7 @@ namespace nocturne::editor
                 const auto& c = EditorTheme::Colors();
                 const auto& m = EditorTheme::Metrics();
                 Fill(dc, rc, c.panelBg);
+
                 if (state)
                 {
                     const auto visible = VisibleTreeIndices(*state);
@@ -753,7 +750,7 @@ namespace nocturne::editor
                         const auto& item = state->items[index];
                         RECT row{ 0, y, (std::max)(0, rc.right - m.scrollbarWidth - 4), y + m.treeRowHeight };
                         if (index == state->selected)
-                            Fill(dc, row, Blend(c.panelBg, c.accent, 42));
+                            Fill(dc, row, Blend(c.panelBg, c.accent, 40));
                         else if (index == state->hover)
                             Fill(dc, row, c.panelBgAlt);
 
@@ -783,9 +780,8 @@ namespace nocturne::editor
                         }
 
                         RECT textRc{ arrowX + 20, y, row.right - 6, y + m.treeRowHeight };
-                        DrawTextSimple(dc, item.text.c_str(), textRc,
-                            index == state->selected ? c.textPrimary : c.textPrimary,
-                            state->font, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+                        DrawTextSimple(dc, item.text.c_str(), textRc, c.textPrimary, state->font,
+                            DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
                     }
                 }
                 EndPaint(hwnd, &ps);
@@ -795,6 +791,11 @@ namespace nocturne::editor
             return DefWindowProcW(hwnd, msg, wParam, lParam);
         }
 
+        struct InputCreateInfo
+        {
+            const wchar_t* placeholder = L"";
+        };
+
         struct InputState
         {
             HWND edit = nullptr;
@@ -802,11 +803,6 @@ namespace nocturne::editor
             HBRUSH brush = nullptr;
             std::wstring placeholder;
             bool focused = false;
-        };
-
-        struct InputCreateInfo
-        {
-            const wchar_t* placeholder = L"";
         };
 
         LRESULT CALLBACK InputProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -889,8 +885,8 @@ namespace nocturne::editor
                 RECT rc{};
                 GetClientRect(hwnd, &rc);
                 const auto& c = EditorTheme::Colors();
-                const auto& m = EditorTheme::Metrics();
-                RoundBox(dc, rc, c.inputBg, state && state->focused ? c.accent : c.border, m.inputRadius);
+                RoundBox(dc, rc, c.inputBg, state && state->focused ? c.accent : c.border,
+                    EditorTheme::Metrics().inputRadius);
                 EndPaint(hwnd, &ps);
                 return 0;
             }
@@ -909,8 +905,11 @@ namespace nocturne::editor
         {
             auto* state = reinterpret_cast<ConsoleSyncState*>(refData);
             const LRESULT result = DefSubclassProc(hwnd, msg, wParam, lParam);
-            if (state && (msg == WM_MOUSEWHEEL || msg == WM_KEYDOWN || msg == WM_LBUTTONUP || msg == WM_SIZE))
+            if (state && (msg == WM_MOUSEWHEEL || msg == WM_KEYDOWN ||
+                msg == WM_LBUTTONUP || msg == WM_SIZE))
+            {
                 SyncEditorConsoleScroll(hwnd, state->scroll, state->lineHeight);
+            }
             if (msg == WM_NCDESTROY)
             {
                 RemoveWindowSubclass(hwnd, ConsoleSubclassProc, 1);
@@ -959,8 +958,7 @@ namespace nocturne::editor
 
     HWND CreateEditorScrollBar(HWND parent, int id)
     {
-        return CreateWindowExW(0, kScrollClass, L"",
-            WS_CHILD | WS_VISIBLE,
+        return CreateWindowExW(0, kScrollClass, L"", WS_CHILD | WS_VISIBLE,
             0, 0, 0, 0, parent, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),
             GetModuleHandleW(nullptr), nullptr);
     }
@@ -971,8 +969,8 @@ namespace nocturne::editor
         auto* state = reinterpret_cast<ScrollState*>(GetWindowLongPtrW(scrollBar, GWLP_USERDATA));
         if (!state) return;
         state->info = info;
-        const int maxPos = ScrollMaxPos(*state);
-        state->info.position = (std::clamp)(state->info.position, state->info.minimum, maxPos);
+        state->info.position = (std::clamp)(state->info.position,
+            state->info.minimum, ScrollMaxPos(*state));
         InvalidateRect(scrollBar, nullptr, FALSE);
     }
 
@@ -985,8 +983,7 @@ namespace nocturne::editor
 
     HWND CreateEditorDataTable(HWND parent, int id)
     {
-        return CreateWindowExW(0, kTableClass, L"",
-            WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+        return CreateWindowExW(0, kTableClass, L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP,
             0, 0, 0, 0, parent, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),
             GetModuleHandleW(nullptr), nullptr);
     }
@@ -1014,8 +1011,7 @@ namespace nocturne::editor
 
     HWND CreateEditorTree(HWND parent, int id)
     {
-        return CreateWindowExW(0, kTreeClass, L"",
-            WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+        return CreateWindowExW(0, kTreeClass, L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP,
             0, 0, 0, 0, parent, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),
             GetModuleHandleW(nullptr), nullptr);
     }
@@ -1045,8 +1041,7 @@ namespace nocturne::editor
     HWND CreateEditorInput(HWND parent, int id, const wchar_t* placeholder)
     {
         InputCreateInfo init{ placeholder };
-        return CreateWindowExW(0, kInputClass, L"",
-            WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+        return CreateWindowExW(0, kInputClass, L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP,
             0, 0, 0, 0, parent, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),
             GetModuleHandleW(nullptr), &init);
     }
@@ -1074,7 +1069,6 @@ namespace nocturne::editor
         const int firstLine = static_cast<int>(SendMessageW(edit, EM_GETFIRSTVISIBLELINE, 0, 0));
         const int visible = (std::max)(1, (rc.bottom - rc.top) / (std::max)(1, lineHeight));
         EditorScrollInfo info{};
-        info.minimum = 0;
         info.maximum = lineCount;
         info.page = visible;
         info.position = firstLine;
