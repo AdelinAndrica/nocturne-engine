@@ -40,6 +40,7 @@ namespace noc
 			const RenderQueue* queue);
 
 	private:
+		bool EnsureSkyPso_(ID3D12Device* device, ResourceManager* rm);
 		bool EnsureRootSigAndPso_(ID3D12Device* device, Dx12PsoCache& cache, ResourceManager* rm);
 		bool EnsureValidationCubeUploaded_(ID3D12Device* device, ID3D12GraphicsCommandList* cmd,
 			Dx12DeferredReleaseQueue& deferred, const Dx12FrameSync& sync, uint32_t frameIndex);
@@ -48,7 +49,14 @@ namespace noc
 		void EnsurePerFrameInstanceSrv_(ID3D12Device* device);
 
 	private:
+		ResourceHandleT<TextResource> skyHlsl_;
 		ResourceHandleT<TextResource> shaderHlsl_;
+
+		// Phase 14 procedural sky pass. Design choice (not directly from the book):
+		// a fullscreen gradient provides a stable editor sky without pulling PBR,
+		// cubemaps or lighting into this phase.
+		dx12::ComPtr<ID3D12RootSignature> skyRootSig_;
+		dx12::ComPtr<ID3D12PipelineState> skyPso_;
 
 		// Graphics state shared by the validation mesh pass.
 		dx12::ComPtr<ID3D12RootSignature> rootSig_;
@@ -73,6 +81,7 @@ namespace noc
 
 		Dx12PsoCache* psoCache_ = nullptr;
 
+		bool skyReady_ = false;
 		bool rootReady_ = false;
 		bool psoReady_ = false;
 		bool meshReady_ = false;

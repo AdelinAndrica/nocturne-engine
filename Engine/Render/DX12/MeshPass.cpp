@@ -34,6 +34,7 @@ namespace noc
 		cbvSrvUav_ = &cbvSrvUav;
 		psoCache_ = &psoCache;
 
+		skyReady_ = false;
 		rootReady_ = false;
 		psoReady_ = false;
 		meshReady_ = false;
@@ -51,20 +52,20 @@ namespace noc
 
 	void MeshPass::Shutdown(Dx12DeferredReleaseQueue& deferred, uint64_t safeFenceValue)
 	{
-		if (pso_)
+		auto defer = [&](auto& object)
 		{
+			if (!object)
+				return;
 			dx12::ComPtr<IUnknown> u;
-			pso_.As(&u);
+			object.As(&u);
 			deferred.Enqueue(safeFenceValue, std::move(u));
-			pso_.Reset();
-		}
-		if (rootSig_)
-		{
-			dx12::ComPtr<IUnknown> u;
-			rootSig_.As(&u);
-			deferred.Enqueue(safeFenceValue, std::move(u));
-			rootSig_.Reset();
-		}
+			object.Reset();
+		};
+
+		defer(skyPso_);
+		defer(skyRootSig_);
+		defer(pso_);
+		defer(rootSig_);
 
 		vb_.ShutdownNow();
 		ib_.ShutdownNow();
@@ -142,6 +143,74 @@ namespace noc
 		}
 
 		instReady_ = true;
+	}
+
+	bool MeshPass::EnsureSkyPso_(ID3D12Device* device, ResourceManager* rm)
+	{
+		if (skyReady_)
+			return true;
+		if (!device || !rm)
+			return false;
+
+		if (!skyHlsl_.IsValid())
+			skyHlsl_ = rm->RequestText("Shaders/EditorSky.hlsl");
+
+		const TextResource* src = rm->GetText(skyHlsl_);
+		if (!src)
+			return false;
+
+		dx12::ComPtr<ID3DBlob> vs;
+		dx12::ComPtr<ID3DBlob> ps;
+		if (!ShaderCompiler::CompileFromMemory("Shaders/EditorSky.hlsl", src->Str().c_str(), src->Str().size(), "VSMain", "vs_5_1", vs))
+			return false;
+		if (!ShaderCompiler::CompileFromMemory("Shaders/EditorSky.hlsl", src->Str().c_str(), src->Str().size(), "PSMain", "ps_5_1", ps))
+			return false;
+
+		D3D12_ROOT_SIGNATURE_DESC rs{};
+		rs.NumParameters = 0;
+		rs.pParameters = nullptr;
+		rs.NumStaticSamplers = 0;
+		rs.pStaticSamplers = nullptr;
+		rs.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+
+		dx12::ComPtr<ID3DBlob> blob;
+		dx12::ComPtr<ID3DBlob> err;
+		if (!dx12::HrOk(D3D12SerializeRootSignature(&rs, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &err), "SerializeRootSignature(EditorSky)"))
+		{
+			const char* e = err ? (const char*)err->GetBufferPointer() : "unknown";
+			NOC_LOG_ERROR("Render", "Editor sky root signature error: %s", e);
+			return false;
+		}
+		if (!dx12::HrOk(device->CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(), IID_PPV_ARGS(&skyRootSig_)),
+			"CreateRootSignature(EditorSky)"))
+			return false;
+
+		D3D12_GRAPHICS_PIPELINE_STATE_DESC pso{};
+		pso.pRootSignature = skyRootSig_.Get();
+		pso.VS = { vs->GetBufferPointer(), vs->GetBufferSize() };
+		pso.PS = { ps->GetBufferPointer(), ps->GetBufferSize() };
+		pso.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+		pso.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+		pso.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+		pso.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+		pso.DepthStencilState.DepthEnable = FALSE;
+		pso.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+		pso.DepthStencilState.StencilEnable = FALSE;
+		pso.DSVFormat = Dx12SwapChain::kDepthFormat;
+		pso.SampleMask = UINT_MAX;
+		pso.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+		pso.NumRenderTargets = 1;
+		pso.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+		pso.SampleDesc.Count = 1;
+		pso.InputLayout = { nullptr, 0 };
+
+		if (!dx12::HrOk(device->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&skyPso_)),
+			"CreateGraphicsPipelineState(EditorSky)"))
+			return false;
+
+		skyReady_ = true;
+		NOC_LOG_INFO("Render", "Phase 14 procedural editor sky ready");
+		return true;
 	}
 
 	bool MeshPass::EnsureRootSigAndPso_(ID3D12Device* device, Dx12PsoCache& cache, ResourceManager* rm)
@@ -358,9 +427,36 @@ namespace noc
 			return;
 
 		cmd->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
-		const float clearColor[4] = { 0.035f, 0.040f, 0.055f, 1.0f };
+		const float clearColor[4] = { 0.018f, 0.025f, 0.040f, 1.0f };
 		cmd->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
 		cmd->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+		D3D12_VIEWPORT vp{};
+		vp.Width = (float)swap.Width();
+		vp.Height = (float)swap.Height();
+		vp.MinDepth = 0.0f;
+		vp.MaxDepth = 1.0f;
+
+		D3D12_RECT sc{};
+		sc.left = 0;
+		sc.top = 0;
+		sc.right = (LONG)swap.Width();
+		sc.bottom = (LONG)swap.Height();
+		cmd->RSSetViewports(1, &vp);
+		cmd->RSSetScissorRects(1, &sc);
+
+		// Design choice (not directly from the book): a fullscreen procedural sky
+		// gives the Phase 14 editor viewport spatial context without introducing
+		// cubemap assets, PBR or the later lighting pipeline.
+		if (rm && EnsureSkyPso_(device, rm))
+		{
+			cmd->SetGraphicsRootSignature(skyRootSig_.Get());
+			cmd->SetPipelineState(skyPso_.Get());
+			cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			cmd->IASetVertexBuffers(0, 0, nullptr);
+			cmd->IASetIndexBuffer(nullptr);
+			cmd->DrawInstanced(3, 1, 0, 0);
+		}
 
 		if (!rm || !queue || queue->instanceCount == 0)
 			return;
@@ -389,20 +485,6 @@ namespace noc
 		cmd->SetPipelineState(pso_.Get());
 		cmd->SetGraphicsRootDescriptorTable(0, perFrameCbv_[frameIndex].gpu);
 		cmd->SetGraphicsRootDescriptorTable(1, instanceSrv_[frameIndex].gpu);
-
-		D3D12_VIEWPORT vp{};
-		vp.Width = (float)swap.Width();
-		vp.Height = (float)swap.Height();
-		vp.MinDepth = 0.0f;
-		vp.MaxDepth = 1.0f;
-
-		D3D12_RECT sc{};
-		sc.left = 0;
-		sc.top = 0;
-		sc.right = (LONG)swap.Width();
-		sc.bottom = (LONG)swap.Height();
-		cmd->RSSetViewports(1, &vp);
-		cmd->RSSetScissorRects(1, &sc);
 
 		auto vbv = vb_.VertexView();
 		auto ibv = ib_.IndexView(DXGI_FORMAT_R16_UINT);
