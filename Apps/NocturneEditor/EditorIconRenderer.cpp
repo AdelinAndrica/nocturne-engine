@@ -297,15 +297,27 @@ namespace nocturne::editor
                     static_cast<UINT>(svg.size())));
                 if (!stream) return nullptr;
 
+                constexpr float kTablerLogicalSize = 24.0f;
+
                 ComPtr<ID2D1SvgDocument> document;
-                hr = svgContext_->CreateSvgDocument(stream.Get(),
-                    D2D1::SizeF(static_cast<float>(width), static_cast<float>(height)), &document);
+                hr = svgContext_->CreateSvgDocument(
+                    stream.Get(),
+                    D2D1::SizeF(kTablerLogicalSize, kTablerLogicalSize),
+                    &document);
                 if (FAILED(hr)) return nullptr;
+
+                const float scaleX = static_cast<float>(width) / kTablerLogicalSize;
+                const float scaleY = static_cast<float>(height) / kTablerLogicalSize;
+
+                D2D1_MATRIX_3X2_F previousTransform{};
+                svgContext_->GetTransform(&previousTransform);
 
                 svgContext_->SetTarget(target.Get());
                 svgContext_->BeginDraw();
                 svgContext_->Clear(D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f));
+                svgContext_->SetTransform(D2D1::Matrix3x2F::Scale(scaleX, scaleY));
                 svgContext_->DrawSvgDocument(document.Get());
+                svgContext_->SetTransform(previousTransform);
                 hr = svgContext_->EndDraw();
                 svgContext_->SetTarget(nullptr);
                 document.Reset();
