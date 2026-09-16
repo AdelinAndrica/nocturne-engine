@@ -4,7 +4,10 @@
 #include <Windows.h>
 
 #include <cstdint>
+#include <cwctype>
+#include <iterator>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "Platform/Win32/WinWindow.h"
