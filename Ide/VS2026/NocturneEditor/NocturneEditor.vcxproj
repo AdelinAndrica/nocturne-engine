@@ -13,10 +13,12 @@
     <ClCompile Include="..\..\..\Apps\NocturneEditor\main.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorShell.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorTheme.cpp" />
+    <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorControls.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorShell.h" />
     <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorTheme.h" />
+    <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorControls.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\NocturneEngine\NocturneEngine.vcxproj">
