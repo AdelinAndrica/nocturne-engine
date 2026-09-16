@@ -31,8 +31,12 @@
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Development|x64'">NOC_DEV</PreprocessorDefinitions>
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Ship|x64'">NOC_SHIP</PreprocessorDefinitions>
     </ClCompile>
+    <ClCompile Include="..\..\..\Apps\NocturneHost\Phase11Tests.cpp" />
+    <ClCompile Include="..\..\..\Apps\NocturneHost\Phase12CookPack.cpp" />
+    <ClCompile Include="..\..\..\Apps\NocturneHost\Phase12Tests.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneHost\Tests\phase5_tests.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneHost\Tests\phase6_tests.cpp" />
+    <ClCompile Include="..\..\..\Apps\NocturneHost\ZipWriter.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\NocturneEngine\NocturneEngine.vcxproj">
@@ -41,6 +45,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\Apps\NocturneHost\AppConfig.h" />
+    <ClInclude Include="..\..\..\Apps\NocturneHost\Phase12CookPack.h" />
+    <ClInclude Include="..\..\..\Apps\NocturneHost\ZipWriter.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>18.0</VCProjectVersion>

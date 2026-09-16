@@ -18,6 +18,9 @@
 #include "Runtime/World.h"
 #include <Platform/Win32/WinWindow.h>
 
+#include "Assets/AssetImportPipeline.h"
+
+
 namespace noc {
 
 	class WinWindow;
@@ -48,6 +51,9 @@ namespace noc {
 		VirtualFileSystem& VFS() { return vfs_; }
 		ResourceManager& Resources() { return resources_; }
 		const ResourceManager& Resources() const { return resources_; }
+
+		AssetImportPipeline& Assets() { return assets_; }
+		const AssetImportPipeline& Assets() const { return assets_; }
 
 		InputSystem& Input() { return input_; }
 		const InputSystem& Input() const { return input_; }
@@ -86,6 +92,7 @@ namespace noc {
 		VirtualFileSystem vfs_;
 		JobSystem jobs_;
 		ResourceManager resources_;
+		AssetImportPipeline assets_;
 		InputSystem input_;
 
 		RenderSystem render_;

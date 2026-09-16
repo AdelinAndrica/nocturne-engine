@@ -27,6 +27,20 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\Engine\Assets\AssetDependencyGraph.h" />
+    <ClInclude Include="..\..\..\Engine\Assets\AssetId.h" />
+    <ClInclude Include="..\..\..\Engine\Assets\AssetImportPipeline.h" />
+    <ClInclude Include="..\..\..\Engine\Assets\AssetMetadata.h" />
+    <ClInclude Include="..\..\..\Engine\Assets\Importers\AssetImporterRegistry.h" />
+    <ClInclude Include="..\..\..\Engine\Assets\Importers\BmpTextureImporter.h" />
+    <ClInclude Include="..\..\..\Engine\Assets\Importers\IAssetImporter.h" />
+    <ClInclude Include="..\..\..\Engine\Assets\Importers\ObjMeshImporter.h" />
+    <ClInclude Include="..\..\..\Engine\Assets\Importers\TextImporter.h" />
+    <ClInclude Include="..\..\..\Engine\Assets\IntermediateAssets.h" />
+    <ClInclude Include="..\..\..\Engine\Assets\JsonWriter.h" />
+    <ClInclude Include="..\..\..\Engine\Assets\RuntimeFormats\MaterialBlob.h" />
+    <ClInclude Include="..\..\..\Engine\Assets\RuntimeFormats\MeshBlob.h" />
+    <ClInclude Include="..\..\..\Engine\Assets\RuntimeFormats\TextureBlob.h" />
     <ClInclude Include="..\..\..\Engine\Core\Assert.h" />
     <ClInclude Include="..\..\..\Engine\Core\BuildConfig.h" />
     <ClInclude Include="..\..\..\Engine\Core\Jobs\JobSystem.h" />
@@ -69,11 +83,17 @@
     <ClInclude Include="..\..\..\Engine\Resources\ResourceID.h" />
     <ClInclude Include="..\..\..\Engine\Resources\ResourceManager.h" />
     <ClInclude Include="..\..\..\Engine\Resources\Typed\IResourceLoader.h" />
+    <ClInclude Include="..\..\..\Engine\Resources\Typed\MaterialResource.h" />
+    <ClInclude Include="..\..\..\Engine\Resources\Typed\MaterialResourceLoader.h" />
+    <ClInclude Include="..\..\..\Engine\Resources\Typed\MeshResource.h" />
+    <ClInclude Include="..\..\..\Engine\Resources\Typed\MeshResourceLoader.h" />
     <ClInclude Include="..\..\..\Engine\Resources\Typed\ResourceHandleT.h" />
     <ClInclude Include="..\..\..\Engine\Resources\Typed\ResourceLoaderRegistry.h" />
     <ClInclude Include="..\..\..\Engine\Resources\Typed\ResourceType.h" />
     <ClInclude Include="..\..\..\Engine\Resources\Typed\TextResource.h" />
     <ClInclude Include="..\..\..\Engine\Resources\Typed\TextResourceLoader.h" />
+    <ClInclude Include="..\..\..\Engine\Resources\Typed\TextureResource.h" />
+    <ClInclude Include="..\..\..\Engine\Resources\Typed\TextureResourceLoader.h" />
     <ClInclude Include="..\..\..\Engine\Resources\VirtualFileSystem.h" />
     <ClInclude Include="..\..\..\Engine\Resources\VPath.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Bounds.h" />
@@ -86,6 +106,16 @@
     <ClInclude Include="..\..\..\Engine\Runtime\World.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\Engine\Assets\AssetDependencyGraph.cpp" />
+    <ClCompile Include="..\..\..\Engine\Assets\AssetImportPipeline.cpp" />
+    <ClCompile Include="..\..\..\Engine\Assets\Importers\AssetImporterRegistry.cpp" />
+    <ClCompile Include="..\..\..\Engine\Assets\Importers\BmpTextureImporter.cpp" />
+    <ClCompile Include="..\..\..\Engine\Assets\Importers\ObjMeshImporter.cpp" />
+    <ClCompile Include="..\..\..\Engine\Assets\Importers\TextImporter.cpp" />
+    <ClCompile Include="..\..\..\Engine\Assets\JsonWriter.cpp" />
+    <ClCompile Include="..\..\..\Engine\Assets\RuntimeFormats\MaterialBlob.cpp" />
+    <ClCompile Include="..\..\..\Engine\Assets\RuntimeFormats\MeshBlob.cpp" />
+    <ClCompile Include="..\..\..\Engine\Assets\RuntimeFormats\TextureBlob.cpp" />
     <ClCompile Include="..\..\..\Engine\Core\Assert.cpp" />
     <ClCompile Include="..\..\..\Engine\Core\Jobs\JobSystem.cpp" />
     <ClCompile Include="..\..\..\Engine\Core\Log.cpp" />

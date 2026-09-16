@@ -18,7 +18,8 @@ namespace noc
 		{
 			view = LookToLH(eye, forward, up);
 			proj = PerspectiveFovLH(fovYRadians, aspect, nearZ, farZ);
-			viewProj = Mul(proj, view);
+			viewProj = Mul(proj, view); // column-major, column vectors
+
 		}
 	};
 }

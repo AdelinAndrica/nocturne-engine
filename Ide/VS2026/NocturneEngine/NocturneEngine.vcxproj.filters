@@ -52,6 +52,15 @@
     <Filter Include="Header Files\Core\Math">
       <UniqueIdentifier>{b138e5f4-ebf7-49f3-b397-01055dbe2135}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\Assets">
+      <UniqueIdentifier>{4a2c4aac-fb19-4641-9918-589a186340e1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Assets\Importers">
+      <UniqueIdentifier>{87bc686a-2b15-4fe7-9f1b-9ba48f608d3f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Assets\RuntimeFormats">
+      <UniqueIdentifier>{779639e3-4b82-4a62-8bc9-db573a55ca76}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\Engine\Core\Assert.h">
@@ -225,6 +234,66 @@
     <ClInclude Include="..\..\..\Engine\Core\Math\MathTypes.h">
       <Filter>Header Files\Core\Math</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Assets\AssetDependencyGraph.h">
+      <Filter>Header Files\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Assets\AssetId.h">
+      <Filter>Header Files\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Assets\AssetImportPipeline.h">
+      <Filter>Header Files\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Assets\AssetMetadata.h">
+      <Filter>Header Files\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Assets\IntermediateAssets.h">
+      <Filter>Header Files\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Assets\JsonWriter.h">
+      <Filter>Header Files\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Assets\RuntimeFormats\MaterialBlob.h">
+      <Filter>Header Files\Assets\RuntimeFormats</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Assets\RuntimeFormats\MeshBlob.h">
+      <Filter>Header Files\Assets\RuntimeFormats</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Assets\RuntimeFormats\TextureBlob.h">
+      <Filter>Header Files\Assets\RuntimeFormats</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Assets\Importers\AssetImporterRegistry.h">
+      <Filter>Header Files\Assets\Importers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Assets\Importers\BmpTextureImporter.h">
+      <Filter>Header Files\Assets\Importers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Assets\Importers\IAssetImporter.h">
+      <Filter>Header Files\Assets\Importers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Assets\Importers\ObjMeshImporter.h">
+      <Filter>Header Files\Assets\Importers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Assets\Importers\TextImporter.h">
+      <Filter>Header Files\Assets\Importers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Resources\Typed\MaterialResource.h">
+      <Filter>Header Files\Resources\Typed</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Resources\Typed\MaterialResourceLoader.h">
+      <Filter>Header Files\Resources\Typed</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Resources\Typed\MeshResource.h">
+      <Filter>Header Files\Resources\Typed</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Resources\Typed\MeshResourceLoader.h">
+      <Filter>Header Files\Resources\Typed</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Resources\Typed\TextureResource.h">
+      <Filter>Header Files\Resources\Typed</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Resources\Typed\TextureResourceLoader.h">
+      <Filter>Header Files\Resources\Typed</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\Engine\Core\Assert.cpp">
@@ -328,6 +397,36 @@
     </ClCompile>
     <ClCompile Include="..\..\..\Engine\Runtime\World.cpp">
       <Filter>Header Files\Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Engine\Assets\Importers\AssetImporterRegistry.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Engine\Assets\Importers\BmpTextureImporter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Engine\Assets\Importers\ObjMeshImporter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Engine\Assets\Importers\TextImporter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Engine\Assets\RuntimeFormats\MaterialBlob.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Engine\Assets\RuntimeFormats\MeshBlob.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Engine\Assets\RuntimeFormats\TextureBlob.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Engine\Assets\AssetDependencyGraph.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Engine\Assets\AssetImportPipeline.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Engine\Assets\JsonWriter.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

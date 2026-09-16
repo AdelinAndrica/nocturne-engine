@@ -9,6 +9,10 @@
 #include "Resources/Typed/TextResource.h"
 #include "Resources/Typed/ResourceType.h"
 
+#include "Resources/Typed/MeshResource.h"
+#include "Resources/Typed/TextureResource.h"
+#include "Resources/Typed/MaterialResource.h"
+
 namespace noc
 {
     class Engine;
@@ -26,10 +30,8 @@ namespace noc
         bool Init(Engine& engine, VirtualFileSystem& vfs);
         void Shutdown();
 
-        // Call once per frame on the main thread.
         void Update();
 
-        // ---- Binary blob API ----
         ResourceHandle RequestBinary(std::string_view vpath);
 
         bool IsReady(ResourceHandle h) const;
@@ -38,18 +40,22 @@ namespace noc
         const uint8_t* GetBytes(ResourceHandle h) const;
         size_t GetSize(ResourceHandle h) const;
 
-        // Returns nullptr if:
-        // - handle invalid
-        // - resource has not failed
-        // Otherwise returns a stable, null-terminated error message.
         const char* GetError(ResourceHandle h) const;
 
-        // Optional helper for host-side testing.
         bool WaitUntilReady(ResourceHandle h, uint32_t timeoutMs);
 
-        // ---- Typed API (Phase 5) ----
+        // ---- Typed API ----
         ResourceHandleT<TextResource> RequestText(const char* vpath);
         const TextResource* GetText(ResourceHandleT<TextResource> h) const;
+
+        ResourceHandleT<MeshResource> RequestMesh(const char* vpath);
+        const MeshResource* GetMesh(ResourceHandleT<MeshResource> h) const;
+
+        ResourceHandleT<TextureResource> RequestTexture(const char* vpath);
+        const TextureResource* GetTexture(ResourceHandleT<TextureResource> h) const;
+
+        ResourceHandleT<MaterialResource> RequestMaterial(const char* vpath);
+        const MaterialResource* GetMaterial(ResourceHandleT<MaterialResource> h) const;
 
         ResourceLoaderRegistry& Loaders() { return loaders_; }
         const ResourceLoaderRegistry& Loaders() const { return loaders_; }
@@ -65,7 +71,6 @@ namespace noc
 
         // Internal opaque state (allocated in .cpp)
         void* state_ = nullptr;
-
         bool running_ = false;
 
         ResourceLoaderRegistry loaders_;

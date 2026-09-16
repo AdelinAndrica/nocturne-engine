@@ -24,9 +24,27 @@
     <ClCompile Include="..\..\..\Apps\NocturneHost\Tests\phase6_tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\Apps\NocturneHost\Phase11Tests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Apps\NocturneHost\Phase12CookPack.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Apps\NocturneHost\Phase12Tests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Apps\NocturneHost\ZipWriter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\Apps\NocturneHost\AppConfig.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Apps\NocturneHost\Phase12CookPack.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Apps\NocturneHost\ZipWriter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

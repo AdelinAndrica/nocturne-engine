@@ -453,15 +453,21 @@ namespace noc
 				visible++;
 				continue;
 			}
-			else {
+			if (debugCullDump_)
+			{
 				const auto& wb = impl_->rend[idx].worldBounds;
 
+				const bool hit = AabbIntersectsFrustum(wb, impl_->frustum);
+
 				NOC_LOG_INFO("World",
-					"Obj %u bounds min(%.2f %.2f %.2f) max(%.2f %.2f %.2f)",
+					"CullDump idx=%u hit=%s bounds min(%.2f %.2f %.2f) max(%.2f %.2f %.2f)",
 					idx,
+					hit ? "YES" : "NO",
 					wb.min.x, wb.min.y, wb.min.z,
 					wb.max.x, wb.max.y, wb.max.z);
 			}
+
+
 
 			if (AabbIntersectsFrustum(impl_->rend[idx].worldBounds, impl_->frustum))
 				visible++;
@@ -471,10 +477,24 @@ namespace noc
 		{
 			lastStats_.visible = 0;
 			lastStats_.total = total;
+
+			if (debugCullDump_)
+			{
+				NOC_LOG_INFO("World",
+					"CullDump summary: visible=%u total=%u (culling=%s)",
+					lastStats_.visible, lastStats_.total, cullingEnabled_ ? "ON" : "OFF");
+
+				debugCullDump_ = false; // one-shot
+			}
+
+
 			return q;
 		}
 
 		void* mem = frameArena.Allocate(sizeof(RenderInstance) * visible, 16);
+
+
+
 		if (!mem)
 			return q;
 
@@ -501,6 +521,16 @@ namespace noc
 		lastStats_.visible = w;
 		lastStats_.total = total;
 
+		if (debugCullDump_)
+		{
+			NOC_LOG_INFO("World",
+				"CullDump summary: visible=%u total=%u (culling=%s)",
+				lastStats_.visible, lastStats_.total, cullingEnabled_ ? "ON" : "OFF");
+
+			debugCullDump_ = false; // one-shot
+		}
+
+
 		q.instances = out;
 		q.instanceCount = w;
 		return q;
@@ -509,5 +539,10 @@ namespace noc
 	const WorldStats& World::GetLastStats() const
 	{
 		return lastStats_;
+	}
+
+	void World::DebugRequestCullDump()
+	{
+		debugCullDump_ = true;
 	}
 }

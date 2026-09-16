@@ -29,28 +29,30 @@ namespace noc
 
 	inline Frustum FrustumFromViewProj(const Mat4& m)
 	{
-		// Row-major m(r,c)
+		// Mat4 is stored column-major in m.m[col*4 + row]
+		auto at = [&](int row, int col) -> float { return m.m[col * 4 + row]; };
 
 		Frustum f{};
 
 		// Left   = row3 + row0
-		f.p[0] = Plane{ m(3,0) + m(0,0), m(3,1) + m(0,1), m(3,2) + m(0,2), m(3,3) + m(0,3) };
+		f.p[0] = Plane{ at(3,0) + at(0,0), at(3,1) + at(0,1), at(3,2) + at(0,2), at(3,3) + at(0,3) };
 		// Right  = row3 - row0
-		f.p[1] = Plane{ m(3,0) - m(0,0), m(3,1) - m(0,1), m(3,2) - m(0,2), m(3,3) - m(0,3) };
+		f.p[1] = Plane{ at(3,0) - at(0,0), at(3,1) - at(0,1), at(3,2) - at(0,2), at(3,3) - at(0,3) };
 		// Bottom = row3 + row1
-		f.p[2] = Plane{ m(3,0) + m(1,0), m(3,1) + m(1,1), m(3,2) + m(1,2), m(3,3) + m(1,3) };
+		f.p[2] = Plane{ at(3,0) + at(1,0), at(3,1) + at(1,1), at(3,2) + at(1,2), at(3,3) + at(1,3) };
 		// Top    = row3 - row1
-		f.p[3] = Plane{ m(3,0) - m(1,0), m(3,1) - m(1,1), m(3,2) - m(1,2), m(3,3) - m(1,3) };
+		f.p[3] = Plane{ at(3,0) - at(1,0), at(3,1) - at(1,1), at(3,2) - at(1,2), at(3,3) - at(1,3) };
 
-		// D3D 0..1 depth:
+		// D3D depth 0..1:
 		// Near = row2
-		f.p[4] = Plane{ m(2,0), m(2,1), m(2,2), m(2,3) };
+		f.p[4] = Plane{ at(2,0), at(2,1), at(2,2), at(2,3) };
 		// Far  = row3 - row2
-		f.p[5] = Plane{ m(3,0) - m(2,0), m(3,1) - m(2,1), m(3,2) - m(2,2), m(3,3) - m(2,3) };
+		f.p[5] = Plane{ at(3,0) - at(2,0), at(3,1) - at(2,1), at(3,2) - at(2,2), at(3,3) - at(2,3) };
 
 		for (int i = 0; i < 6; ++i) NormalizePlane(f.p[i]);
 		return f;
 	}
+
 
 
 

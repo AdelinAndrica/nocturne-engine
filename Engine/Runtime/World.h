@@ -65,7 +65,7 @@ namespace noc
 
 
 		const WorldStats& GetLastStats() const;
-
+		void DebugRequestCullDump();
 
 	private:
 		struct Impl;
@@ -74,5 +74,6 @@ namespace noc
 		WorldStats lastStats_;
 
 		bool cullingEnabled_ = true;
+		bool debugCullDump_ = false;
 	};
 }

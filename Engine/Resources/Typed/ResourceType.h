@@ -7,10 +7,11 @@ namespace noc {
         Unknown = 0,
         Binary,
         Text,
-        // Future:
-        // Json,
-        // Image,
-        // Mesh,
+
+        // Phase 11:
+        Mesh,
+        Texture,
+        Material,
     };
 
 } // namespace noc

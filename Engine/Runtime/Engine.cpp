@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <span>
+#include <filesystem>
 
 #include "Core/Assert.h"
 #include "Core/Log.h"
@@ -206,6 +207,15 @@ namespace noc {
         if (!resources_.Init(*this, vfs_))
             return false;
 
+        // Ensure DDC exists and mount it if you want runtime blobs visible via VFS.
+        // Design choice: mount loose dir "DerivedDataCache" at the same priority as content.
+        std::filesystem::create_directories("DerivedDataCache");
+        vfs_.MountLooseDirectory("DerivedDataCache");
+
+        // Start asset pipeline (host-side imports)
+        assets_.Init(*this);
+
+
 		// Phase 7: InputSystem init (HWND comes later in AttachWindow).
 		if (!input_.Init(*this))
 			return false;
@@ -338,6 +348,7 @@ namespace noc {
 		render_.Shutdown();
         world_.Shutdown();
         // Resource manager must shutdown while jobs + memory + log still exist.
+        assets_.Shutdown();
         resources_.Shutdown();
 		input_.Shutdown();
         registry_.ShutdownAll(this);

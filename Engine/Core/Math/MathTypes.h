@@ -4,244 +4,206 @@
 
 namespace noc
 {
-	// ============================================================
-	// Vec3
-	// ============================================================
+    // ============================================================
+    // Vec3
+    // ============================================================
 
-	struct Vec3
-	{
-		float x{}, y{}, z{};
+    struct Vec3
+    {
+        float x{}, y{}, z{};
 
-		constexpr Vec3() = default;
-		constexpr Vec3(float X, float Y, float Z) : x(X), y(Y), z(Z) {}
+        constexpr Vec3() = default;
+        constexpr Vec3(float X, float Y, float Z) : x(X), y(Y), z(Z) {}
 
-		static constexpr Vec3 Zero() { return { 0,0,0 }; }
-		static constexpr Vec3 One() { return { 1,1,1 }; }
+        static constexpr Vec3 Zero() { return { 0,0,0 }; }
+        static constexpr Vec3 One() { return { 1,1,1 }; }
 
-		friend constexpr Vec3 operator+(const Vec3& a, const Vec3& b)
-		{
-			return { a.x + b.x, a.y + b.y, a.z + b.z };
-		}
+        friend constexpr Vec3 operator+(const Vec3& a, const Vec3& b) { return { a.x + b.x, a.y + b.y, a.z + b.z }; }
+        friend constexpr Vec3 operator-(const Vec3& a, const Vec3& b) { return { a.x - b.x, a.y - b.y, a.z - b.z }; }
+        friend constexpr Vec3 operator*(const Vec3& v, float s) { return { v.x * s, v.y * s, v.z * s }; }
+        friend constexpr Vec3 operator*(float s, const Vec3& v) { return v * s; }
+    };
 
-		friend constexpr Vec3 operator-(const Vec3& a, const Vec3& b)
-		{
-			return { a.x - b.x, a.y - b.y, a.z - b.z };
-		}
+    inline float Dot(const Vec3& a, const Vec3& b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
 
-		friend constexpr Vec3 operator*(const Vec3& v, float s)
-		{
-			return { v.x * s, v.y * s, v.z * s };
-		}
+    inline Vec3 Cross(const Vec3& a, const Vec3& b)
+    {
+        return {
+            a.y * b.z - a.z * b.y,
+            a.z * b.x - a.x * b.z,
+            a.x * b.y - a.y * b.x
+        };
+    }
 
-		friend constexpr Vec3 operator*(float s, const Vec3& v)
-		{
-			return v * s;
-		}
-	};
+    inline float LengthSq(const Vec3& v) { return Dot(v, v); }
+    inline float Length(const Vec3& v) { return std::sqrt(LengthSq(v)); }
 
-	inline float Dot(const Vec3& a, const Vec3& b)
-	{
-		return a.x * b.x + a.y * b.y + a.z * b.z;
-	}
+    inline Vec3 Normalize(const Vec3& v)
+    {
+        const float len = Length(v);
+        if (len <= 1e-6f) return Vec3::Zero();
+        return v * (1.0f / len);
+    }
 
-	inline Vec3 Cross(const Vec3& a, const Vec3& b)
-	{
-		return {
-			a.y * b.z - a.z * b.y,
-			a.z * b.x - a.x * b.z,
-			a.x * b.y - a.y * b.x
-		};
-	}
+    // ============================================================
+    // Quat
+    // ============================================================
 
-	inline float LengthSq(const Vec3& v)
-	{
-		return Dot(v, v);
-	}
+    struct Quat
+    {
+        float x{}, y{}, z{}, w{ 1.0f };
 
-	inline float Length(const Vec3& v)
-	{
-		return std::sqrt(LengthSq(v));
-	}
+        constexpr Quat() = default;
+        constexpr Quat(float X, float Y, float Z, float W) : x(X), y(Y), z(Z), w(W) {}
 
-	inline Vec3 Normalize(const Vec3& v)
-	{
-		float len = Length(v);
-		if (len <= 1e-6f) return Vec3::Zero();
-		return v * (1.0f / len);
-	}
+        static constexpr Quat Identity() { return { 0,0,0,1 }; }
+    };
 
-	// ============================================================
-	// Quaternion
-	// ============================================================
+    // Rotate vector by unit quaternion (no matrices)
+    inline Vec3 Rotate(const Quat& q, const Vec3& v)
+    {
+        Vec3 qv{ q.x, q.y, q.z };
+        Vec3 t = Cross(qv, v) * 2.0f;
+        return v + t * q.w + Cross(qv, t);
+    }
 
-	struct Quat
-	{
-		float x{}, y{}, z{}, w{ 1.0f };
+    // ============================================================
+    // Mat4 (COLUMN-MAJOR, m[col*4 + row])
+    // ============================================================
 
-		constexpr Quat() = default;
-		constexpr Quat(float X, float Y, float Z, float W)
-			: x(X), y(Y), z(Z), w(W) {
-		}
+    struct Mat4
+    {
+        float m[16]{};
 
-		static constexpr Quat Identity()
-		{
-			return { 0,0,0,1 };
-		}
-	};
+        static Mat4 Identity()
+        {
+            Mat4 r{};
+            r.m[0] = 1.0f;
+            r.m[5] = 1.0f;
+            r.m[10] = 1.0f;
+            r.m[15] = 1.0f;
+            return r;
+        }
+    };
 
-	// ============================================================
-	// Mat4 (ROW-MAJOR)
-	// ============================================================
+    // Access helper: element at (row, col)
+    inline float& M(Mat4& m, int row, int col) { return m.m[col * 4 + row]; }
+    inline float  M(const Mat4& m, int row, int col) { return m.m[col * 4 + row]; }
 
-	struct Mat4
-	{
-		// Row-major 4x4
-		float m[16]{};
+    // Matrix multiply (column-major, column vectors): r = a * b
+    inline Mat4 Mul(const Mat4& a, const Mat4& b)
+    {
+        Mat4 r{};
+        for (int c = 0; c < 4; ++c)
+        {
+            for (int rrow = 0; rrow < 4; ++rrow)
+            {
+                M(r, rrow, c) =
+                    M(a, rrow, 0) * M(b, 0, c) +
+                    M(a, rrow, 1) * M(b, 1, c) +
+                    M(a, rrow, 2) * M(b, 2, c) +
+                    M(a, rrow, 3) * M(b, 3, c);
+            }
+        }
+        return r;
+    }
 
-		static Mat4 Identity()
-		{
-			Mat4 r{};
-			r.m[0] = 1.0f;
-			r.m[5] = 1.0f;
-			r.m[10] = 1.0f;
-			r.m[15] = 1.0f;
-			return r;
-		}
+    // Transform point (column vector): p' = M * [p,1]
+    inline Vec3 TransformPoint(const Mat4& m, const Vec3& p)
+    {
+        const float x = M(m, 0, 0) * p.x + M(m, 0, 1) * p.y + M(m, 0, 2) * p.z + M(m, 0, 3) * 1.0f;
+        const float y = M(m, 1, 0) * p.x + M(m, 1, 1) * p.y + M(m, 1, 2) * p.z + M(m, 1, 3) * 1.0f;
+        const float z = M(m, 2, 0) * p.x + M(m, 2, 1) * p.y + M(m, 2, 2) * p.z + M(m, 2, 3) * 1.0f;
+        return { x,y,z };
+    }
 
-		float& operator()(int r, int c)
-		{
-			return m[r * 4 + c];
-		}
+    inline Mat4 Translation(const Vec3& t)
+    {
+        Mat4 r = Mat4::Identity();
+        r.m[12] = t.x;
+        r.m[13] = t.y;
+        r.m[14] = t.z;
+        return r;
+    }
 
-		const float& operator()(int r, int c) const
-		{
-			return m[r * 4 + c];
-		}
-	};
+    inline Mat4 Scale(const Vec3& s)
+    {
+        Mat4 r{};
+        r.m[0] = s.x;
+        r.m[5] = s.y;
+        r.m[10] = s.z;
+        r.m[15] = 1.0f;
+        return r;
+    }
 
-	// ============================================================
-	// Matrix multiply (row-major)
-	// ============================================================
+    inline Mat4 RotationFromQuat(const Quat& q)
+    {
+        const float x = q.x, y = q.y, z = q.z, w = q.w;
+        const float xx = x * x, yy = y * y, zz = z * z;
+        const float xy = x * y, xz = x * z, yz = y * z;
+        const float wx = w * x, wy = w * y, wz = w * z;
 
-	inline Mat4 Mul(const Mat4& a, const Mat4& b)
-	{
-		Mat4 r{};
+        Mat4 r = Mat4::Identity();
 
-		for (int i = 0; i < 4; ++i)
-		{
-			for (int j = 0; j < 4; ++j)
-			{
-				float s = 0.0f;
-				for (int k = 0; k < 4; ++k)
-					s += a(i, k) * b(k, j);
-				r(i, j) = s;
-			}
-		}
+        // column-major rotation matrix
+        r.m[0] = 1.0f - 2.0f * (yy + zz);
+        r.m[1] = 2.0f * (xy + wz);
+        r.m[2] = 2.0f * (xz - wy);
 
-		return r;
-	}
+        r.m[4] = 2.0f * (xy - wz);
+        r.m[5] = 1.0f - 2.0f * (xx + zz);
+        r.m[6] = 2.0f * (yz + wx);
 
-	// ============================================================
-	// Transform helpers
-	// ============================================================
+        r.m[8] = 2.0f * (xz + wy);
+        r.m[9] = 2.0f * (yz - wx);
+        r.m[10] = 1.0f - 2.0f * (xx + yy);
 
-	inline Vec3 TransformPoint(const Mat4& m, const Vec3& p)
-	{
-		return {
-			p.x * m(0,0) + p.y * m(0,1) + p.z * m(0,2) + m(0,3),
-			p.x * m(1,0) + p.y * m(1,1) + p.z * m(1,2) + m(1,3),
-			p.x * m(2,0) + p.y * m(2,1) + p.z * m(2,2) + m(2,3)
-		};
-	}
+        return r;
+    }
 
-	inline Mat4 Translation(const Vec3& t)
-	{
-		Mat4 r = Mat4::Identity();
-		r(0, 3) = t.x;
-		r(1, 3) = t.y;
-		r(2, 3) = t.z;
-		return r;
-	}
+    inline Mat4 TRS(const Vec3& t, const Quat& r, const Vec3& s)
+    {
+        // Column-vector convention: M = T * R * S
+        return Mul(Translation(t), Mul(RotationFromQuat(r), Scale(s)));
+    }
 
-	inline Mat4 Scale(const Vec3& s)
-	{
-		Mat4 r = Mat4::Identity();
-		r(0, 0) = s.x;
-		r(1, 1) = s.y;
-		r(2, 2) = s.z;
-		return r;
-	}
+    // ============================================================
+    // Camera matrices
+    // ============================================================
 
-	inline Mat4 RotationFromQuat(const Quat& q)
-	{
-		const float x2 = q.x + q.x;
-		const float y2 = q.y + q.y;
-		const float z2 = q.z + q.z;
+    inline Mat4 LookToLH(const Vec3& eye, const Vec3& dir, const Vec3& up)
+    {
+        const Vec3 zaxis = Normalize(dir);
+        const Vec3 xaxis = Normalize(Cross(up, zaxis));
+        const Vec3 yaxis = Cross(zaxis, xaxis);
 
-		const float xx = q.x * x2;
-		const float yy = q.y * y2;
-		const float zz = q.z * z2;
-		const float xy = q.x * y2;
-		const float xz = q.x * z2;
-		const float yz = q.y * z2;
-		const float wx = q.w * x2;
-		const float wy = q.w * y2;
-		const float wz = q.w * z2;
+        Mat4 r = Mat4::Identity();
 
-		Mat4 r = Mat4::Identity();
+        // basis vectors into columns
+        r.m[0] = xaxis.x; r.m[1] = xaxis.y; r.m[2] = xaxis.z;
+        r.m[4] = yaxis.x; r.m[5] = yaxis.y; r.m[6] = yaxis.z;
+        r.m[8] = zaxis.x; r.m[9] = zaxis.y; r.m[10] = zaxis.z;
 
-		r(0, 0) = 1.0f - (yy + zz);
-		r(0, 1) = xy - wz;
-		r(0, 2) = xz + wy;
+        // translation
+        r.m[12] = -Dot(xaxis, eye);
+        r.m[13] = -Dot(yaxis, eye);
+        r.m[14] = -Dot(zaxis, eye);
 
-		r(1, 0) = xy + wz;
-		r(1, 1) = 1.0f - (xx + zz);
-		r(1, 2) = yz - wx;
+        return r;
+    }
 
-		r(2, 0) = xz - wy;
-		r(2, 1) = yz + wx;
-		r(2, 2) = 1.0f - (xx + yy);
+    // D3D-style LH perspective, depth 0..1
+    inline Mat4 PerspectiveFovLH(float fovY, float aspect, float zn, float zf)
+    {
+        Mat4 r{};
+        const float yScale = 1.0f / std::tan(fovY * 0.5f);
+        const float xScale = yScale / aspect;
 
-		return r;
-	}
-
-	inline Mat4 TRS(const Vec3& t, const Quat& r, const Vec3& s)
-	{
-		return Mul(Mul(Translation(t), RotationFromQuat(r)), Scale(s));
-	}
-
-	// ============================================================
-	// Camera
-	// ============================================================
-
-	inline Mat4 LookToLH(const Vec3& eye, const Vec3& dir, const Vec3& up)
-	{
-		const Vec3 zaxis = Normalize(dir);
-		const Vec3 xaxis = Normalize(Cross(up, zaxis));
-		const Vec3 yaxis = Cross(zaxis, xaxis);
-
-		Mat4 m = Mat4::Identity();
-
-		m(0, 0) = xaxis.x; m(0, 1) = xaxis.y; m(0, 2) = xaxis.z; m(0, 3) = -Dot(xaxis, eye);
-		m(1, 0) = yaxis.x; m(1, 1) = yaxis.y; m(1, 2) = yaxis.z; m(1, 3) = -Dot(yaxis, eye);
-		m(2, 0) = zaxis.x; m(2, 1) = zaxis.y; m(2, 2) = zaxis.z; m(2, 3) = -Dot(zaxis, eye);
-
-		return m;
-	}
-
-	inline Mat4 PerspectiveFovLH(float fovY, float aspect, float zn, float zf)
-	{
-		Mat4 r{};
-
-		const float yScale = 1.0f / std::tan(fovY * 0.5f);
-		const float xScale = yScale / aspect;
-
-		r(0, 0) = xScale;
-		r(1, 1) = yScale;
-		r(2, 2) = zf / (zf - zn);
-		r(2, 3) = 1.0f;
-		r(3, 2) = (-zn * zf) / (zf - zn);
-
-		return r;
-	}
+        r.m[0] = xScale;
+        r.m[5] = yScale;
+        r.m[10] = zf / (zf - zn);
+        r.m[11] = 1.0f;
+        r.m[14] = (-zn * zf) / (zf - zn);
+        return r;
+    }
 }

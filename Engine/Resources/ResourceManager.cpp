@@ -23,6 +23,9 @@
 #include "Runtime/Engine.h"
 
 #include "Resources/Typed/TextResourceLoader.h"
+#include "Resources/Typed/MeshResourceLoader.h"
+#include "Resources/Typed/TextureResourceLoader.h"
+#include "Resources/Typed/MaterialResourceLoader.h"
 
 namespace noc
 {
@@ -87,6 +90,9 @@ namespace noc
     };
 
     static TextResourceLoader g_textLoader;
+    static MeshResourceLoader g_meshLoader;
+    static TextureResourceLoader g_texLoader;
+    static MaterialResourceLoader g_matLoader;
 
     static std::string NormalizeVPath_(std::string_view vpath)
     {
@@ -120,6 +126,9 @@ namespace noc
 
         // Register built-in loaders (Phase 5)
         loaders_.RegisterLoader(&g_textLoader);
+        loaders_.RegisterLoader(&g_meshLoader);
+        loaders_.RegisterLoader(&g_texLoader);
+        loaders_.RegisterLoader(&g_matLoader);
 
         running_ = true;
 
@@ -454,6 +463,168 @@ namespace noc
 
         Record* r = st->records[index].get();
         return ResourceHandleT<TextResource>(ResourceHandle{ index, r->generation });
+    }
+
+    ResourceHandleT<MeshResource> ResourceManager::RequestMesh(const char* vpath) {
+        if (!running_ || !state_) return {};
+        auto* st = static_cast<InternalState*>(state_);
+
+        const std::string norm = NormalizeVPath_(std::string_view{ vpath ? vpath : "" });
+        if (norm.empty()) { NOC_LOG_ERROR("Res", "Invalid vpath: %s", vpath ? vpath : "(null)"); return {}; }
+
+        const ResourceID id = MakeResourceID(norm);
+        const uint64_t key = MakeCacheKey_(id.value, ResourceType::Mesh);
+
+        {
+            std::lock_guard<std::mutex> lock(st->mtx);
+            auto it = st->idToIndex.find(key);
+            if (it != st->idToIndex.end()) {
+                const uint32_t idx = it->second;
+                Record* r = st->records[idx].get();
+                return ResourceHandleT<MeshResource>(ResourceHandle{ idx, r->generation });
+            }
+        }
+
+        if (!loaders_.FindLoader(ResourceType::Mesh)) {
+            NOC_LOG_ERROR("Res", "RequestMesh: no loader registered for ResourceType::Mesh");
+            return {};
+        }
+
+        auto rec = std::make_unique<Record>();
+        rec->id = id;
+        rec->vpathNormalized = norm;
+        rec->type = ResourceType::Mesh;
+        rec->typedObject = nullptr;
+        rec->state.store(ResourceState::Requested, std::memory_order_release);
+
+        uint32_t index = 0;
+        {
+            std::lock_guard<std::mutex> lock(st->mtx);
+            index = (uint32_t)st->records.size();
+            st->records.push_back(std::move(rec));
+            st->idToIndex.emplace(key, index);
+        }
+
+        EnqueueLoadJob_(index);
+        return ResourceHandleT<MeshResource>(ResourceHandle{ index, 1 });
+    }
+
+    const MeshResource* ResourceManager::GetMesh(ResourceHandleT<MeshResource> h) const {
+        uint32_t idx = 0;
+        if (!ValidateHandle_(h.Untyped(), &idx)) return nullptr;
+        auto* st = static_cast<InternalState*>(state_);
+        const Record& r = *st->records[idx];
+        if (r.state.load(std::memory_order_acquire) != ResourceState::Ready) return nullptr;
+        if (r.type != ResourceType::Mesh) return nullptr;
+        return static_cast<const MeshResource*>(r.typedObject);
+    }
+
+    ResourceHandleT<TextureResource> ResourceManager::RequestTexture(const char* vpath) {
+        if (!running_ || !state_) return {};
+        auto* st = static_cast<InternalState*>(state_);
+
+        const std::string norm = NormalizeVPath_(std::string_view{ vpath ? vpath : "" });
+        if (norm.empty()) { NOC_LOG_ERROR("Res", "Invalid vpath: %s", vpath ? vpath : "(null)"); return {}; }
+
+        const ResourceID id = MakeResourceID(norm);
+        const uint64_t key = MakeCacheKey_(id.value, ResourceType::Texture);
+
+        {
+            std::lock_guard<std::mutex> lock(st->mtx);
+            auto it = st->idToIndex.find(key);
+            if (it != st->idToIndex.end()) {
+                const uint32_t idx = it->second;
+                Record* r = st->records[idx].get();
+                return ResourceHandleT<TextureResource>(ResourceHandle{ idx, r->generation });
+            }
+        }
+
+        if (!loaders_.FindLoader(ResourceType::Texture)) {
+            NOC_LOG_ERROR("Res", "RequestTexture: no loader registered for ResourceType::Texture");
+            return {};
+        }
+
+        auto rec = std::make_unique<Record>();
+        rec->id = id;
+        rec->vpathNormalized = norm;
+        rec->type = ResourceType::Texture;
+        rec->typedObject = nullptr;
+        rec->state.store(ResourceState::Requested, std::memory_order_release);
+
+        uint32_t index = 0;
+        {
+            std::lock_guard<std::mutex> lock(st->mtx);
+            index = (uint32_t)st->records.size();
+            st->records.push_back(std::move(rec));
+            st->idToIndex.emplace(key, index);
+        }
+
+        EnqueueLoadJob_(index);
+        return ResourceHandleT<TextureResource>(ResourceHandle{ index, 1 });
+    }
+
+    const TextureResource* ResourceManager::GetTexture(ResourceHandleT<TextureResource> h) const {
+        uint32_t idx = 0;
+        if (!ValidateHandle_(h.Untyped(), &idx)) return nullptr;
+        auto* st = static_cast<InternalState*>(state_);
+        const Record& r = *st->records[idx];
+        if (r.state.load(std::memory_order_acquire) != ResourceState::Ready) return nullptr;
+        if (r.type != ResourceType::Texture) return nullptr;
+        return static_cast<const TextureResource*>(r.typedObject);
+    }
+
+    ResourceHandleT<MaterialResource> ResourceManager::RequestMaterial(const char* vpath) {
+        if (!running_ || !state_) return {};
+        auto* st = static_cast<InternalState*>(state_);
+
+        const std::string norm = NormalizeVPath_(std::string_view{ vpath ? vpath : "" });
+        if (norm.empty()) { NOC_LOG_ERROR("Res", "Invalid vpath: %s", vpath ? vpath : "(null)"); return {}; }
+
+        const ResourceID id = MakeResourceID(norm);
+        const uint64_t key = MakeCacheKey_(id.value, ResourceType::Material);
+
+        {
+            std::lock_guard<std::mutex> lock(st->mtx);
+            auto it = st->idToIndex.find(key);
+            if (it != st->idToIndex.end()) {
+                const uint32_t idx = it->second;
+                Record* r = st->records[idx].get();
+                return ResourceHandleT<MaterialResource>(ResourceHandle{ idx, r->generation });
+            }
+        }
+
+        if (!loaders_.FindLoader(ResourceType::Material)) {
+            NOC_LOG_ERROR("Res", "RequestMaterial: no loader registered for ResourceType::Material");
+            return {};
+        }
+
+        auto rec = std::make_unique<Record>();
+        rec->id = id;
+        rec->vpathNormalized = norm;
+        rec->type = ResourceType::Material;
+        rec->typedObject = nullptr;
+        rec->state.store(ResourceState::Requested, std::memory_order_release);
+
+        uint32_t index = 0;
+        {
+            std::lock_guard<std::mutex> lock(st->mtx);
+            index = (uint32_t)st->records.size();
+            st->records.push_back(std::move(rec));
+            st->idToIndex.emplace(key, index);
+        }
+
+        EnqueueLoadJob_(index);
+        return ResourceHandleT<MaterialResource>(ResourceHandle{ index, 1 });
+    }
+
+    const MaterialResource* ResourceManager::GetMaterial(ResourceHandleT<MaterialResource> h) const {
+        uint32_t idx = 0;
+        if (!ValidateHandle_(h.Untyped(), &idx)) return nullptr;
+        auto* st = static_cast<InternalState*>(state_);
+        const Record& r = *st->records[idx];
+        if (r.state.load(std::memory_order_acquire) != ResourceState::Ready) return nullptr;
+        if (r.type != ResourceType::Material) return nullptr;
+        return static_cast<const MaterialResource*>(r.typedObject);
     }
 
     void ResourceManager::Update()
