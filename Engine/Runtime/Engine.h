@@ -68,6 +68,8 @@ namespace noc {
 		void KillMemory();
 
 		bool AttachWindow(WinWindow& window);
+		bool AttachRenderWindow(void* nativeHwnd, uint32_t clientWidth, uint32_t clientHeight);
+		bool ResizeRenderWindow(uint32_t clientWidth, uint32_t clientHeight);
 		bool CreateAndAttachMainWindow(WinWindowDesc desc, WinWindow& outWindow);
 
 
@@ -100,6 +102,9 @@ namespace noc {
 
 		EngineConfig cfg_{};
 		bool initialized_ = false;
+		bool renderAttached_ = false;
+		uint32_t renderWidth_ = 0;
+		uint32_t renderHeight_ = 0;
 	};
 
 } // namespace noc
