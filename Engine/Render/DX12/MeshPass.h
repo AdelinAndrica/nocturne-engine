@@ -50,6 +50,10 @@ namespace noc
 	private:
 		ResourceHandleT<TextResource> shaderHlsl_;
 
+		// Graphics state shared by the validation mesh pass.
+		dx12::ComPtr<ID3D12RootSignature> rootSig_;
+		dx12::ComPtr<ID3D12PipelineState> pso_;
+
 		// Phase 14 validation geometry. The general multi-mesh render path remains
 		// future renderer work; this pass still draws one geometry instanced N times.
 		GpuBuffer vb_;
