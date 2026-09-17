@@ -1,0 +1,57 @@
+name: Nocturne Windows CI
+
+on:
+  push:
+    paths:
+      - "Engine/**"
+      - "Apps/NocturneHost/**"
+      - "Ide/VS2026/NocturneEngine/**"
+      - "Ide/VS2026/NocturneHost/**"
+      - ".github/workflows/windows-ci.yml"
+  pull_request:
+    paths:
+      - "Engine/**"
+      - "Apps/NocturneHost/**"
+      - "Ide/VS2026/NocturneEngine/**"
+      - "Ide/VS2026/NocturneHost/**"
+      - ".github/workflows/windows-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  phase15-entity-registry:
+    name: Phase 15 — Entity Registry
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build NocturneHost (Debug x64)
+        shell: pwsh
+        run: |
+          $root = "$env:GITHUB_WORKSPACE\"
+          $out = "$env:GITHUB_WORKSPACE\Build\CI\bin\"
+
+          msbuild "Ide\VS2026\NocturneHost\NocturneHost.vcxproj" `
+            /m `
+            /p:Configuration=Debug `
+            /p:Platform=x64 `
+            /p:PlatformToolset=v143 `
+            "/p:SolutionDir=$root" `
+            "/p:OutDir=$out"
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Run Phase 15 entity-registry tests
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE\Build\CI\bin\NocturneHost.exe" --phase15-entity-tests
+          exit $LASTEXITCODE
