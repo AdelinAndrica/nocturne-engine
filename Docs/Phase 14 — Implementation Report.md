@@ -41,10 +41,10 @@ Phase 14 did **not** introduce ECS, full scene authoring, serialization, PBR/lig
 
 The architectural direction is grounded in the provided books:
 
-- Jason Gregory, *Game Engine Architecture (3rd Edition)*, `15.4.1.2 — game-world visualization in editor tooling;
-- Gregory `15.4.1.3 — editor viewport navigation;
-- Gregory `15.4.1.4 — object selection and synchronization;
-- Gregory `15.4.1.7 — object placement and transform aids;
+- Jason Gregory, *Game Engine Architecture (3rd Edition)*, §15.4.1.2 — game-world visualization in editor tooling;
+- Gregory §15.4.1.3 — editor viewport navigation;
+- Gregory §15.4.1.4 — object selection and synchronization;
+- Gregory §15.4.1.7 — object placement and transform aids;
 - Frank D. Luna, *Introduction to 3D Game Programming with DirectX 12*, Chapter 4 — device/swap-chain/back-buffer/depth-buffer/viewport/scissor/resize lifecycle;
 - Luna Chapter 17 — picking-ray construction, local/object-space bounds tests and nearest-hit selection.
 

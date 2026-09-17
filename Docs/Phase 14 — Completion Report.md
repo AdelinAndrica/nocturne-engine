@@ -54,10 +54,10 @@ The exact child-HWND and callback integration is **Design choice (not directly f
 
 Primary grounding:
 
-- Jason Gregory, *Game Engine Architecture (3rd Edition)*, `15.4.1.2 — game-world visualization;
-- Gregory `15.4.1.3 — navigation;
-- Gregory `15.4.1.4 — selection;
-- Gregory `15.4.1.7 — object placement/alignment aids and transform handles;
+- Jason Gregory, *Game Engine Architecture (3rd Edition)*, §15.4.1.2 — game-world visualization;
+- Gregory §15.4.1.3 — navigation;
+- Gregory §15.4.1.4 — selection;
+- Gregory §15.4.1.7 — object placement/alignment aids and transform handles;
 - Frank D. Luna, *Introduction to 3D Game Programming with DirectX 12*, Chapter 4 — swap-chain/depth/resize lifecycle;
 - Luna Chapter 17 — picking ray, object/local-space tests and nearest hit.
 
