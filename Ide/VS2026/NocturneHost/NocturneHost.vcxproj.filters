@@ -27,6 +27,9 @@
     <ClCompile Include="..\..\..\Apps\NocturneHost\Tests\phase15_camera_tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\Apps\NocturneHost\Tests\phase15_name_tests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\Apps\NocturneHost\Tests\phase15_renderable_tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

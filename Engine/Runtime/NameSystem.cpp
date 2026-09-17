@@ -1,0 +1,148 @@
+#include "Runtime/NameSystem.h"
+
+#include "Runtime/EntityRegistry.h"
+
+#include <cstring>
+
+namespace noc
+{
+    NameSystem::~NameSystem()
+    {
+        Shutdown();
+    }
+
+    bool NameSystem::Init(
+        EntityRegistry& entities,
+        IAllocator& allocator,
+        uint32_t initialCapacity)
+    {
+        if (entities_)
+            return true;
+
+        const uint32_t sparseCapacity =
+            entities.Capacity() > initialCapacity
+                ? entities.Capacity()
+                : initialCapacity;
+
+        if (!names_.Init(
+                allocator,
+                initialCapacity,
+                sparseCapacity))
+        {
+            return false;
+        }
+
+        entities_ = &entities;
+        return true;
+    }
+
+    void NameSystem::Shutdown()
+    {
+        names_.Shutdown();
+        entities_ = nullptr;
+    }
+
+    NameComponent* NameSystem::Add(
+        EntityHandle entity,
+        const char* initialName)
+    {
+        if (!IsUsableEntity_(entity))
+            return nullptr;
+
+        uint32_t length = 0;
+        if (!ValidateName_(initialName, length))
+            return nullptr;
+
+        NameComponent* component = names_.Emplace(entity);
+        if (!component)
+            return nullptr;
+
+        if (length > 0)
+            std::memcpy(component->value, initialName, length);
+        component->value[length] = '\0';
+        return component;
+    }
+
+    bool NameSystem::Remove(EntityHandle entity)
+    {
+        if (!IsUsableEntity_(entity))
+            return false;
+
+        return names_.Remove(entity);
+    }
+
+    bool NameSystem::Has(EntityHandle entity) const
+    {
+        return IsUsableEntity_(entity) && names_.Has(entity);
+    }
+
+    const NameComponent* NameSystem::Get(EntityHandle entity) const
+    {
+        if (!IsUsableEntity_(entity))
+            return nullptr;
+
+        return names_.Get(entity);
+    }
+
+    uint32_t NameSystem::Count() const
+    {
+        return names_.Count();
+    }
+
+    bool NameSystem::SetName(EntityHandle entity, const char* name)
+    {
+        if (!IsUsableEntity_(entity))
+            return false;
+
+        uint32_t length = 0;
+        if (!ValidateName_(name, length))
+            return false;
+
+        NameComponent* component = names_.Get(entity);
+        if (!component)
+            return false;
+
+        if (length > 0)
+            std::memcpy(component->value, name, length);
+        component->value[length] = '\0';
+        return true;
+    }
+
+    uint32_t NameSystem::DenseCount() const
+    {
+        return names_.Count();
+    }
+
+    EntityHandle NameSystem::OwnerAtDenseIndex(uint32_t denseIndex) const
+    {
+        return names_.OwnerAtDenseIndex(denseIndex);
+    }
+
+    const NameComponent* NameSystem::ComponentAtDenseIndex(
+        uint32_t denseIndex) const
+    {
+        return names_.ComponentAtDenseIndex(denseIndex);
+    }
+
+    bool NameSystem::IsUsableEntity_(EntityHandle entity) const
+    {
+        return entities_ && entities_->IsAlive(entity);
+    }
+
+    bool NameSystem::ValidateName_(
+        const char* name,
+        uint32_t& outLength)
+    {
+        outLength = 0;
+        if (!name)
+            return false;
+
+        while (outLength <= kNameComponentMaxBytes
+            && name[outLength] != '\0')
+        {
+            ++outLength;
+        }
+
+        return outLength <= kNameComponentMaxBytes;
+    }
+}
