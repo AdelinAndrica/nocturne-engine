@@ -101,8 +101,10 @@
     <ClInclude Include="..\..\..\Engine\Runtime\ComponentRegistry.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\ComponentStorage.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\ComponentType.h" />
+    <ClInclude Include="..\..\..\Engine\Runtime\Components\CameraComponent.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Components\RenderableComponent.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Components\TransformComponent.h" />
+    <ClInclude Include="..\..\..\Engine\Runtime\CameraSystem.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\RenderableSystem.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\TransformSystem.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Entity.h" />
@@ -158,6 +160,7 @@
     <ClCompile Include="..\..\..\Engine\Resources\VPath.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\ComponentRegistry.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\EntityRegistry.cpp" />
+    <ClCompile Include="..\..\..\Engine\Runtime\CameraSystem.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\RenderableSystem.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\TransformSystem.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\Engine.cpp" />
