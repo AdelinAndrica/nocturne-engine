@@ -28,6 +28,9 @@ namespace nocturne::editor
         constexpr int kRotateTool = 1008;
         constexpr int kScaleTool = 1009;
         constexpr int kHierarchyRowHeight = 24;
+        constexpr int kGizmoRingSegments = 64;
+        constexpr float kGizmoTargetPixels = 88.0f;
+        constexpr float kGizmoHitRadiusPixels = 9.0f;
 
         noc::Quat MulQuat(const noc::Quat& a, const noc::Quat& b)
         {
@@ -75,6 +78,41 @@ namespace nocturne::editor
             return std::sqrt(dx * dx + dy * dy);
         }
 
+        float GizmoWorldLength(HWND renderHost, const noc::Vec3& cameraPos,
+            const noc::Quat& cameraRot, float fovY, const noc::Vec3& pivot)
+        {
+            RECT rc{};
+            if (!renderHost || !GetClientRect(renderHost, &rc))
+                return 1.5f;
+            const float height = float((std::max)(1L, rc.bottom - rc.top));
+            const noc::Vec3 forward = noc::Normalize(noc::Rotate(cameraRot, { 0,0,1 }));
+            const float depth = (std::max)(0.05f, noc::Dot(pivot - cameraPos, forward));
+            const float worldPerPixel = (2.0f * depth * std::tan(fovY * 0.5f)) / height;
+            return (std::clamp)(worldPerPixel * kGizmoTargetPixels, 0.35f, 50.0f);
+        }
+
+        noc::Vec3 GizmoRingLocalPoint(int axis, float angle)
+        {
+            const float c = std::cos(angle);
+            const float s = std::sin(angle);
+            switch (axis)
+            {
+            case 0: return { 0.0f, c, s };     // YZ ring -> X rotation axis
+            case 1: return { s, 0.0f, c };     // ZX ring -> Y rotation axis
+            default: return { c, s, 0.0f };    // XY ring -> Z rotation axis
+            }
+        }
+
+        void GizmoRingBasis(int axis, noc::Vec3& outU, noc::Vec3& outV)
+        {
+            switch (axis)
+            {
+            case 0: outU = { 0,1,0 }; outV = { 0,0,1 }; break;
+            case 1: outU = { 0,0,1 }; outV = { 1,0,0 }; break;
+            default: outU = { 1,0,0 }; outV = { 0,1,0 }; break;
+            }
+        }
+
         void DrawLine(HDC dc, POINT a, POINT b, COLORREF color, int width = 1)
         {
             HPEN pen = CreatePen(PS_SOLID, width, color);
@@ -83,6 +121,44 @@ namespace nocturne::editor
             LineTo(dc, b.x, b.y);
             SelectObject(dc, old);
             DeleteObject(pen);
+        }
+
+        void DrawArrowHead(HDC dc, POINT start, POINT end, COLORREF color)
+        {
+            const float dx = float(end.x - start.x);
+            const float dy = float(end.y - start.y);
+            const float len = std::sqrt(dx * dx + dy * dy);
+            if (len < 1.0f) return;
+            const float ux = dx / len;
+            const float uy = dy / len;
+            const float px = -uy;
+            const float py = ux;
+            const float bx = float(end.x) - ux * 12.0f;
+            const float by = float(end.y) - uy * 12.0f;
+            POINT points[3] = {
+                end,
+                { LONG(bx + px * 5.0f), LONG(by + py * 5.0f) },
+                { LONG(bx - px * 5.0f), LONG(by - py * 5.0f) }
+            };
+            HBRUSH brush = CreateSolidBrush(color);
+            HGDIOBJ oldBrush = SelectObject(dc, brush);
+            HGDIOBJ oldPen = SelectObject(dc, GetStockObject(NULL_PEN));
+            Polygon(dc, points, 3);
+            SelectObject(dc, oldPen);
+            SelectObject(dc, oldBrush);
+            DeleteObject(brush);
+        }
+
+        void DrawScaleHandle(HDC dc, POINT center, COLORREF color)
+        {
+            RECT rc{ center.x - 5, center.y - 5, center.x + 6, center.y + 6 };
+            HBRUSH brush = CreateSolidBrush(color);
+            HGDIOBJ oldBrush = SelectObject(dc, brush);
+            HGDIOBJ oldPen = SelectObject(dc, GetStockObject(NULL_PEN));
+            Rectangle(dc, rc.left, rc.top, rc.right, rc.bottom);
+            SelectObject(dc, oldPen);
+            SelectObject(dc, oldBrush);
+            DeleteObject(brush);
         }
 
         COLORREF BlendColor(COLORREF a, COLORREF b, int bPercent)
@@ -286,6 +362,7 @@ namespace nocturne::editor
         pendingMouseDy_ = 0;
         selectedIndex_ = -1;
         dragObjectIndex_ = -1;
+        gizmoAxis_ = -1;
         hierarchySelectedRow_ = 0;
         hierarchyHoverRow_ = -1;
         shell_ = nullptr;
@@ -518,6 +595,7 @@ namespace nocturne::editor
         if (index < 0 || index >= kValidationObjectCount || !validationObjects_[index].selectable)
             index = -1;
         selectedIndex_ = index;
+        gizmoAxis_ = -1;
         RefreshDebugSelection_();
 
         if (syncTree)
@@ -544,17 +622,52 @@ namespace nocturne::editor
     int EditorViewportController::HitGizmoAxis_(POINT p) const
     {
         if (selectedIndex_ < 0) return -1;
+        const int tool = ActiveTool_();
+        if (tool != kMoveTool && tool != kRotateTool && tool != kScaleTool)
+            return -1;
+
         const ValidationObject& object = validationObjects_[selectedIndex_];
         POINT center{};
         if (!Project_(object.t, center)) return -1;
+        const float gizmoLength = GizmoWorldLength(renderHost_, cameraPos_, cameraRot_, fovY_, object.t);
         const noc::Vec3 axes[3] = { {1,0,0},{0,1,0},{0,0,1} };
-        float best = 9.0f;
+        float best = kGizmoHitRadiusPixels;
         int bestAxis = -1;
+
+        if (tool == kRotateTool)
+        {
+            constexpr float kTwoPi = 6.28318530718f;
+            for (int axis = 0; axis < 3; ++axis)
+            {
+                POINT previous{};
+                bool previousValid = false;
+                for (int segment = 0; segment <= kGizmoRingSegments; ++segment)
+                {
+                    const float angle = kTwoPi * float(segment) / float(kGizmoRingSegments);
+                    const noc::Vec3 local = GizmoRingLocalPoint(axis, angle);
+                    POINT current{};
+                    const bool currentValid = Project_(object.t + noc::Rotate(object.r, local) * gizmoLength, current);
+                    if (currentValid && previousValid)
+                    {
+                        const float distance = PointSegmentDistance(p, previous, current);
+                        if (distance < best)
+                        {
+                            best = distance;
+                            bestAxis = axis;
+                        }
+                    }
+                    previous = current;
+                    previousValid = currentValid;
+                }
+            }
+            return bestAxis;
+        }
+
         for (int i = 0; i < 3; ++i)
         {
             POINT end{};
             const noc::Vec3 axis = noc::Rotate(object.r, axes[i]);
-            if (!Project_(object.t + axis * 1.5f, end)) continue;
+            if (!Project_(object.t + axis * gizmoLength, end)) continue;
             const float dist = PointSegmentDistance(p, center, end);
             if (dist < best) { best = dist; bestAxis = i; }
         }
@@ -573,6 +686,7 @@ namespace nocturne::editor
         dragStartR_ = object.r;
         dragStartS_ = object.s;
         SetCapture(renderHost_);
+        if (overlay_) InvalidateRect(overlay_, nullptr, FALSE);
     }
 
     void EditorViewportController::UpdateGizmoDrag_(POINT mouse)
@@ -583,27 +697,71 @@ namespace nocturne::editor
         ValidationObject& object = validationObjects_[dragObjectIndex_];
         const noc::Vec3 unit[3] = { {1,0,0},{0,1,0},{0,0,1} };
         const noc::Vec3 axisWorld = noc::Rotate(dragStartR_, unit[gizmoAxis_]);
-        POINT a{}, b{};
-        if (!Project_(dragStartT_, a) || !Project_(dragStartT_ + axisWorld * 1.5f, b)) return;
-        const float vx = float(b.x - a.x), vy = float(b.y - a.y);
-        const float len = std::sqrt(vx * vx + vy * vy);
-        if (len < 1.0f) return;
-        const float dx = float(mouse.x - dragStartMouse_.x);
-        const float dy = float(mouse.y - dragStartMouse_.y);
-        const float signedPixels = (dx * vx + dy * vy) / len;
-
+        const float gizmoLength = GizmoWorldLength(renderHost_, cameraPos_, cameraRot_, fovY_, dragStartT_);
         const int tool = ActiveTool_();
-        if (tool == kMoveTool)
-            object.t = dragStartT_ + axisWorld * (signedPixels * 0.02f);
-        else if (tool == kScaleTool)
+
+        if (tool == kRotateTool)
         {
-            object.s = dragStartS_;
-            float* component = gizmoAxis_ == 0 ? &object.s.x : (gizmoAxis_ == 1 ? &object.s.y : &object.s.z);
-            const float start = gizmoAxis_ == 0 ? dragStartS_.x : (gizmoAxis_ == 1 ? dragStartS_.y : dragStartS_.z);
-            *component = (std::max)(0.05f, start + signedPixels * 0.01f);
+            POINT center{};
+            if (!Project_(dragStartT_, center)) return;
+            const float sx = float(dragStartMouse_.x - center.x);
+            const float sy = float(dragStartMouse_.y - center.y);
+            const float cx = float(mouse.x - center.x);
+            const float cy = float(mouse.y - center.y);
+            const float startLenSq = sx * sx + sy * sy;
+            const float currentLenSq = cx * cx + cy * cy;
+            if (startLenSq < 16.0f || currentLenSq < 16.0f) return;
+
+            float angle = std::atan2(sx * cy - sy * cx, sx * cx + sy * cy);
+
+            // Preserve an intuitive sign for each projected local rotation ring.
+            // Design choice (not directly from the book): screen-space tangential
+            // dragging drives the selected local-axis rotation.
+            noc::Vec3 localU{}, localV{};
+            GizmoRingBasis(gizmoAxis_, localU, localV);
+            POINT uScreen{}, vScreen{};
+            if (Project_(dragStartT_ + noc::Rotate(dragStartR_, localU) * gizmoLength, uScreen) &&
+                Project_(dragStartT_ + noc::Rotate(dragStartR_, localV) * gizmoLength, vScreen))
+            {
+                const float ux = float(uScreen.x - center.x);
+                const float uy = float(uScreen.y - center.y);
+                const float vx = float(vScreen.x - center.x);
+                const float vy = float(vScreen.y - center.y);
+                if (ux * vy - uy * vx < 0.0f)
+                    angle = -angle;
+            }
+
+            object.r = NormalizeQuat(MulQuat(AxisAngle(axisWorld, angle), dragStartR_));
         }
-        else if (tool == kRotateTool)
-            object.r = NormalizeQuat(MulQuat(AxisAngle(axisWorld, signedPixels * 0.01f), dragStartR_));
+        else
+        {
+            POINT a{}, b{};
+            if (!Project_(dragStartT_, a) || !Project_(dragStartT_ + axisWorld * gizmoLength, b)) return;
+            const float vx = float(b.x - a.x), vy = float(b.y - a.y);
+            const float len = std::sqrt(vx * vx + vy * vy);
+            if (len < 1.0f) return;
+            const float dx = float(mouse.x - dragStartMouse_.x);
+            const float dy = float(mouse.y - dragStartMouse_.y);
+            const float signedPixels = (dx * vx + dy * vy) / len;
+
+            if (tool == kMoveTool)
+            {
+                const float worldDelta = (signedPixels / len) * gizmoLength;
+                object.t = dragStartT_ + axisWorld * worldDelta;
+            }
+            else if (tool == kScaleTool)
+            {
+                object.s = dragStartS_;
+                float* component = gizmoAxis_ == 0 ? &object.s.x : (gizmoAxis_ == 1 ? &object.s.y : &object.s.z);
+                const float start = gizmoAxis_ == 0 ? dragStartS_.x : (gizmoAxis_ == 1 ? dragStartS_.y : dragStartS_.z);
+                const float reference = (std::max)(std::fabs(start), 0.25f);
+                *component = (std::max)(0.05f, start + (signedPixels / len) * reference);
+            }
+            else
+            {
+                return;
+            }
+        }
 
         engine_->GetWorld().SetLocalTRS(object.handle, object.t, object.r, object.s);
         engine_->GetWorld().Update();
@@ -632,6 +790,11 @@ namespace nocturne::editor
             lastMouse_ = mouse;
             pendingMouseDx_ = 0;
             pendingMouseDy_ = 0;
+            if (gizmoAxis_ != -1)
+            {
+                gizmoAxis_ = -1;
+                if (overlay_) InvalidateRect(overlay_, nullptr, FALSE);
+            }
             SetCapture(renderHost_);
             break;
         case WM_RBUTTONUP:
@@ -652,7 +815,9 @@ namespace nocturne::editor
             SetSelectedIndex_(PickValidationObject_(cameraPos_, MakePickRay_(mouse.x, mouse.y)));
             break;
         }
-        case WM_LBUTTONUP: EndGizmoDrag_(); break;
+        case WM_LBUTTONUP:
+            EndGizmoDrag_();
+            break;
         case WM_MOUSEMOVE:
             if (cameraCapturing_)
             {
@@ -660,7 +825,32 @@ namespace nocturne::editor
                 pendingMouseDy_ += mouse.y - lastMouse_.y;
                 lastMouse_ = mouse;
             }
-            else if (gizmoDragging_) UpdateGizmoDrag_(mouse);
+            else if (gizmoDragging_)
+            {
+                UpdateGizmoDrag_(mouse);
+            }
+            else
+            {
+                const int tool = ActiveTool_();
+                const bool transformTool = tool == kMoveTool || tool == kRotateTool || tool == kScaleTool;
+                const int hoverAxis = transformTool ? HitGizmoAxis_(mouse) : -1;
+                if (hoverAxis != gizmoAxis_)
+                {
+                    gizmoAxis_ = hoverAxis;
+                    if (overlay_) InvalidateRect(overlay_, nullptr, FALSE);
+                }
+                TRACKMOUSEEVENT t{ sizeof(t), TME_LEAVE, renderHost_, 0 };
+                TrackMouseEvent(&t);
+            }
+            break;
+        case WM_MOUSELEAVE:
+            if (!cameraCapturing_ && !gizmoDragging_)
+            {
+                // -2 forces the first mouse move after a toolbar change to repaint
+                // the overlay even when no axis is under the cursor.
+                gizmoAxis_ = -2;
+                if (overlay_) InvalidateRect(overlay_, nullptr, FALSE);
+            }
             break;
         case WM_MOUSEWHEEL:
             cameraSpeed_ = (std::clamp)(cameraSpeed_ + float(GET_WHEEL_DELTA_WPARAM(wParam)) / 120.0f, 1.0f, 30.0f); break;
@@ -671,6 +861,7 @@ namespace nocturne::editor
             gizmoDragging_ = false;
             gizmoAxis_ = -1;
             dragObjectIndex_ = -1;
+            if (overlay_) InvalidateRect(overlay_, nullptr, FALSE);
             break;
         }
     }
@@ -687,27 +878,60 @@ namespace nocturne::editor
             return;
 
         const int tool = ActiveTool_();
-        if (tool == kMoveTool || tool == kRotateTool || tool == kScaleTool)
+        if (tool != kMoveTool && tool != kRotateTool && tool != kScaleTool)
+            return;
+
+        const ValidationObject& object = validationObjects_[selectedIndex_];
+        const noc::Vec3 axes[3] = { {1,0,0},{0,1,0},{0,0,1} };
+        const COLORREF colors[3] = { RGB(224,75,75), RGB(74,207,112), RGB(73,139,239) };
+        constexpr COLORREF highlight = RGB(255,236,130);
+        const float gizmoLength = GizmoWorldLength(renderHost_, cameraPos_, cameraRot_, fovY_, object.t);
+        POINT center{};
+        if (!Project_(object.t, center))
+            return;
+
+        if (tool == kRotateTool)
         {
-            const ValidationObject& object = validationObjects_[selectedIndex_];
-            const noc::Vec3 axes[3] = { {1,0,0},{0,1,0},{0,0,1} };
-            const COLORREF colors[3] = { RGB(224,75,75), RGB(74,207,112), RGB(73,139,239) };
-            POINT center{};
-            if (Project_(object.t, center))
+            constexpr float kTwoPi = 6.28318530718f;
+            for (int axis = 0; axis < 3; ++axis)
             {
-                for (int i = 0; i < 3; ++i)
+                const bool active = gizmoAxis_ == axis;
+                const COLORREF color = active ? highlight : colors[axis];
+                HPEN pen = CreatePen(PS_SOLID, active ? 4 : 3, color);
+                HGDIOBJ oldPen = SelectObject(dc, pen);
+                POINT previous{};
+                bool previousValid = false;
+                for (int segment = 0; segment <= kGizmoRingSegments; ++segment)
                 {
-                    POINT end{};
-                    if (!Project_(object.t + noc::Rotate(object.r, axes[i]) * 1.5f, end)) continue;
-                    const COLORREF color = (gizmoDragging_ && gizmoAxis_ == i) ? RGB(255,236,130) : colors[i];
-                    DrawLine(dc, center, end, color, 3);
-                    HBRUSH brush = CreateSolidBrush(color);
-                    HGDIOBJ oldBrush = SelectObject(dc, brush);
-                    HGDIOBJ oldPen = SelectObject(dc, GetStockObject(NULL_PEN));
-                    Ellipse(dc, end.x - 4, end.y - 4, end.x + 5, end.y + 5);
-                    SelectObject(dc, oldPen); SelectObject(dc, oldBrush); DeleteObject(brush);
+                    const float angle = kTwoPi * float(segment) / float(kGizmoRingSegments);
+                    const noc::Vec3 local = GizmoRingLocalPoint(axis, angle);
+                    POINT current{};
+                    const bool currentValid = Project_(object.t + noc::Rotate(object.r, local) * gizmoLength, current);
+                    if (currentValid && previousValid)
+                    {
+                        MoveToEx(dc, previous.x, previous.y, nullptr);
+                        LineTo(dc, current.x, current.y);
+                    }
+                    previous = current;
+                    previousValid = currentValid;
                 }
+                SelectObject(dc, oldPen);
+                DeleteObject(pen);
             }
+            return;
+        }
+
+        for (int i = 0; i < 3; ++i)
+        {
+            POINT end{};
+            if (!Project_(object.t + noc::Rotate(object.r, axes[i]) * gizmoLength, end)) continue;
+            const bool active = gizmoAxis_ == i;
+            const COLORREF color = active ? highlight : colors[i];
+            DrawLine(dc, center, end, color, active ? 4 : 3);
+            if (tool == kMoveTool)
+                DrawArrowHead(dc, center, end, color);
+            else
+                DrawScaleHandle(dc, end, color);
         }
     }
 
@@ -849,9 +1073,12 @@ namespace nocturne::editor
             return HTCLIENT;
         case WM_RBUTTONDOWN: case WM_RBUTTONUP:
         case WM_LBUTTONDOWN: case WM_LBUTTONUP:
-        case WM_MOUSEMOVE: case WM_MOUSEWHEEL: case WM_CAPTURECHANGED:
+        case WM_MOUSEMOVE: case WM_MOUSELEAVE: case WM_MOUSEWHEEL: case WM_CAPTURECHANGED:
             self->HandleViewportMouse_(msg, wParam, lParam);
             return 0;
+        case WM_SETFOCUS:
+            if (self->overlay_) InvalidateRect(self->overlay_, nullptr, FALSE);
+            return DefSubclassProc(hwnd, msg, wParam, lParam);
         case WM_KILLFOCUS:
             self->cameraCapturing_ = false;
             self->pendingMouseDx_ = 0;
