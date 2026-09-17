@@ -37,6 +37,9 @@
     <Filter Include="Header Files\Runtime">
       <UniqueIdentifier>{52391dce-8f59-4643-b8bb-6aa3b18b4793}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\Runtime\Components">
+      <UniqueIdentifier>{A3F17B18-3E5B-49AF-8E27-C4C5D2B79315}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Header Files\Platform">
       <UniqueIdentifier>{a86c5cea-8f29-430c-8647-5fb64d541321}</UniqueIdentifier>
     </Filter>
@@ -166,6 +169,12 @@
       <Filter>Header Files\Runtime</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\Engine\Runtime\ComponentType.h">
+      <Filter>Header Files\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Runtime\Components\TransformComponent.h">
+      <Filter>Header Files\Runtime\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Runtime\TransformSystem.h">
       <Filter>Header Files\Runtime</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\Engine\Runtime\Entity.h">
@@ -318,6 +327,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\Engine\Runtime\ComponentRegistry.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Engine\Runtime\TransformSystem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\Engine\Runtime\EntityRegistry.cpp">

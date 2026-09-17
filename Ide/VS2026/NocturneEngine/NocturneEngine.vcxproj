@@ -101,6 +101,8 @@
     <ClInclude Include="..\..\..\Engine\Runtime\ComponentRegistry.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\ComponentStorage.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\ComponentType.h" />
+    <ClInclude Include="..\..\..\Engine\Runtime\Components\TransformComponent.h" />
+    <ClInclude Include="..\..\..\Engine\Runtime\TransformSystem.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Entity.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\EntityRegistry.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Engine.h" />
@@ -154,6 +156,7 @@
     <ClCompile Include="..\..\..\Engine\Resources\VPath.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\ComponentRegistry.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\EntityRegistry.cpp" />
+    <ClCompile Include="..\..\..\Engine\Runtime\TransformSystem.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\Engine.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\MainLoop.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\World.cpp" />
