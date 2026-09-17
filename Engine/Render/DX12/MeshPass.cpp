@@ -210,6 +210,8 @@ namespace noc
 	{
 		if (!device || !rm)
 			return false;
+		if (psoReady_ && pso_ && rootReady_ && rootSig_)
+			return true;
 		if (!shaderHlsl_.IsValid())
 			shaderHlsl_ = rm->RequestText("Shaders/Basic.hlsl");
 
