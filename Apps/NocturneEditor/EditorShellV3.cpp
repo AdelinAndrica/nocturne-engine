@@ -779,7 +779,7 @@ namespace nocturne::editor
     void EditorShellV3::Layout_(int w, int h)
     {
         if (w <= 0 || h <= 0) return;
-        constexpr int menuH = 26, toolbarH = 48, statusH = 24, gap = 7, headerH = 29, buttonH = 34;
+        constexpr int menuH = 30, toolbarH = 58, statusH = 24, gap = 7, headerH = 29, buttonH = 38;
         MoveWindow(menuBand_, 0,0,w,menuH, TRUE); int menuX = 11; const int menuWidths[] = {40,40,60,46,46,52,46,42}; for (size_t i = 0; i < menuButtons_.size(); ++i) { const int bw = menuWidths[i]; MoveWindow(menuButtons_[i], menuX,1,bw,menuH-2,TRUE); menuX += bw + 2; }
         MoveWindow(toolbarBand_, 0,menuH,w,toolbarH,TRUE); int x = 12; const int widths[] = {76,80,76,80,80,90,84,88,84,86,82,86}; for (size_t i = 0; i < toolbarButtons_.size(); ++i) { const int bw = widths[i]; MoveWindow(toolbarButtons_[i], x, menuH + (toolbarH - buttonH) / 2, bw, buttonH, TRUE); x += bw + 4; if (i == 2 || i == 4 || i == 8) x += 10; }
         const int top = menuH + toolbarH + gap; const int statusY = (std::max)(top, h - statusH); const int available = (std::max)(0, statusY - top - gap); const int bottomH = (std::clamp)(available * 34 / 100, 205, 280); const int topH = (std::max)(140, available - bottomH - gap); const int bottomY = top + topH + gap; const int actualBottom = (std::max)(0, statusY - bottomY);
