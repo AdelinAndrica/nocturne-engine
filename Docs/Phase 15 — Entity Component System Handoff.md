@@ -379,6 +379,6 @@ Alte reguli:
 
 În noul chat spune:
 
-> **Phase 14 este COMPLETE. Începem Phase 15 — Entity / Component System. Studiază integral toate `.md`-urile fazelor anterioare, în special Phase 10 și `Docs/Phase 14 — Completion Report.md`. Pornește din head-ul final Phase 14 și proiectează component model-ul după cărțile furnizate înainte de a modifica codul. Nu introduce Phase 16 scene editing sau Phase 17 serialization înainte de vreme.**
+> **Phase 14 este COMPLETE. Începem Phase 15 — Entity / Component System. Studiază integral toate `.md`-urile fazelor anterioare, în special Phase 10, `Docs/Phase 14 — Completion Report.md` și `Docs/Production Engineering Standard.md`. Standardul de production engineering este obligatoriu pentru Phase 15 și toate fazele următoare. Pornește din head-ul final Phase 14 și proiectează component model-ul după cărțile furnizate înainte de a modifica codul. Implementarea trebuie să fie professional-grade în limitele Phase 15, nu un prototype/minimum viable ECS. Nu introduce Phase 16 scene editing sau Phase 17 serialization înainte de vreme.**
 
 La începutul acelui chat, primul pas este auditul complet al documentației și al actualului `World`, apoi stabilirea exactă a API-ului `EntityHandle / EntityId / EntityRegistry / ComponentStorage` înainte de primul commit de implementare.
