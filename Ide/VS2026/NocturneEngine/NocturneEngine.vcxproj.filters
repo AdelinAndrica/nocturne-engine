@@ -159,6 +159,9 @@
     <ClInclude Include="..\..\..\Engine\Resources\ResourceManager.h">
       <Filter>Header Files\Resources</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Runtime\ComponentStorage.h">
+      <Filter>Header Files\Runtime</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\Engine\Runtime\Entity.h">
       <Filter>Header Files\Runtime</Filter>
     </ClInclude>

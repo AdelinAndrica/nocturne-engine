@@ -20,8 +20,8 @@ permissions:
   contents: read
 
 jobs:
-  phase15-entity-registry:
-    name: Phase 15 — Entity Registry
+  phase15-foundation:
+    name: Phase 15 — ECS Foundation
     runs-on: windows-latest
     timeout-minutes: 15
 
@@ -50,8 +50,8 @@ jobs:
             exit $LASTEXITCODE
           }
 
-      - name: Run Phase 15 entity-registry tests
+      - name: Run Phase 15 foundation tests
         shell: pwsh
         run: |
-          & "$env:GITHUB_WORKSPACE\Build\CI\bin\NocturneHost.exe" --phase15-entity-tests
+          & "$env:GITHUB_WORKSPACE\Build\CI\bin\NocturneHost.exe" --phase15-tests
           exit $LASTEXITCODE

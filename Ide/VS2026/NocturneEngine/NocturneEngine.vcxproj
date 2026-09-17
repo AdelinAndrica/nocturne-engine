@@ -98,6 +98,7 @@
     <ClInclude Include="..\..\..\Engine\Resources\VPath.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Bounds.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Camera.h" />
+    <ClInclude Include="..\..\..\Engine\Runtime\ComponentStorage.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Entity.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\EntityRegistry.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Engine.h" />

@@ -10,8 +10,9 @@ bool RunPhase11Tests(noc::Engine& engine);
 // Phase 12 tests
 bool RunPhase12Tests(noc::Engine& engine);
 
-// Phase 15 entity-registry foundation tests
+// Phase 15 ECS foundation tests
 bool RunPhase15EntityRegistryTests();
+bool RunPhase15ComponentStorageTests();
 
 // Phase 12 tooling
 #include "Phase12CookPack.h"
@@ -38,11 +39,22 @@ int main(int argc, char** argv)
     args.reserve((size_t)argc);
     for (int i = 1; i < argc; ++i) args.emplace_back(argv[i]);
 
-    // Phase 15 entity-registry tests are pure runtime-foundation tests.
-    // Keep them before Engine::Init() so CI does not depend on DX12, a GPU,
-    // content mounts, or a native window.
+    // Phase 15 foundation tests are pure runtime tests. Keep them before
+    // Engine::Init() so CI does not depend on DX12, a GPU, content mounts, or
+    // a native window.
+    if (HasArg(args, "--phase15-tests")) {
+        bool ok = RunPhase15EntityRegistryTests();
+        ok &= RunPhase15ComponentStorageTests();
+        return ok ? 0 : 1;
+    }
+
+    // Backward-compatible focused entry point from the first Phase 15 commit.
     if (HasArg(args, "--phase15-entity-tests")) {
         return RunPhase15EntityRegistryTests() ? 0 : 1;
+    }
+
+    if (HasArg(args, "--phase15-component-tests")) {
+        return RunPhase15ComponentStorageTests() ? 0 : 1;
     }
 
     noc::Engine engine;
