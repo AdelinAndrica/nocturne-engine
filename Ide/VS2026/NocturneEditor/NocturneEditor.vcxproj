@@ -30,6 +30,7 @@
   <ItemGroup>
     <ResourceCompile Include="NocturneEditor.rc" />
     <None Include="..\..\..\Apps\NocturneEditor\Resources\NocturneEditor.ico" />
+    <None Include="..\..\..\Apps\NocturneEditor\Resources\NocturneEngine-Logo.png" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\NocturneEngine\NocturneEngine.vcxproj">
