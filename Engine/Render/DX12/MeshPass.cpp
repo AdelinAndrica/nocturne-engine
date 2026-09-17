@@ -616,17 +616,35 @@ namespace noc
 		}
 
 		// Selection geometry is built from the object's local bounds and then
-		// transformed by the selected object's exact world matrix. This produces
-		// an oriented box that follows translation, rotation and scale rather than
-		// a world-space AABB. It uses the same depth-tested line pass, so hidden
-		// edges remain occluded by the selected object and other scene geometry.
+		// transformed by the selected object's exact world matrix. The outline uses
+		// a small constant world-space clearance rather than percentage expansion,
+		// so very large/thin objects (such as Ground_Plane) do not look inflated.
 		if (linePassReady && queue->debugSelection.enabled && EnsureSelectionUpload_(device))
 		{
 			const Vec3 localCenter =
 				(queue->debugSelection.localBoundsMin + queue->debugSelection.localBoundsMax) * 0.5f;
 			Vec3 localHalf =
 				(queue->debugSelection.localBoundsMax - queue->debugSelection.localBoundsMin) * 0.5f;
-			localHalf = localHalf * 1.015f + Vec3(0.008f, 0.008f, 0.008f);
+
+			// Design choice (not directly from the book): keep roughly 6 mm of
+			// clearance in world space on each oriented local axis. Convert that
+			// fixed world offset back to local units using the scale encoded by the
+			// world-matrix columns. This avoids size-dependent outline inflation.
+			constexpr float kSelectionWorldOffset = 0.006f;
+			const Mat4& selectionWorld = queue->debugSelection.world;
+			const float scaleX = Length(Vec3{
+				M(selectionWorld, 0, 0), M(selectionWorld, 1, 0), M(selectionWorld, 2, 0) });
+			const float scaleY = Length(Vec3{
+				M(selectionWorld, 0, 1), M(selectionWorld, 1, 1), M(selectionWorld, 2, 1) });
+			const float scaleZ = Length(Vec3{
+				M(selectionWorld, 0, 2), M(selectionWorld, 1, 2), M(selectionWorld, 2, 2) });
+			const Vec3 localOffset{
+				scaleX > 1e-6f ? kSelectionWorldOffset / scaleX : 0.0f,
+				scaleY > 1e-6f ? kSelectionWorldOffset / scaleY : 0.0f,
+				scaleZ > 1e-6f ? kSelectionWorldOffset / scaleZ : 0.0f
+			};
+			localHalf = localHalf + localOffset;
+
 			const Vec3 mn = localCenter - localHalf;
 			const Vec3 mx = localCenter + localHalf;
 
