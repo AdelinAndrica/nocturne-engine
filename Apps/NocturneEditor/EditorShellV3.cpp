@@ -1,6 +1,7 @@
 #include "EditorShellV3.h"
 #include "EditorTheme.h"
 #include "EditorIconRenderer.h"
+#include "NocturneEditorResource.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -698,7 +699,18 @@ namespace nocturne::editor
     bool EditorShellV3::Init(noc::Engine& engine, noc::WinWindow& window)
     {
         engine_ = &engine; window_ = &window; hwnd_ = static_cast<HWND>(window.Handle()); if (!hwnd_) return false;
-        if (!RegisterV3Classes(GetModuleHandleW(nullptr))) return false;
+        const HINSTANCE instance = GetModuleHandleW(nullptr);
+        const auto appIcon = reinterpret_cast<HICON>(LoadImageW(
+            instance, MAKEINTRESOURCEW(IDI_NOCTURNE_EDITOR), IMAGE_ICON,
+            GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON),
+            LR_DEFAULTCOLOR | LR_SHARED));
+        const auto appIconSmall = reinterpret_cast<HICON>(LoadImageW(
+            instance, MAKEINTRESOURCEW(IDI_NOCTURNE_EDITOR), IMAGE_ICON,
+            GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON),
+            LR_DEFAULTCOLOR | LR_SHARED));
+        if (appIcon) SendMessageW(hwnd_, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(appIcon));
+        if (appIconSmall) SendMessageW(hwnd_, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(appIconSmall));
+        if (!RegisterV3Classes(instance)) return false;
         constexpr DWORD kDark = 20; BOOL dark = TRUE; DwmSetWindowAttribute(hwnd_, kDark, &dark, sizeof(dark));
 
         uiFont_ = MakeFont(12, FW_NORMAL, L"Segoe UI Variable Text"); uiBold_ = MakeFont(12, FW_SEMIBOLD, L"Segoe UI Variable Text"); menuFont_ = MakeFont(14, FW_SEMIBOLD, L"Segoe UI Variable Text");

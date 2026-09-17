@@ -1,0 +1,3 @@
+#include "../../../Apps/NocturneEditor/NocturneEditorResource.h"
+
+IDI_NOCTURNE_EDITOR ICON "../../../Apps/NocturneEditor/Resources/NocturneEditor.ico"

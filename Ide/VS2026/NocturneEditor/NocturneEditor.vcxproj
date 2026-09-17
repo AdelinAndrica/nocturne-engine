@@ -25,6 +25,11 @@
     <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorTheme.h" />
     <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorControls.h" />
     <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorIconRenderer.h" />
+    <ClInclude Include="..\..\..\Apps\NocturneEditor\NocturneEditorResource.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="NocturneEditor.rc" />
+    <None Include="..\..\..\Apps\NocturneEditor\Resources\NocturneEditor.ico" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\NocturneEngine\NocturneEngine.vcxproj">
