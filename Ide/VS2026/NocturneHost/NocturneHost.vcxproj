@@ -36,6 +36,7 @@
     <ClCompile Include="..\..\..\Apps\NocturneHost\Phase12Tests.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneHost\Tests\phase5_tests.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneHost\Tests\phase6_tests.cpp" />
+    <ClCompile Include="..\..\..\Apps\NocturneHost\Tests\phase15_entity_registry_tests.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneHost\ZipWriter.cpp" />
   </ItemGroup>
   <ItemGroup>

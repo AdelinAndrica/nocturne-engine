@@ -98,6 +98,8 @@
     <ClInclude Include="..\..\..\Engine\Resources\VPath.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Bounds.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Camera.h" />
+    <ClInclude Include="..\..\..\Engine\Runtime\Entity.h" />
+    <ClInclude Include="..\..\..\Engine\Runtime\EntityRegistry.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Engine.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\EngineConfig.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Frustum.h" />
@@ -147,6 +149,7 @@
     <ClCompile Include="..\..\..\Engine\Resources\ResourceManager.cpp" />
     <ClCompile Include="..\..\..\Engine\Resources\VirtualFileSystem.cpp" />
     <ClCompile Include="..\..\..\Engine\Resources\VPath.cpp" />
+    <ClCompile Include="..\..\..\Engine\Runtime\EntityRegistry.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\Engine.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\MainLoop.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\World.cpp" />

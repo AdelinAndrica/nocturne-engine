@@ -159,6 +159,12 @@
     <ClInclude Include="..\..\..\Engine\Resources\ResourceManager.h">
       <Filter>Header Files\Resources</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Runtime\Entity.h">
+      <Filter>Header Files\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Runtime\EntityRegistry.h">
+      <Filter>Header Files\Runtime</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\Engine\Runtime\Engine.h">
       <Filter>Header Files\Runtime</Filter>
     </ClInclude>
@@ -300,6 +306,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\Engine\Core\Log.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Engine\Runtime\EntityRegistry.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\Engine\Runtime\Engine.cpp">

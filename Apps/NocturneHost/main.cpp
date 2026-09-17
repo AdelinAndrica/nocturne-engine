@@ -10,6 +10,9 @@ bool RunPhase11Tests(noc::Engine& engine);
 // Phase 12 tests
 bool RunPhase12Tests(noc::Engine& engine);
 
+// Phase 15 entity-registry foundation tests
+bool RunPhase15EntityRegistryTests();
+
 // Phase 12 tooling
 #include "Phase12CookPack.h"
 
@@ -56,6 +59,7 @@ int main(int argc, char** argv)
     const bool doPack = HasArg(args, "--pack");
     const bool doCookPack = HasArg(args, "--cookpack");
     const bool doP12Tests = HasArg(args, "--phase12-tests");
+    const bool doP15EntityTests = HasArg(args, "--phase15-entity-tests");
 
     if (doCook || doCookPack) {
         noc::tools::Phase12CookPack::CookOptions opt{};
@@ -93,6 +97,12 @@ int main(int argc, char** argv)
 
     if (doP12Tests) {
         const bool ok = RunPhase12Tests(engine);
+        engine.Shutdown();
+        return ok ? 0 : 1;
+    }
+
+    if (doP15EntityTests) {
+        const bool ok = RunPhase15EntityRegistryTests();
         engine.Shutdown();
         return ok ? 0 : 1;
     }
