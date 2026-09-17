@@ -152,7 +152,6 @@ namespace noc {
     static bool StartupJobs(void* ctx)
     {
         auto* e = static_cast<noc::Engine*>(ctx);
-        // Design choice: worker count = HW threads - 1 (leave room for main thread), clamped.
         const uint32_t hw = (std::max)(1u, std::thread::hardware_concurrency());
         const uint32_t workers = (hw > 1) ? (hw - 1) : 1;
         return e->Jobs().Init(workers);
@@ -184,7 +183,6 @@ namespace noc {
         if (!registry_.StartupAll(this))
             return false;
 
-        // Phase 3 policy: later mounts override earlier mounts.
         if (cfg_.archivePath && cfg_.archivePath[0] != 0)
         {
             if (!vfs_.MountArchive(cfg_.archivePath))
@@ -203,36 +201,27 @@ namespace noc {
                 NOC_LOG_WARN("VFS", "Failed to mount overrideRoot: %s", cfg_.overrideRoot);
         }
 
-        // Phase 6: ResourceManager uses JobSystem (must be after jobs + VFS mounts).
         if (!resources_.Init(*this, vfs_))
             return false;
 
-        // Ensure DDC exists and mount it if you want runtime blobs visible via VFS.
-        // Design choice: mount loose dir "DerivedDataCache" at the same priority as content.
         std::filesystem::create_directories("DerivedDataCache");
         vfs_.MountLooseDirectory("DerivedDataCache");
-
-        // Start asset pipeline (host-side imports)
         assets_.Init(*this);
 
+        if (!input_.Init(*this))
+            return false;
 
-		// Phase 7: InputSystem init (HWND comes later in AttachWindow).
-		if (!input_.Init(*this))
-			return false;
-
-        // Phase 8: RenderSystem init (no HWND yet)
 #if NOC_ENABLE_ASSERTS
-		const bool enableDebugLayer = true;
+        const bool enableDebugLayer = true;
 #else
-		const bool enableDebugLayer = false;
+        const bool enableDebugLayer = false;
 #endif
 
-		if (!render_.Init(enableDebugLayer))
-			return false;
+        if (!render_.Init(enableDebugLayer))
+            return false;
 
         render_.SetResourceManager(&resources_);
 
-        // World is runtime-owned
         if (!world_.Init(Allocator()))
             return false;
 
@@ -240,20 +229,43 @@ namespace noc {
         return true;
     }
 
+    bool Engine::AttachRenderWindow(void* nativeHwnd, uint32_t clientWidth, uint32_t clientHeight)
+    {
+        if (!initialized_ || !nativeHwnd || clientWidth == 0 || clientHeight == 0)
+            return false;
+        if (renderAttached_)
+            return false;
+
+        if (!render_.AttachToWindow(nativeHwnd, clientWidth, clientHeight))
+            return false;
+
+        renderAttached_ = true;
+        renderWidth_ = clientWidth;
+        renderHeight_ = clientHeight;
+        return true;
+    }
+
+    bool Engine::ResizeRenderWindow(uint32_t clientWidth, uint32_t clientHeight)
+    {
+        if (!renderAttached_)
+            return false;
+
+        renderWidth_ = clientWidth;
+        renderHeight_ = clientHeight;
+        if (clientWidth == 0 || clientHeight == 0)
+            return true;
+
+        return render_.ResizeAttachedWindow(clientWidth, clientHeight);
+    }
+
     bool Engine::AttachWindow(WinWindow& window)
     {
-        // Forward WM_INPUT + focus loss -> InputSystem.
         window.SetRawInputSink(input_.RawSink());
 
-        // Register Raw Input devices (requires HWND).
         if (!input_.AttachToWindow(window.Handle()))
             return false;
 
-        // Phase 8: DX12 attach (requires HWND + client size).
-        if (!render_.AttachToWindow(window.Handle(), window.ClientWidth(), window.ClientHeight()))
-            return false;
-
-        return true;
+        return AttachRenderWindow(window.Handle(), window.ClientWidth(), window.ClientHeight());
     }
 
     bool Engine::CreateAndAttachMainWindow(WinWindowDesc desc, WinWindow& outWindow)
@@ -267,6 +279,18 @@ namespace noc {
         return true;
     }
 
+    void Engine::SetDebugSelection(const AABB& localBounds, const Mat4& world)
+    {
+        debugSelectionLocalBounds_ = localBounds;
+        debugSelectionWorld_ = world;
+        debugSelectionEnabled_ = true;
+    }
+
+    void Engine::ClearDebugSelectionBounds()
+    {
+        debugSelectionEnabled_ = false;
+        debugSelectionWorld_ = Mat4::Identity();
+    }
 
     int Engine::Run()
     {
@@ -285,10 +309,10 @@ namespace noc {
 
         if (!AttachWindow(window))
         {
-            NOC_LOG_FATAL("Runtime", "Failed to attach InputSystem to window");
+            NOC_LOG_FATAL("Runtime", "Failed to attach engine to window");
             window.Destroy();
             return -1;
-		}
+        }
 
         MainLoop loop;
         loop.Run(*this, window);
@@ -301,29 +325,33 @@ namespace noc {
     {
         GetTime().BeginFrame();
         FrameArena().Reset();
-		input_.BeginFrame();
-		render_.BeginFrame();
+        input_.BeginFrame();
+        if (renderAttached_ && renderWidth_ > 0 && renderHeight_ > 0)
+            render_.BeginFrame();
     }
 
     void Engine::Tick()
     {
-		input_.Update();
+        input_.Update();
         resources_.Update();
         world_.Update();
     }
 
     void Engine::EndFrame()
     {
-        // Phase 10: runtime builds render submission in FrameArena and hands it to Render.
-        // This keeps Render from touching Runtime state.
-        // Viewport size is owned by the swapchain; in this phase we mirror host window size.
-        // (Design choice) If you already expose swapchain size, wire it here instead.
-        const uint32_t viewportW = 1280;
-        const uint32_t viewportH = 720;
-
-        RenderQueue rq = world_.BuildRenderQueue(FrameArena(), viewportW, viewportH);
-        render_.SetFrameRenderQueue(&rq);
-        render_.EndFramePresent();
+        if (renderAttached_ && renderWidth_ > 0 && renderHeight_ > 0)
+        {
+            RenderQueue rq = world_.BuildRenderQueue(FrameArena(), renderWidth_, renderHeight_);
+            if (debugSelectionEnabled_)
+            {
+                rq.debugSelection.enabled = 1;
+                rq.debugSelection.localBoundsMin = debugSelectionLocalBounds_.min;
+                rq.debugSelection.localBoundsMax = debugSelectionLocalBounds_.max;
+                rq.debugSelection.world = debugSelectionWorld_;
+            }
+            render_.SetFrameRenderQueue(&rq);
+            render_.EndFramePresent();
+        }
         GetTime().EndFrame();
     }
 
@@ -334,7 +362,8 @@ namespace noc {
 
         void* a = FrameArena().Allocate(256, 16);
         void* b = FrameArena().Allocate(1024, 64);
-        (void)a; (void)b;
+        (void)a;
+        (void)b;
 
         GetTime().EndFrame();
 
@@ -345,13 +374,16 @@ namespace noc {
 
     void Engine::Shutdown()
     {
-		render_.Shutdown();
+        ClearDebugSelectionBounds();
+        render_.Shutdown();
+        renderAttached_ = false;
+        renderWidth_ = renderHeight_ = 0;
         world_.Shutdown();
-        // Resource manager must shutdown while jobs + memory + log still exist.
         assets_.Shutdown();
         resources_.Shutdown();
-		input_.Shutdown();
+        input_.Shutdown();
         registry_.ShutdownAll(this);
+        initialized_ = false;
     }
 
 } // namespace noc

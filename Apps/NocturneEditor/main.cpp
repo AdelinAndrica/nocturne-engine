@@ -1,4 +1,5 @@
 #include "EditorShellV3.h"
+#include "EditorViewportController.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -14,8 +15,6 @@
 
 int main()
 {
-    // Design choice (not directly from the book): make editor UI crisp on mixed-DPI
-    // desktop setups. The runtime/window architecture remains unchanged.
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
     noc::Engine engine;
@@ -27,6 +26,16 @@ int main()
         return 1;
     }
 
+    // Prepare the Phase 14 viewport scene before EditorShellV3 populates its
+    // hierarchy, so the Phase 13 hierarchy reflects the runtime object count.
+    nocturne::editor::EditorViewportController viewport;
+    if (!viewport.PrepareScene(engine))
+    {
+        NOC_LOG_FATAL("Editor", "Phase 14 viewport scene preparation failed");
+        engine.Shutdown();
+        return 1;
+    }
+
     noc::WinWindow window;
     noc::WinWindowDesc desc{};
     desc.title = L"Nocturne Editor";
@@ -34,8 +43,8 @@ int main()
     desc.height = 920;
     desc.resizable = true;
 
-    // Phase 13 owns only the editor shell. Do not attach the DX12 swap chain to the
-    // top-level editor HWND: Phase 14 will provide a dedicated viewport render target.
+    // The top-level editor window remains chrome-only. Phase 14 attaches DX12
+    // to a dedicated child HWND created inside EditorShellV3's viewport body.
     if (!window.Create(desc))
     {
         NOC_LOG_FATAL("Editor", "Failed to create editor window");
@@ -52,13 +61,30 @@ int main()
         return 1;
     }
 
-    // Architectural contract: Runtime owns the main loop. The editor is a client
-    // layered on top of the same engine instance; it does not introduce an editor loop.
-    noc::MainLoop loop;
-    loop.Run(engine, window);
+    if (!viewport.Attach(engine, window, shell))
+    {
+        NOC_LOG_FATAL("Editor", "Phase 14 viewport attachment failed");
+        shell.Shutdown();
+        engine.Shutdown();
+        window.Destroy();
+        return 1;
+    }
 
+    // Architectural contract: Runtime owns the only main loop. The optional
+    // frame hook lets the editor consume accumulated viewport input exactly once
+    // per engine frame before World::Update(), without a second editor loop.
+    noc::MainLoop loop;
+    loop.Run(engine, window,
+        [](void* userData)
+        {
+            static_cast<nocturne::editor::EditorViewportController*>(userData)->TickFrame();
+        },
+        &viewport);
+
+    viewport.Shutdown();
     shell.Shutdown();
-    window.Destroy();
+    // Release DXGI presentation resources while their child HWND is still valid.
     engine.Shutdown();
+    window.Destroy();
     return 0;
 }

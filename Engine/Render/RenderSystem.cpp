@@ -49,6 +49,14 @@ namespace noc
 		return impl_->renderer.AttachToWindow(nativeHwnd, clientWidth, clientHeight);
 	}
 
+	bool RenderSystem::ResizeAttachedWindow(uint32_t clientWidth, uint32_t clientHeight)
+	{
+		if (!impl_)
+			return false;
+
+		return impl_->renderer.ResizeAttachedWindow(clientWidth, clientHeight);
+	}
+
 	void RenderSystem::SetResourceManager(ResourceManager* rm)
 	{
 		if (!impl_) return;

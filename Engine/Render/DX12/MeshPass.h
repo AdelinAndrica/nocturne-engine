@@ -8,7 +8,6 @@
 #include "GpuRingConstantBuffer.h"
 #include "MeshFormat.h"
 
-#include "Resources/ResourceHandle.h"
 #include "Resources/Typed/ResourceHandleT.h"
 #include "Resources/Typed/TextResource.h"
 
@@ -41,25 +40,53 @@ namespace noc
 			const RenderQueue* queue);
 
 	private:
+		bool EnsureSkyPso_(ID3D12Device* device, ResourceManager* rm);
 		bool EnsureRootSigAndPso_(ID3D12Device* device, Dx12PsoCache& cache, ResourceManager* rm);
-		bool EnsureMeshUploaded_(ID3D12Device* device, ID3D12GraphicsCommandList* cmd, Dx12DeferredReleaseQueue& deferred,
-			const Dx12FrameSync& sync, uint32_t frameIndex, ResourceManager* rm);
+		bool EnsureGridPso_(ID3D12Device* device, ResourceManager* rm);
+		bool EnsureValidationCubeUploaded_(ID3D12Device* device, ID3D12GraphicsCommandList* cmd,
+			Dx12DeferredReleaseQueue& deferred, const Dx12FrameSync& sync, uint32_t frameIndex);
+		bool EnsureGridUploaded_(ID3D12Device* device, ID3D12GraphicsCommandList* cmd,
+			Dx12DeferredReleaseQueue& deferred, const Dx12FrameSync& sync, uint32_t frameIndex);
+		bool EnsureSelectionUpload_(ID3D12Device* device);
 
 		void EnsurePerFrameCbv_(ID3D12Device* device);
 		void EnsurePerFrameInstanceSrv_(ID3D12Device* device);
 
 	private:
+		ResourceHandleT<TextResource> skyHlsl_;
 		ResourceHandleT<TextResource> shaderHlsl_;
+		ResourceHandleT<TextResource> gridHlsl_;
 
-		// GPU objects
+		// Phase 14 procedural sky pass. Design choice (not directly from the book):
+		// a fullscreen gradient provides a stable editor sky without pulling PBR,
+		// cubemaps or lighting into this phase.
+		dx12::ComPtr<ID3D12RootSignature> skyRootSig_;
+		dx12::ComPtr<ID3D12PipelineState> skyPso_;
+
+		// Graphics state shared by the validation mesh pass.
 		dx12::ComPtr<ID3D12RootSignature> rootSig_;
 		dx12::ComPtr<ID3D12PipelineState> pso_;
 
-		// For Phase 10 demo: one mesh upload path (triangle.nmsh), but drawn N times.
-		ResourceHandle meshBin_{};
+		// Design choice (not directly from the book): grid, axes and selection
+		// bounds share one LINE PSO. It depth-tests against scene geometry and does
+		// not write depth, so debug lines cannot reveal hidden cube edges.
+		dx12::ComPtr<ID3D12RootSignature> gridRootSig_;
+		dx12::ComPtr<ID3D12PipelineState> gridPso_;
+
+		// Phase 14 validation geometry. The general multi-mesh render path remains
+		// future renderer work; this pass still draws one geometry instanced N times.
 		GpuBuffer vb_;
 		GpuBuffer ib_;
 		uint32_t indexCount_ = 0;
+
+		GpuBuffer gridVb_;
+		uint32_t gridVertexCount_ = 0;
+
+		// One persistently mapped 12-line selection VB per frame-in-flight avoids
+		// CPU/GPU overwrite hazards while selection/gizmos update every frame.
+		dx12::ComPtr<ID3D12Resource> selectionUpload_[dx12::kFrameCount];
+		uint8_t* selectionMapped_[dx12::kFrameCount]{};
+		D3D12_VERTEX_BUFFER_VIEW selectionVbv_[dx12::kFrameCount]{};
 
 		// Per-frame constants
 		GpuRingConstantBuffer perFrameCB_;
@@ -74,9 +101,12 @@ namespace noc
 
 		Dx12PsoCache* psoCache_ = nullptr;
 
+		bool skyReady_ = false;
 		bool rootReady_ = false;
 		bool psoReady_ = false;
+		bool gridPsoReady_ = false;
 		bool meshReady_ = false;
+		bool gridReady_ = false;
 		bool cbReady_ = false;
 		bool instReady_ = false;
 	};

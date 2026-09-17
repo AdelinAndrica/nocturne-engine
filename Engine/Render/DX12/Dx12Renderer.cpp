@@ -55,7 +55,7 @@ namespace noc
 
 	bool Dx12Renderer::AttachToWindow(void* nativeHwnd, uint32_t clientWidth, uint32_t clientHeight)
 	{
-		if (!inited_)
+		if (!inited_ || attached_ || clientWidth == 0 || clientHeight == 0)
 			return false;
 
 		if (!swap_.Init(device_.Factory(), device_.Queue(), nativeHwnd, clientWidth, clientHeight))
@@ -96,9 +96,32 @@ namespace noc
 		return true;
 	}
 
-	void Dx12Renderer::BeginFrame()
+	bool Dx12Renderer::ResizeAttachedWindow(uint32_t clientWidth, uint32_t clientHeight)
 	{
 		if (!attached_)
+			return false;
+		if (clientWidth == 0 || clientHeight == 0)
+			return true;
+		if (clientWidth == swap_.Width() && clientHeight == swap_.Height())
+			return true;
+		if (frameOpen_)
+		{
+			NOC_LOG_WARN("Render", "ResizeAttachedWindow deferred because a frame is open");
+			return false;
+		}
+
+		sync_.WaitForGpu(device_.Queue());
+		if (!swap_.Resize(device_.Device(), clientWidth, clientHeight))
+			return false;
+
+		frameIndex_ = swap_.FrameIndex();
+		NOC_LOG_INFO("Render", "Dx12Renderer resized (%ux%u)", clientWidth, clientHeight);
+		return true;
+	}
+
+	void Dx12Renderer::BeginFrame()
+	{
+		if (!attached_ || swap_.Width() == 0 || swap_.Height() == 0)
 			return;
 
 		if (device_.Device()->GetDeviceRemovedReason() != S_OK)
@@ -132,20 +155,16 @@ namespace noc
 
 	void Dx12Renderer::EndFramePresent()
 	{
-		if (!attached_)
+		if (!attached_ || swap_.Width() == 0 || swap_.Height() == 0)
 			return;
 
 		if (device_.Device()->GetDeviceRemovedReason() != S_OK)
 			return;
 
 		if (!frameOpen_)
-		{
-			NOC_LOG_ERROR("Render", "EndFramePresent called without BeginFrame");
 			return;
-		}
 		struct Guard { bool& b; ~Guard() { b = false; } } g{ frameOpen_ };
 
-		// Record pass: clear + draw instances from frameQueue_ (if any are ready).
 		meshPass_.Record(device_.Device(), cmdList_.Get(), swap_, sync_, frameIndex_, deferred_, rm_, frameQueue_);
 
 		swap_.TransitionTo(cmdList_.Get(), frameIndex_, D3D12_RESOURCE_STATE_PRESENT);

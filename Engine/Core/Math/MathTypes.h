@@ -179,10 +179,12 @@ namespace noc
 
         Mat4 r = Mat4::Identity();
 
-        // basis vectors into columns
-        r.m[0] = xaxis.x; r.m[1] = xaxis.y; r.m[2] = xaxis.z;
-        r.m[4] = yaxis.x; r.m[5] = yaxis.y; r.m[6] = yaxis.z;
-        r.m[8] = zaxis.x; r.m[9] = zaxis.y; r.m[10] = zaxis.z;
+        // Column-major storage + column vectors means the camera basis belongs
+        // in matrix rows. This keeps CPU projection helpers and GPU rendering
+        // on the same view transform.
+        r.m[0] = xaxis.x; r.m[4] = xaxis.y; r.m[8]  = xaxis.z;
+        r.m[1] = yaxis.x; r.m[5] = yaxis.y; r.m[9]  = yaxis.z;
+        r.m[2] = zaxis.x; r.m[6] = zaxis.y; r.m[10] = zaxis.z;
 
         // translation
         r.m[12] = -Dot(xaxis, eye);

@@ -28,6 +28,13 @@ namespace nocturne::editor
         bool OnWindowMessage(void* hwnd, uint32_t msg, uintptr_t wParam,
             intptr_t lParam, intptr_t& result) override;
 
+        // Phase 14 integration seam. The shell retains ownership of layout/chrome;
+        // the viewport controller receives only the existing insertion surface and
+        // read-only tool selection state.
+        HWND ViewportBody() const { return viewport_.body; }
+        HWND SceneTree() const { return sceneTree_; }
+        int ActiveToolId() const { return activeToolId_; }
+
     private:
         enum ControlId : int
         {
@@ -98,6 +105,7 @@ namespace nocturne::editor
 
         HFONT uiFont_ = nullptr;
         HFONT uiBold_ = nullptr;
+        HFONT menuFont_ = nullptr;
         HFONT smallFont_ = nullptr;
         HFONT consoleFont_ = nullptr;
         HFONT brandFont_ = nullptr;

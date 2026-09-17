@@ -22,6 +22,7 @@ namespace noc
 		void Shutdown();
 
 		bool AttachToWindow(void* nativeHwnd, uint32_t clientWidth, uint32_t clientHeight);
+		bool ResizeAttachedWindow(uint32_t clientWidth, uint32_t clientHeight);
 
 		void SetResourceManager(ResourceManager* rm) { rm_ = rm; }
 		void SetFrameRenderQueue(const RenderQueue* q) { frameQueue_ = q; }
