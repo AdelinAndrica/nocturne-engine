@@ -39,6 +39,7 @@
     <ClCompile Include="..\..\..\Apps\NocturneHost\Tests\phase15_entity_registry_tests.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneHost\Tests\phase15_component_storage_tests.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneHost\Tests\phase15_component_registry_tests.cpp" />
+    <ClCompile Include="..\..\..\Apps\NocturneHost\Tests\phase15_renderable_tests.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneHost\Tests\phase15_transform_tests.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneHost\ZipWriter.cpp" />
   </ItemGroup>

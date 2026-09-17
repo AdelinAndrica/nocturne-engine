@@ -171,8 +171,14 @@
     <ClInclude Include="..\..\..\Engine\Runtime\ComponentType.h">
       <Filter>Header Files\Runtime</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Runtime\Components\RenderableComponent.h">
+      <Filter>Header Files\Runtime\Components</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\Engine\Runtime\Components\TransformComponent.h">
       <Filter>Header Files\Runtime\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Runtime\RenderableSystem.h">
+      <Filter>Header Files\Runtime</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\Engine\Runtime\TransformSystem.h">
       <Filter>Header Files\Runtime</Filter>
@@ -327,6 +333,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\Engine\Runtime\ComponentRegistry.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Engine\Runtime\RenderableSystem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\Engine\Runtime\TransformSystem.cpp">
