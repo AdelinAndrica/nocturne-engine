@@ -105,6 +105,7 @@ namespace nocturne::editor
 
         HFONT uiFont_ = nullptr;
         HFONT uiBold_ = nullptr;
+        HFONT menuFont_ = nullptr;
         HFONT smallFont_ = nullptr;
         HFONT consoleFont_ = nullptr;
         HFONT brandFont_ = nullptr;
