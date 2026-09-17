@@ -1,10 +1,14 @@
 # Phase 14 — Editor Rendering Viewport Handoff
 
-> **Status:** READY TO START
+> **Status:** ✅ HISTORICAL STARTING CONTRACT — PHASE 14 IS COMPLETE
 >
-> **Prerequisite:** Phase 13 is COMPLETE.
+> **Completion record:** `Docs/Phase 14 — Completion Report.md`
 >
-> **Starting branch:** create a Phase 14 branch from the completed `phase-13-editor-framework` baseline after pulling the latest documentation commit.
+> **Final validated Phase 14 code head before documentation closure:** `6b8a3a45124e6c3a2b334952d7b3dd16e6a92813`
+>
+> **Prerequisite at phase start:** Phase 13 was COMPLETE.
+>
+> **Historical note:** the remaining content in this file preserves the original Phase 14 starting contract and acceptance criteria. For the implemented/final state, use the completion and implementation reports.
 >
 > **Roadmap scope:** viewport camera, gizmos, selection/picking and debug draw.
 
