@@ -1,26 +1,120 @@
-# Phase 15 — Entity / Component System
+# Handoff — Phase 15: Entity / Component System
 
-> **Status:** READY TO START
->
-> **Branch:** `phase-15-entity-component-system`
->
-> **Starting baseline:** merged Phase 14 on `master`
->
-> **Roadmap scope:** ECS or component model, serialization-ready data layout.
->
-> **Hard boundary:** no Phase 16 full scene editing, no Phase 17 scene serialization/save-load, no Phase 18 physics.
->
-> **Quality contract:** `Docs/Production Engineering Standard.md` is mandatory. Phase 15 must be production-grade within its scope; no prototype-only or school-project shortcuts are accepted.
+**Phase 14 este COMPLETĂ și merged în `master`.**
 
-## 1. Phase name + objective
+Începem **Phase 15 — Entity / Component System**.
 
-**Phase 15 — Entity / Component System**
+Branch activ:
 
-În roadmap, Phase 15 este explicit **„Entity / Component System — ECS or component model, serialization-ready data layout”**, poziționată intenționat între viewport/editor și Phase 16 scene editing / Phase 17 serialization.
+`phase-15-entity-component-system`
 
-Obiectivul fazei este simplu de formulat: **înlocuim modelul temporar din `World` cu fundația reală pentru obiectele jocului**. Vizual, editorul ar trebui să arate aproape identic la final; diferența importantă va fi arhitecturală.
+Head documentație Phase 15 la momentul handoff-ului:
 
-La final vreau ca un obiect din Nocturne să nu mai fie „un slot în `World` cu Transform + Renderable hard-coded”, ci:
+`48c9fdefc66ea1adfe3485e0b941995ad3172c10`
+
+## OBLIGATORIU la începutul chat-ului
+
+Înainte de orice design nou sau modificare de cod:
+
+1. Studiază integral toate fișierele `.md` existente pentru fazele anterioare.
+2. Acordă atenție specială:
+   - `Docs/Production Engineering Standard.md`
+   - `Docs/Phase 15 — Entity Component System Handoff.md`
+   - `Docs/Phase 14 — Completion Report.md`
+   - `Docs/Phase 14 — Implementation Report.md`
+   - `Docs/Phase 10 — Scene Representation.md`
+   - `Docs/nocturne_engine_architecture.md`
+3. Inspectează codul real actual din branch, în special:
+   - `Engine/Runtime/World.h`
+   - `Engine/Runtime/World.cpp`
+   - `Engine/Runtime/SceneObject.h`
+   - `Engine/Runtime/Engine.h/.cpp`
+   - `Engine/Runtime/MainLoop.h/.cpp`
+   - `Engine/Render/RenderQueue.h`
+   - `Apps/NocturneEditor/EditorViewportController.h/.cpp`
+   - orice cod care consumă `SceneObjectHandle`, transform, hierarchy, renderable sau camera data.
+4. Nu presupune că documentația veche este identică cu codul actual. Reconcilierea trebuie făcută din sursa reală.
+5. Nu scrie cod înainte să fie clar:
+   - ce păstrăm;
+   - ce migrăm;
+   - ce eliminăm;
+   - care sunt invariants;
+   - ownership/lifetime;
+   - invalidation rules;
+   - failure semantics;
+   - performance implications.
+
+---
+
+# Quality contract — NON-NEGOTIABLE
+
+`Docs/Production Engineering Standard.md` este obligatoriu.
+
+Nocturne Engine este un produs comercial, nu tutorial, school project, throwaway prototype sau proof of concept.
+
+Tot ceea ce implementăm din Phase 15 înainte trebuie să fie:
+
+**production-grade within the scope of the phase**
+
+Asta înseamnă:
+
+- ownership explicit;
+- lifetime explicit;
+- invariants documentate;
+- invalid-state handling;
+- negative-path handling;
+- no silent corruption;
+- single source of truth;
+- API-uri curate și stabile;
+- allocator/memory discipline;
+- determinism unde contează;
+- diagnostics;
+- tests;
+- stress tests;
+- regression coverage;
+- performance measurement pe hot paths;
+- documentație care reflectă exact codul real;
+- fără `TODO` structural ascuns drept soluție finală.
+
+Professional-grade NU înseamnă feature creep.
+
+Regula este:
+
+> Implementăm complet și robust responsabilitatea fazei curente, astfel încât fazele următoare să poată construi peste ea fără să fie obligate să-i înlocuiască fundația.
+
+---
+
+# Primary source of truth
+
+Folosește cărțile furnizate ca sursă principală pentru concepte și arhitectură.
+
+Relevant pentru Phase 15:
+
+## Jason Gregory — Game Engine Architecture, 3rd Edition
+
+- §16.2 — Runtime Object Model Architectures
+- §16.2.1.6 — Pure Component Models
+- §16.2.2 — Property-Centric Architectures
+- §16.5 — Object References and World Queries
+
+## Bob Nystrom — Game Programming Patterns
+
+- Component
+- Data Locality
+
+Pentru orice alegere care nu este clar prescrisă de cărți:
+
+**Design choice (not directly from the book)**
+
+Nu inventa citări sau pagini.
+
+---
+
+# Phase 15 objective
+
+Înlocuim modelul temporar / hard-coded actual din `World` cu fundația reală Entity / Component a Nocturne Engine.
+
+Ținta conceptuală:
 
 ```text
 Entity
@@ -28,47 +122,10 @@ Entity
  ├── RenderableComponent
  ├── CameraComponent
  ├── NameComponent
- └── ...future components
+ └── future components
 ```
 
-Gregory descrie runtime object model-ul ca implementarea concretă a modelului de obiecte pe care îl vede editorul și prezintă atât arhitecturi object-centric, cât și property-centric/component-like.
-
-Nystrom motivează Component pattern-ul prin separarea domeniilor: entity-ul devine un container, iar rendering, physics, AI etc. nu trebuie să fie îngrămădite într-o clasă gigantică.
-
-## 2. Key concepts from the books
-
-Gregory merge inclusiv până la un **pure component model**, unde obiectul logic este identificat printr-un ID, iar componentele sunt legate de acel ID; subliniază însă explicit că această arhitectură are trade-off-uri și necesită mecanisme bune de creare, lookup și comunicare.
-
-Pentru Nocturne, vreau să păstrăm și ideea actuală de handle cu generație. Gregory discută problema stale handles și folosirea identității suplimentare pentru ca un handle vechi să nu înceapă accidental să refere un obiect nou care reutilizează același slot.
-
-De asemenea, component data separat pe tip ne permite stocare contiguă și iterare cache-friendly; Gregory prezintă avantajele layout-urilor property-centric / struct-of-arrays în această direcție.
-
-Surse primare:
-
-- Jason Gregory, *Game Engine Architecture (3rd Edition)*, §16.2 — Runtime Object Model Architectures;
-- Gregory §16.2.1.6 — Pure Component Models;
-- Gregory §16.2.2 — Property-Centric Architectures;
-- Gregory §16.5 — Object References and World Queries;
-- Bob Nystrom, *Game Programming Patterns* — Component pattern;
-- Bob Nystrom, *Game Programming Patterns* — Data Locality discussion where component storage and contiguous homogeneous data are relevant.
-
-## 3. What we implement now
-
-**Design choice (not directly from the book):** pentru Nocturne nu introducem EnTT și nu alegem automat un archetype/chunk ECS doar pentru că este o arhitectură populară. Construim un **production-grade component/property-centric runtime object model**, deliberat limitat la responsabilitățile Phase 15, care evoluează direct din `World` existent. Alegerea finală a layout-ului și lookup-ului trebuie justificată prin invariants, access patterns și măsurători, nu prin minimalism.
-
-Asta se potrivește foarte bine cu ce avem deja. `World` are deja conceptual:
-
-```text
-generations[]
-alive[]
-TransformData[]
-RenderableData[]
-freeList[]
-```
-
-Deci, într-un sens, Phase 10 ne-a lăsat deja o versiune embrionară de ECS. Phase 15 o generalizează.
-
-Ținta arhitecturală:
+Arhitectura de pornire:
 
 ```cpp
 EntityHandle
@@ -77,308 +134,469 @@ EntityHandle
     uint32_t generation;
 };
 
-EntityId               // identity persistentă/editor/serialization
+EntityId
 
-EntityRegistry         // create/destroy/alive/generation
-ComponentRegistry      // tipurile cunoscute de componente
-
+EntityRegistry
+ComponentRegistry
 ComponentStorage<T>
 World
 ```
 
-Primele componente reale:
-
-```cpp
-TransformComponent
-RenderableComponent
-CameraComponent
-NameComponent
-```
-
-`TransformComponent` va păstra local TRS + hierarchy/runtime world transform.
-
-`RenderableComponent` va păstra mesh/bounds.
-
-`CameraComponent` va prelua datele care acum sunt special-case în `World`.
-
-`NameComponent` ne pregătește pentru Scene Hierarchy din Phase 16.
-
-Gregory cere identitate unică, queries și mecanisme sigure de referire la obiecte ca responsabilități fundamentale ale gameplay foundation.
-
-Vom separa clar:
+Separare obligatorie:
 
 ```text
 EntityHandle = referință runtime rapidă, index + generation
-EntityId     = identitate stabilă destinată editorului/serializării
+EntityId     = identitate stabilă pentru editor / references / future serialization
 ```
 
-**Design choice (not directly from the book):** `EntityId` va fi separat de handle-ul runtime, astfel încât Phase 17 să nu serializeze indici/generații temporare.
+Runtime handles NU se serializează.
 
-## 3.1 Production-grade requirements for Phase 15
+---
 
-Phase 15 este o fundație de runtime pe care se vor sprijini editorul, serialization, physics, animation, audio, scripting, AI și gameplay. De aceea, sign-off-ul nu se face doar pe baza unui API funcțional.
+# Architectural direction
 
-### Entity identity and handle safety
+**Design choice (not directly from the book):**
 
-Trebuie definite și testate:
+Nu introducem EnTT și nu alegem automat un archetype/chunk ECS doar pentru că este popular.
 
-- diferența contractuală dintre `EntityId` persistent și `EntityHandle` runtime;
-- invalidarea stale handles după destroy/reuse;
-- politica de generation overflow/wrap;
-- duplicate-ID rejection;
-- lookup by stable ID;
-- behavior pentru invalid handle în Debug și Shipping;
-- faptul că runtime slot/index/generation nu devin date persistente.
+Nu construim un ECS „lightweight” în sensul de minimalist sau incomplet.
 
-### Entity lifecycle
+Construim un:
 
-Create/destroy trebuie să aibă ownership complet:
+**production-grade component/property-centric runtime object model**
 
-- creare într-o stare validă;
-- distrugere idempotentă sau explicit respinsă;
-- eliminarea tuturor componentelor asociate;
-- actualizarea tuturor lookup tables;
-- invalidarea relațiilor care nu mai sunt valide;
-- cleanup determinist;
-- nicio componentă „orfană” după entity destruction.
+care evoluează din `World` existent.
 
-### Component storage invariants
+Storage-ul poate fi dens per component type, dar implementarea finală trebuie decisă după auditul access patterns, invariants, lifetime și performance.
 
-Pentru fiecare `ComponentStorage<T>` trebuie documentate:
+Nu presupune din start că `swap-and-pop`, sparse sets sau orice altă strategie este automat alegerea finală.
 
-- storage layout;
-- entity → component lookup;
-- component → entity ownership;
-- add behavior;
-- duplicate-add behavior;
-- remove behavior;
-- relocation/compaction behavior;
-- pointer/reference invalidation rules;
+Justifică designul înainte de implementare.
+
+---
+
+# Phase 15 scope
+
+## 1. Entity identity
+
+Trebuie să existe o separare robustă între:
+
+- transient runtime handle;
+- persistent/stable entity identity.
+
+Trebuie definite:
+
+- creation;
+- destruction;
+- slot reuse;
+- generation checking;
+- stale-handle invalidation;
+- generation overflow/wrap policy;
+- duplicate ID handling;
+- lookup by stable `EntityId`;
+- behavior pentru invalid handle în Debug și Shipping.
+
+---
+
+## 2. EntityRegistry
+
+Extragem lifecycle-ul entităților din `World`.
+
+Responsabilități:
+
+- create;
+- destroy;
+- alive/valid checks;
+- generations;
+- free-list / slot reuse;
+- stable IDs;
+- ID lookup;
+- deterministic iteration unde este necesar;
+- cleanup complet.
+
+Entity destruction trebuie să elimine toate componentele asociate.
+
+Nu acceptăm orphan components.
+
+---
+
+## 3. Component model
+
+Introducem mecanisme production-grade pentru:
+
+```cpp
+Add<T>()
+Remove<T>()
+Has<T>()
+Get<T>()
+TryGet<T>()
+```
+
+sau API-ul final echivalent stabilit după design audit.
+
+Pentru fiecare `ComponentStorage<T>` trebuie definite:
+
+- layout;
+- entity -> component mapping;
+- component -> entity ownership;
+- duplicate Add policy;
+- Remove absent component policy;
 - growth policy;
-- iteration semantics;
-- destruction semantics.
+- compaction policy;
+- relocation rules;
+- pointer/reference invalidation;
+- iteration guarantees;
+- destruction semantics;
+- allocator ownership.
 
-**Design choice (not directly from the book):** dense storage este candidatul inițial, dar implementarea exactă trebuie aleasă după auditul access patterns. Dacă se folosește swap-and-pop, mapping-ul invers trebuie actualizat atomic din perspectiva invariants-ului storage-ului.
+Hot-path iteration nu trebuie să facă heap allocation per entity/component/per frame.
 
-### Transform hierarchy correctness
+---
 
-Migrarea `TransformData` nu are voie să păstreze doar happy path-ul.
+## 4. Components to introduce/migrate
 
-Trebuie tratate:
+### TransformComponent
+
+Migrează actualul `TransformData`.
+
+Trebuie păstrate și întărite:
+
+- local translation;
+- local rotation;
+- local scale;
+- world transform;
+- hierarchy;
+- dirty propagation.
+
+Trebuie tratate explicit:
 
 - self-parent rejection;
 - ancestor-cycle rejection;
 - reparent;
 - unparent;
-- destroy parent;
+- invalid parent;
+- parent destruction;
 - child policy la parent destruction;
 - dirty propagation;
-- local/world transform consistency;
-- non-uniform scale;
 - deterministic traversal;
-- invalid parent handle.
+- local/world consistency;
+- non-uniform scaling.
 
-### Component metadata
+Transform hierarchy nu are voie să poată intra în ciclu.
 
-Metadata minimă nu înseamnă metadata fragilă.
+### RenderableComponent
 
-Registry-ul trebuie să aibă:
+Migrează actualul `RenderableData`.
+
+Trebuie să păstreze:
+
+- mesh/resource identity;
+- local bounds;
+- derived world bounds;
+- render extraction;
+- culling integration.
+
+Renderer-ul trebuie să continue să consume render data, nu ECS/runtime internals direct.
+
+### CameraComponent
+
+Eliminăm camera special-case din `World` și o mutăm într-un model component-based coerent.
+
+Trebuie păstrate:
+
+- fov;
+- aspect;
+- near/far;
+- active camera semantics necesare runtime-ului;
+- Phase 14 editor-camera separation.
+
+Nu trebuie să stricăm editor camera.
+
+### NameComponent
+
+Introduce identitate human-readable pentru editor/tooling.
+
+Nu confunda `NameComponent` cu `EntityId`.
+
+Name-ul nu este persistent identity.
+
+---
+
+# Component metadata
+
+Introducem metadata minimă production-grade:
 
 - stable component type ID;
-- canonical name;
+- canonical type name;
 - size;
 - alignment;
 - version;
 - duplicate type-ID detection;
 - duplicate registration detection;
 - deterministic enumeration;
-- o regulă clară pentru type-ID stability între build-uri.
+- regulă clară pentru type-ID stability între build-uri.
 
-Nu implementăm încă full reflection/Inspector serialization, dar metadata introdusă acum nu trebuie să fie incompatibilă structural cu Phase 16/17.
+Scopul este să pregătim corect Phase 16/17.
 
-### Memory discipline
+NU implementăm încă:
 
-- hot-path query/iteration nu trebuie să aloce pe heap per element/per frame;
-- capacity growth trebuie să fie amortizat și testat;
-- relocarea nu trebuie să lase pointers/indices stale;
-- storage-ul trebuie să folosească allocator ownership coerent cu engine-ul;
-- cleanup-ul trebuie verificat cu debug allocator/leak diagnostics disponibile în proiect.
+- full reflection;
+- generic inspector serialization;
+- scene-file serializer.
 
-### Query semantics
+Dar metadata de acum nu trebuie să ne forțeze la redesign în Phase 17.
 
-Phase 15 trebuie să definească minim:
+---
 
-- alive/valid entity query;
-- lookup by stable ID;
+# World responsibilities after Phase 15
+
+`World` nu trebuie să rămână un container monolitic care doar ascunde aceleași arrays hard-coded.
+
+După Phase 15, `World` trebuie să orchestreze:
+
+- entity registry;
+- component storages;
+- transform update;
+- world-level queries;
+- render extraction;
+- runtime camera selection/state unde este cazul.
+
+`World` nu trebuie să devină din nou sursa unică pentru fiecare component type prin fields hard-coded.
+
+---
+
+# Query semantics
+
+Minimum required:
+
+- entity validity;
+- lookup by stable `EntityId`;
 - component presence;
 - typed component access;
-- deterministic entity/component enumeration where editor/runtime correctness depends on order.
+- entity iteration;
+- component iteration;
+- deterministic ordering unde editor/runtime correctness depinde de ordine.
 
-Nu adăugăm un query language generic fără nevoie demonstrată.
+Nu introduce generic query language dacă nu există nevoie concretă.
 
-### Threading contract
+---
 
-**Design choice (not directly from the book):** entity/component structural mutation rămâne single-thread-owned în Phase 15 până când o fază ulterioară definește explicit concurrent mutation/scheduling semantics.
+# Threading contract
 
-Asta este o alegere de siguranță și ownership, nu o limitare „de proiect mic”.
+**Design choice (not directly from the book):**
 
-### Error and edge-case policy
+Phase 15 structural mutation rămâne single-thread-owned până când concurrency semantics sunt proiectate explicit.
 
-Testele trebuie să acopere explicit:
+Asta include:
 
-- invalid entity;
-- stale handle;
-- duplicate component add;
-- remove absent component;
-- entity destruction with multiple component types;
-- repeated create/destroy/reuse;
-- storage growth across multiple capacities;
-- hierarchy cycle attempts;
-- invalid parent;
-- component registry duplicate IDs;
-- cleanup/shutdown with live entities.
+- entity create/destroy;
+- component add/remove;
+- hierarchy mutation.
 
-### Performance baseline
+Nu adăuga multithreaded ECS mutation „pentru profesionalism”.
 
-Nu stabilim arbitrar un număr de entități ca marketing metric.
+Concurrency fără ownership și synchronization contract nu este professional-grade.
 
-În schimb, înainte de completion trebuie să existe un stress workload reprezentativ care măsoară:
+---
 
-- entity create/destroy throughput;
+# Performance contract
+
+Nu optimiza orb.
+
+Dar trebuie să existe măsurători înainte de completion.
+
+Construiește workload reprezentativ pentru:
+
+- entity create;
+- entity destroy;
+- repeated slot reuse;
 - component add/remove;
 - component lookup;
-- transform update;
+- entity/component iteration;
+- transform hierarchy update;
 - render extraction;
 - allocation behavior.
 
-Orice comportament evident O(n²) pe un hot path trebuie justificat sau eliminat înainte de sign-off.
+Orice O(n²) evident pe hot path trebuie:
 
-### Regression contract
+- eliminat;
+- sau justificat explicit.
 
-După migrare, trebuie să rămână validate:
+Nu accepta per-frame heap churn evident.
 
-- Phase 14 viewport rendering;
-- camera navigation;
+---
+
+# Tests required
+
+Trebuie testate minim:
+
+- create valid entity;
+- destroy valid entity;
+- destroy invalid entity;
+- destroy twice;
+- slot reuse;
+- stale handle after reuse;
+- stable ID lookup;
+- duplicate ID behavior;
+- Add component;
+- duplicate Add;
+- Has/Get/TryGet;
+- Remove;
+- Remove absent component;
+- entity destruction with many components;
+- storage growth;
+- storage compaction;
+- relocation/invalidation semantics;
+- shutdown with live entities;
+- transform parent/child;
+- reparent;
+- unparent;
+- self-parent rejection;
+- deep hierarchy;
+- cycle attempt rejection;
+- parent destruction semantics;
+- non-uniform scale;
+- renderable extraction;
+- camera behavior;
+- metadata registration;
+- duplicate component type registration.
+
+Folosește unit/integration/stress tests după natura cazului.
+
+---
+
+# Phase 14 regression contract
+
+Phase 15 nu este completă dacă ECS-ul funcționează, dar strică editorul.
+
+Trebuie să continue să treacă:
+
+- DX12 child-HWND viewport;
+- resize;
+- maximize/restore;
+- minimize/zero-size safety;
+- editor camera;
+- RMB mouse look;
+- WASD;
+- Q/E;
+- Shift speed;
+- wheel speed;
 - picking;
-- hierarchy selection sync;
+- nearest-hit picking;
+- empty-click deselection;
+- viewport ↔ hierarchy selection sync;
 - selection outline;
-- Move/Rotate/Scale gizmos;
-- resize/minimize;
+- Ground_Plane outline;
+- Move gizmo;
+- Rotate gizmo;
+- Scale gizmo;
+- gizmo hover/active feedback;
+- transforms after gizmo use;
+- picking after transforms;
 - DX12 debug-layer sanity;
-- editor UI baseline.
+- Phase 13 editor UI baseline;
+- Nocturne Editor icon/resources.
 
-Phase 15 nu este acceptată dacă ECS-ul „merge” dar rupe contractele deja validate.
+---
 
+# Hard boundaries
 
-## 4. Implementation steps
+NU introduce în Phase 15:
 
-1. Creăm branch-ul Phase 15 din Phase 14 complet și audităm integral toate `.md`-urile precedente, cu accent pe Phase 10 și Phase 14 Completion Report.
+- Phase 16 full scene editing;
+- full generic Inspector;
+- complete Add Component UI;
+- prefab authoring;
+- undo/redo system unless strictly needed by an owned Phase 15 operation;
+- Phase 17 scene serialization;
+- savegame;
+- serializer implementation;
+- Phase 18 physics/collision;
+- production animation;
+- production audio;
+- scripting runtime;
+- AI/navigation;
+- universal event bus;
+- archetype scheduler without demonstrated requirement;
+- automatic system dependency graph;
+- generic multithreaded ECS scheduler;
+- PIE.
 
-2. Extragem lifecycle-ul actual din `World` într-un `EntityRegistry`:
-   - create;
-   - destroy;
-   - generation checking;
-   - free-list;
-   - persistent identity.
+Nu construi sisteme doar pentru că sunt asociate generic cu termenul „ECS”.
 
-3. Introducem `ComponentStorage<T>` și un registry pentru tipuri de componente.
+---
 
-   **Design choice (not directly from the book):** storage dens per component type, cu lookup entity → component; nu archetype chunks.
+# Phase 15 completion gate
 
-4. Migrăm `TransformData` → `TransformComponent`, păstrând:
-   - hierarchy;
-   - dirty propagation;
-   - world matrices.
+Phase 15 NU este COMPLETE până când:
 
-5. Migrăm `RenderableData` → `RenderableComponent`.
+- [ ] architecture audit este documentat;
+- [ ] final entity/component model este justificat;
+- [ ] ownership/lifetime sunt explicite;
+- [ ] `EntityId` și `EntityHandle` sunt separate corect;
+- [ ] stale handles sunt imposibil de confundat cu entități reutilizate;
+- [ ] generation overflow policy este definită;
+- [ ] entity destruction elimină toate componentele;
+- [ ] component storage invariants sunt documentate;
+- [ ] Add/Remove/Has/Get/TryGet semantics sunt stabile;
+- [ ] storage growth nu corupe mappings;
+- [ ] compaction nu corupe reverse lookup;
+- [ ] transform cycles sunt imposibile;
+- [ ] invalid parenting este gestionat;
+- [ ] transform hierarchy produce aceleași rezultate ca înainte;
+- [ ] `RenderableComponent` produce același viewport;
+- [ ] `CameraComponent` păstrează comportamentul runtime;
+- [ ] `NameComponent` este integrat fără a deveni identity;
+- [ ] metadata are stable type ID + version;
+- [ ] duplicate metadata registration este detectată;
+- [ ] hot paths nu au heap churn inutil;
+- [ ] stress/performance baseline există;
+- [ ] tests negative-path există;
+- [ ] Debug diagnostics nu indică corruption/leaks în noul lifecycle;
+- [ ] toate Phase 14 regressions trec;
+- [ ] documentația reflectă exact codul;
+- [ ] Implementation Report este actualizat;
+- [ ] Completion Report este creat;
+- [ ] toate cerințele aplicabile din `Docs/Production Engineering Standard.md` trec.
 
-   `BuildRenderQueue()` va itera componentele reale în locul array-urilor hard-coded din `World`.
+---
 
-6. Introducem `CameraComponent` și mutăm camera special-case către modelul de componente.
+# How to start this chat
 
-7. Introducem `NameComponent` și facem Phase 14 hierarchy/selection să lucreze cu entitățile reale.
+Primul răspuns NU trebuie să scrie cod imediat.
 
-   Validation scene rămâne, dar devine o scenă compusă din entities + components.
+Mai întâi:
 
-8. Introducem metadata minimă pentru componente:
-   - stable component type ID;
-   - nume;
-   - size/alignment;
-   - version.
+1. Citește integral toate `.md`-urile anterioare.
+2. Citește `Docs/Production Engineering Standard.md`.
+3. Inspectează implementarea curentă a `World`.
+4. Inspectează toate call-site-urile `SceneObjectHandle`.
+5. Inspectează Phase 14 editor ↔ runtime integration.
+6. Desenează actualul ownership/data flow.
+7. Identifică technical debt relevant pentru Phase 15.
+8. Compară cel puțin:
+   - actual model;
+   - dense component storage;
+   - sparse mapping / alternative relevantă;
+   - pure component implications din Gregory.
+9. Propune arhitectura finală Phase 15.
+10. Definește:
+    - invariants;
+    - failure semantics;
+    - invalidation;
+    - memory layout;
+    - update ordering;
+    - API contract;
+    - tests;
+    - migration plan.
+11. Abia după aprobarea/reconcilierea designului cu codul real, începe implementation step 1.
 
-   Asta ne face **serialization-ready**, dar nu scriem încă fișiere. Reflection/Inspector complet și scene files sunt Phase 16/17.
+Nu presupune designul doar pentru că apare în handoff.
 
-9. Migrăm `EditorViewportController` astfel încât gizmo/picking/selection să nu mai țină o copie paralelă inutilă a transformului obiectului; sursa autoritativă devine component data.
+Dacă auditul arată că o parte trebuie schimbată pentru o fundație comercială mai solidă, explică exact de ce, citează sursa relevantă și marchează orice decizie proprie ca:
 
-10. Adăugăm testele și facem regresie completă peste Phase 14.
+**Design choice (not directly from the book)**
 
-Un principiu important: Phase 15 nu confundă un ECS profesional cu un scheduler generic obligatoriu. Transform update și render extraction rămân explicit ordonate cât timp aceasta este soluția corectă și testabilă. Gregory atrage atenția că update-ul obiectelor și dependențele între subsisteme pot necesita ordine precisă. Dacă un scheduler devine necesar într-o fază ulterioară, va primi propriul contract de ownership, dependencies, threading și determinism; nu îl introducem acum doar pentru a bifa termenul „ECS”.
+Branch-ul de lucru este:
 
-## 5. Verification checklist
-
-La finalul Phase 15 trebuie să putem bifa:
-
-- [ ] create/destroy entity funcționează și reutilizează sloturile;
-- [ ] stale `EntityHandle` devine invalid după destroy/reuse;
-- [ ] fiecare entity are un `EntityId` stabil distinct de handle-ul runtime;
-- [ ] Add / Remove / Has / Get component funcționează;
-- [ ] component removal nu corupe dense storage;
-- [ ] entity destruction elimină toate componentele sale;
-- [ ] Transform hierarchy produce aceleași world matrices ca înainte;
-- [ ] parenting/unparenting rămâne corect;
-- [ ] render extraction din `Transform + Renderable` produce același viewport;
-- [ ] `CameraComponent` produce aceeași cameră Phase 14;
-- [ ] hierarchy/select/picking/gizmos din Phase 14 continuă să treacă;
-- [ ] component types pot fi enumerate și au ID/version stabil pentru viitoarea serializare;
-- [ ] nu există scene file I/O încă;
-- [ ] nu există full editor Add Component/Create Entity UI încă;
-- [ ] nu am introdus Phase 16/17/18 features prematur;
-- [ ] self-parent și transform cycles sunt respinse;
-- [ ] destroy/reuse stress nu produce stale-reference aliasing;
-- [ ] duplicate component/type registration are policy explicită și testată;
-- [ ] storage growth/compaction nu corupe mappings;
-- [ ] hot-path entity/component iteration nu introduce heap allocation per frame;
-- [ ] există un performance/stress baseline pentru operațiile structurale și transform/render extraction;
-- [ ] Debug build diagnostics nu raportează leaks/corruption pentru lifecycle-ul Phase 15;
-- [ ] documentația finală descrie invariants, invalidation rules și ownership-ul real al implementării;
-- [ ] toate cerințele aplicabile din `Docs/Production Engineering Standard.md` sunt bifate.
-
-## 6. Common pitfalls
-
-Cel mai mare pericol ar fi să transformăm Phase 15 într-un proiect de cercetare ECS:
-
-- archetypes;
-- chunk schedulers;
-- automatic dependency graphs;
-- multithreaded systems;
-- reflection completă;
-- event bus universal;
-- query language;
-
-toate simultan.
-
-Gregory avertizează că nici pure component model-ul nu este automat superior celorlalte arhitecturi, iar Nystrom subliniază că Component pattern-ul introduce complexitate și indirection care trebuie justificate.
-
-Al doilea pericol este să serializăm runtime handles.
-
-**Nu facem asta.**
-
-Gregory diferențiază necesitatea unui ID unic de mecanismul runtime de referire/handle.
-
-Alte reguli:
-
-- nu păstrăm două surse de adevăr pentru transform;
-- nu lăsăm editorul să dețină storage separat de runtime;
-- nu introducem un `GameObject` gigantic care doar mută problema din `World`;
-- nu implementăm scene save/load în această fază;
-- nu implementăm Inspector generic complet în această fază;
-- nu introducem physics components înainte de Phase 18 doar pentru a demonstra ECS;
-- nu rupem contractul Phase 14: child-HWND viewport, un singur `MainLoop`, picking/selection/gizmos validate.
-
-## 7. Next chat handoff
-
-În noul chat spune:
-
-> **Phase 14 este COMPLETE. Începem Phase 15 — Entity / Component System. Studiază integral toate `.md`-urile fazelor anterioare, în special Phase 10, `Docs/Phase 14 — Completion Report.md` și `Docs/Production Engineering Standard.md`. Standardul de production engineering este obligatoriu pentru Phase 15 și toate fazele următoare. Pornește din head-ul final Phase 14 și proiectează component model-ul după cărțile furnizate înainte de a modifica codul. Implementarea trebuie să fie professional-grade în limitele Phase 15, nu un prototype/minimum viable ECS. Nu introduce Phase 16 scene editing sau Phase 17 serialization înainte de vreme.**
-
-La începutul acelui chat, primul pas este auditul complet al documentației și al actualului `World`, apoi stabilirea exactă a API-ului `EntityHandle / EntityId / EntityRegistry / ComponentStorage` înainte de primul commit de implementare.
+`phase-15-entity-component-system`
