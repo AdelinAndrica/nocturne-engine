@@ -214,8 +214,6 @@ namespace nocturne::editor
             NOC_LOG_ERROR("Editor", "Phase 14 viewport body subclass failed");
             return false;
         }
-        SetWindowSubclass(topLevel_, &EditorViewportController::MainSubclassProc_, kSubclassIdMain,
-            reinterpret_cast<DWORD_PTR>(this));
         SetWindowSubclass(sceneTree_, &EditorViewportController::SceneTreeSubclassProc_, kSubclassIdTree,
             reinterpret_cast<DWORD_PTR>(this));
 
@@ -260,20 +258,19 @@ namespace nocturne::editor
 
         hierarchySelectedRow_ = 0;
         InvalidateRect(sceneTree_, nullptr, FALSE);
-        SetTimer(topLevel_, kTimerId, 16, nullptr);
-        NOC_LOG_INFO("Editor", "Phase 14 viewport controller attached; render-host input routing active");
+        NOC_LOG_INFO("Editor", "Phase 14 viewport controller attached; frame-synchronized camera input active");
         return true;
+    }
+
+    void EditorViewportController::TickFrame()
+    {
+        UpdateCamera_();
     }
 
     void EditorViewportController::Shutdown()
     {
         if (engine_)
             engine_->ClearDebugSelectionBounds();
-        if (topLevel_)
-        {
-            KillTimer(topLevel_, kTimerId);
-            RemoveWindowSubclass(topLevel_, &EditorViewportController::MainSubclassProc_, kSubclassIdMain);
-        }
         if (body_)
             RemoveWindowSubclass(body_, &EditorViewportController::BodySubclassProc_, kSubclassIdBody);
         if (sceneTree_)
@@ -285,6 +282,8 @@ namespace nocturne::editor
 
         cameraCapturing_ = false;
         gizmoDragging_ = false;
+        pendingMouseDx_ = 0;
+        pendingMouseDy_ = 0;
         selectedIndex_ = -1;
         dragObjectIndex_ = -1;
         hierarchySelectedRow_ = 0;
@@ -338,7 +337,22 @@ namespace nocturne::editor
     void EditorViewportController::UpdateCamera_()
     {
         if (!cameraCapturing_ || !engine_)
+        {
+            pendingMouseDx_ = 0;
+            pendingMouseDy_ = 0;
             return;
+        }
+
+        bool changed = false;
+        if (pendingMouseDx_ != 0 || pendingMouseDy_ != 0)
+        {
+            cameraYaw_ += float(pendingMouseDx_) * 0.004f;
+            cameraPitch_ = (std::clamp)(cameraPitch_ + float(pendingMouseDy_) * 0.004f, -1.45f, 1.45f);
+            pendingMouseDx_ = 0;
+            pendingMouseDy_ = 0;
+            cameraRot_ = YawPitch(cameraYaw_, cameraPitch_);
+            changed = true;
+        }
 
         float dt = static_cast<float>(noc::GetTime().DeltaSeconds());
         if (!(dt > 0.0f) || dt > 0.05f) dt = 0.016f;
@@ -357,9 +371,23 @@ namespace nocturne::editor
         {
             const float fast = (GetAsyncKeyState(VK_SHIFT) & 0x8000) ? 3.0f : 1.0f;
             cameraPos_ = cameraPos_ + noc::Normalize(move) * (cameraSpeed_ * fast * dt);
-            ApplyCameraTransform_();
+            changed = true;
         }
-        InvalidateRect(overlay_, nullptr, FALSE);
+
+        if (!changed)
+            return;
+
+        engine_->GetWorld().SetLocalTRS(cameraObject_, cameraPos_, cameraRot_, noc::Vec3::One());
+
+        // Only the GDI gizmo depends on camera projection. Selection bounds and
+        // grid are already part of the DX12 frame, so avoid invalidating the
+        // layered overlay for every camera frame unless a gizmo is visible.
+        const int tool = ActiveTool_();
+        if (overlay_ && selectedIndex_ >= 0 &&
+            (tool == kMoveTool || tool == kRotateTool || tool == kScaleTool))
+        {
+            InvalidateRect(overlay_, nullptr, FALSE);
+        }
     }
 
     bool EditorViewportController::Project_(const noc::Vec3& world, POINT& out) const
@@ -599,9 +627,19 @@ namespace nocturne::editor
         switch (msg)
         {
         case WM_RBUTTONDOWN:
-            SetFocus(renderHost_); cameraCapturing_ = true; lastMouse_ = mouse; SetCapture(renderHost_); break;
+            SetFocus(renderHost_);
+            cameraCapturing_ = true;
+            lastMouse_ = mouse;
+            pendingMouseDx_ = 0;
+            pendingMouseDy_ = 0;
+            SetCapture(renderHost_);
+            break;
         case WM_RBUTTONUP:
-            cameraCapturing_ = false; if (GetCapture() == renderHost_) ReleaseCapture(); break;
+            cameraCapturing_ = false;
+            pendingMouseDx_ = 0;
+            pendingMouseDy_ = 0;
+            if (GetCapture() == renderHost_) ReleaseCapture();
+            break;
         case WM_LBUTTONDOWN:
         {
             SetFocus(renderHost_);
@@ -618,20 +656,22 @@ namespace nocturne::editor
         case WM_MOUSEMOVE:
             if (cameraCapturing_)
             {
-                const int dx = mouse.x - lastMouse_.x;
-                const int dy = mouse.y - lastMouse_.y;
+                pendingMouseDx_ += mouse.x - lastMouse_.x;
+                pendingMouseDy_ += mouse.y - lastMouse_.y;
                 lastMouse_ = mouse;
-                cameraYaw_ += float(dx) * 0.004f;
-                cameraPitch_ = (std::clamp)(cameraPitch_ + float(dy) * 0.004f, -1.45f, 1.45f);
-                ApplyCameraTransform_();
-                InvalidateRect(overlay_, nullptr, FALSE);
             }
             else if (gizmoDragging_) UpdateGizmoDrag_(mouse);
             break;
         case WM_MOUSEWHEEL:
             cameraSpeed_ = (std::clamp)(cameraSpeed_ + float(GET_WHEEL_DELTA_WPARAM(wParam)) / 120.0f, 1.0f, 30.0f); break;
         case WM_CAPTURECHANGED:
-            cameraCapturing_ = false; gizmoDragging_ = false; gizmoAxis_ = -1; dragObjectIndex_ = -1; break;
+            cameraCapturing_ = false;
+            pendingMouseDx_ = 0;
+            pendingMouseDy_ = 0;
+            gizmoDragging_ = false;
+            gizmoAxis_ = -1;
+            dragObjectIndex_ = -1;
+            break;
         }
     }
 
@@ -793,19 +833,6 @@ namespace nocturne::editor
         return result;
     }
 
-    LRESULT CALLBACK EditorViewportController::MainSubclassProc_(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam,
-        UINT_PTR subclassId, DWORD_PTR refData)
-    {
-        (void)subclassId;
-        auto* self = reinterpret_cast<EditorViewportController*>(refData);
-        if (self && msg == WM_TIMER && wParam == kTimerId)
-        {
-            self->UpdateCamera_();
-            if (self->overlay_) InvalidateRect(self->overlay_, nullptr, FALSE);
-        }
-        return DefSubclassProc(hwnd, msg, wParam, lParam);
-    }
-
     LRESULT CALLBACK EditorViewportController::RenderHostSubclassProc_(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam,
         UINT_PTR subclassId, DWORD_PTR refData)
     {
@@ -827,6 +854,8 @@ namespace nocturne::editor
             return 0;
         case WM_KILLFOCUS:
             self->cameraCapturing_ = false;
+            self->pendingMouseDx_ = 0;
+            self->pendingMouseDy_ = 0;
             self->EndGizmoDrag_();
             return 0;
         }

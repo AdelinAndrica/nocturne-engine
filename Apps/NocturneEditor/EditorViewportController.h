@@ -24,14 +24,13 @@ namespace nocturne::editor
     public:
         bool PrepareScene(noc::Engine& engine);
         bool Attach(noc::Engine& engine, noc::WinWindow& window, EditorShellV3& shell);
+        void TickFrame();
         void Shutdown();
 
     private:
         static constexpr UINT_PTR kSubclassIdBody = 0x1401;
-        static constexpr UINT_PTR kSubclassIdMain = 0x1402;
         static constexpr UINT_PTR kSubclassIdTree = 0x1403;
         static constexpr UINT_PTR kSubclassIdRenderHost = 0x1404;
-        static constexpr UINT_PTR kTimerId = 0x1410;
         static constexpr int kValidationObjectCount = 4;
 
         struct ValidationObject
@@ -46,8 +45,6 @@ namespace nocturne::editor
 
         static LRESULT CALLBACK OverlayProc_(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
         static LRESULT CALLBACK BodySubclassProc_(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam,
-            UINT_PTR subclassId, DWORD_PTR refData);
-        static LRESULT CALLBACK MainSubclassProc_(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam,
             UINT_PTR subclassId, DWORD_PTR refData);
         static LRESULT CALLBACK SceneTreeSubclassProc_(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam,
             UINT_PTR subclassId, DWORD_PTR refData);
@@ -104,6 +101,8 @@ namespace nocturne::editor
 
         POINT lastMouse_{};
         POINT dragStartMouse_{};
+        int pendingMouseDx_ = 0;
+        int pendingMouseDy_ = 0;
 
         ValidationObject validationObjects_[kValidationObjectCount]{};
         noc::SceneObjectHandle cameraObject_{};

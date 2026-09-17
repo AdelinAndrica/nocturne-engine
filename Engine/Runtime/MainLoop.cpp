@@ -22,7 +22,8 @@ namespace noc
         }
     }
 
-    void MainLoop::Run(Engine& engine, WinWindow& window)
+    void MainLoop::Run(Engine& engine, WinWindow& window,
+        FrameCallback frameCallback, void* userData)
     {
         NOC_LOG_INFO("Runtime", "MainLoop starting");
 
@@ -31,7 +32,9 @@ namespace noc
             PumpMessagesNonBlocking(window);
 
             engine.BeginFrame();
-            engine.Tick();      // empty for now (Phase 2)
+            if (frameCallback)
+                frameCallback(userData);
+            engine.Tick();
             engine.EndFrame();
         }
 

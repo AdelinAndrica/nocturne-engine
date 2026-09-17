@@ -70,10 +70,16 @@ int main()
         return 1;
     }
 
-    // Architectural contract: Runtime owns the only main loop. Editor viewport
-    // interactions merely mutate editor camera/tool state consumed by that loop.
+    // Architectural contract: Runtime owns the only main loop. The optional
+    // frame hook lets the editor consume accumulated viewport input exactly once
+    // per engine frame before World::Update(), without a second editor loop.
     noc::MainLoop loop;
-    loop.Run(engine, window);
+    loop.Run(engine, window,
+        [](void* userData)
+        {
+            static_cast<nocturne::editor::EditorViewportController*>(userData)->TickFrame();
+        },
+        &viewport);
 
     viewport.Shutdown();
     shell.Shutdown();
