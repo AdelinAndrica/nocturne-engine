@@ -2,7 +2,7 @@
 
 > **Implementation status:** ACTIVE — CORE VIEWPORT / DEPTH / GRID / HIERARCHY / SELECTION FOUNDATION IMPLEMENTED
 >
-> **Validation status:** SOURCE/DIFF VALIDATED; PARTIAL LOCAL WINDOWS/UI VALIDATION COMPLETE; FINAL INTERACTION VALIDATION STILL REQUIRED
+> **Validation status:** PICKING PASSED; CAMERA/NAVIGATION MOSTLY PASSED; MOUSE-WHEEL SPEED CONTROL FAILED; SEVERE FPS STUTTERING REMAINS AN OPEN BLOCKER
 >
 > **Code baseline covered by this report:** through `436bc5ec4517ff8724d74b73b6619f933437db0f`
 >
@@ -27,7 +27,7 @@ The Phase 14 target remains:
 - editor debug rendering for grid, axes, selection and gizmo primitives;
 - minimal hierarchy/viewport selection synchronization supported by the current pre-ECS scene representation.
 
-Phase 14 is **not complete yet**. The core implementation exists, but the remaining interaction paths still require explicit local runtime validation before completion can be declared.
+Phase 14 is **not complete yet**. Core viewport functionality is implemented and picking has now passed explicit local validation, but camera speed-wheel behavior, performance stability, gizmo interaction and resize stress validation still remain open.
 
 ## 2. Book grounding
 
@@ -69,7 +69,7 @@ Viewport-dependent swap-chain resources are recreated through the DX12 resize pa
 
 ### 3.3 Depth buffer and depth-tested 3D rendering
 
-The viewport swap chain now owns a depth/stencil target using `DXGI_FORMAT_D24_UNORM_S8_UINT`.
+The viewport swap chain owns a depth/stencil target using `DXGI_FORMAT_D24_UNORM_S8_UINT`.
 
 The PSO cache key includes the DSV format, and the mesh pass:
 
@@ -118,9 +118,7 @@ The grid is positioned below the top surface of `Ground_Plane`, allowing the gro
 
 ### 3.7 Scene Hierarchy exposure
 
-The Phase 14 hierarchy bridge no longer represents the viewport scene only as a runtime-object count.
-
-The current hierarchy exposes the validation objects individually:
+The Phase 14 hierarchy bridge exposes the validation objects individually:
 
 ```text
 Scene (Runtime World)
@@ -133,7 +131,7 @@ Scene (Runtime World)
   Environment (Procedural Sky)
 ```
 
-The previous synthetic Win32 click bridge was removed. Selection synchronization now updates hierarchy state directly, which eliminated the observed `Runtime Objects` selection flicker.
+The previous synthetic Win32 click bridge was removed. Selection synchronization updates hierarchy state directly, which eliminated the observed `Runtime Objects` selection flicker.
 
 The hierarchy bridge is temporary editor plumbing for the current pre-ECS `World` representation and must not be mistaken for the later Phase 15/16 scene architecture.
 
@@ -171,23 +169,19 @@ The debug-selection bridge carries:
 - the selected object's exact world matrix;
 - an enabled flag.
 
-`MeshPass` constructs the eight local bounds corners and transforms each corner by the selected object's exact world matrix. The resulting 12 edges therefore follow:
-
-- translation;
-- rotation;
-- non-uniform scale.
+`MeshPass` constructs the eight local bounds corners and transforms each corner by the selected object's exact world matrix. The resulting 12 edges therefore follow translation, rotation and non-uniform scale.
 
 Because the selection box uses the depth-tested line pass, rear/occluded edges are not intentionally rendered through the object.
 
 ### 3.11 Constant selection-outline clearance
 
-The previous oriented outline still used percentage-based expansion:
+The previous oriented outline used percentage-based expansion:
 
 ```cpp
 localHalf = localHalf * 1.015f + Vec3(0.008f, 0.008f, 0.008f);
 ```
 
-That was visually acceptable for cube-sized objects but made a very large/thin object such as `Ground_Plane` look noticeably inflated.
+That made a very large/thin object such as `Ground_Plane` look noticeably inflated.
 
 Commit `436bc5ec4517ff8724d74b73b6619f933437db0f` replaced that policy with a constant world-space clearance:
 
@@ -196,8 +190,6 @@ constexpr float kSelectionWorldOffset = 0.006f;
 ```
 
 For each oriented local axis, the implementation extracts the axis scale from the selected object's world-matrix columns and converts the fixed world-space clearance back into local units before expanding the local half-extents.
-
-The result is size-independent outline clearance: large objects no longer receive a larger offset simply because their transform scale is larger.
 
 The `0.006f` value and this editor-only clearance policy are **Design choice (not directly from the book)**.
 
@@ -214,20 +206,70 @@ The current implementation includes gizmo drawing/hit-testing/drag plumbing and 
 
 This is a Phase 14 interaction foundation only. It is not the later full scene-authoring, undo/redo or serialization system.
 
-## 4. Locally observed / confirmed behavior so far
+## 4. Local validation results
 
-The following behavior has been observed during local Windows testing during Phase 14 development:
+### 4.1 Picking — PASS
+
+Picking has now been explicitly validated locally against the current validation scene.
+
+Results:
+
+```text
+Cube_A: 10/10
+Cube_B: 10/10
+Cube_C: 10/10
+Ground_Plane: 10/10
+Empty click clears: YES
+Rotated edge accuracy Cube_B: PASS
+Rotated edge accuracy Cube_C: PASS
+Viewport -> Hierarchy sync: PASS
+```
+
+Therefore the primary Phase 14 single-object picking gate is considered **PASS** for the current validation scene.
+
+The implementation also contains nearest-positive-hit selection through `nearestT`. A dedicated overlapping-object stress case has not yet been separately exercised, but this is not currently treated as a blocker because ordinary object picking and post-camera-movement picking both pass.
+
+### 4.2 Camera/navigation — PARTIAL PASS
+
+The following camera/navigation checks have been explicitly validated locally:
+
+```text
+RMB mouse-look: PASS
+WASD: PASS
+Q/E: PASS
+Shift speed: PASS
+Mouse wheel speed: FAIL
+RMB release stops capture: PASS
+Focus isolation: PASS
+Picking after camera movement: PASS
+```
+
+This confirms that editor-camera capture, look, six-axis movement, accelerated movement, focus isolation and selection after camera movement are functioning.
+
+The mouse-wheel camera-speed adjustment remains a confirmed failure and must be investigated before the camera/navigation gate can be closed.
+
+### 4.3 Severe FPS stuttering — OPEN BLOCKER
+
+A **severe FPS stuttering problem** has been observed locally during Phase 14 runtime testing.
+
+At this point no root cause has been established. The report intentionally does not attribute it to the renderer, editor timer, swap chain, camera update, synchronization, debug drawing or any other subsystem without evidence.
+
+This is now an explicit Phase 14 blocker because viewport interaction cannot be considered production-stable while severe frame pacing/stuttering is present.
+
+The next performance investigation must measure and isolate the issue rather than applying speculative fixes.
+
+### 4.4 Other locally observed behavior
+
+The following behavior has also been observed during local Windows testing:
 
 - real DX12 content renders inside the central editor Viewport;
-- the procedural sky is visible;
-- the scene renders with depth-tested 3D cube instances;
-- the GPU grid is occluded by scene cubes rather than being composited over them;
-- the Scene Hierarchy exposes the individual validation objects;
-- the previous hierarchy `Runtime Objects` flicker was removed;
+- procedural sky is visible;
+- scene renders with depth-tested 3D cube instances;
+- GPU grid is occluded by scene cubes rather than composited over them;
+- Scene Hierarchy exposes the individual validation objects;
+- previous hierarchy `Runtime Objects` flicker is removed;
 - oriented selection bounds visually follow rotated cube objects correctly;
 - rear selection-box edges are handled through depth-aware GPU rendering rather than always-visible Win32 painting.
-
-These observations do **not** replace the final Phase 14 verification checklist below.
 
 ## 5. Current known limitations / intentionally deferred work
 
@@ -271,38 +313,44 @@ The procedural validation cubes, colors, ground and sky are therefore expected t
 - [x] Selection clearance is now a constant ~`0.006` world units converted per local axis.
 - [x] No ECS/serialization/PIE/lighting/PBR/shadow scope was introduced.
 
-### Locally confirmed during iterative testing
+### Locally confirmed — picking
 
-- [x] Viewport renders actual 3D content.
-- [x] Procedural sky is visible.
-- [x] Grid is depth-aware against cube geometry.
-- [x] Hierarchy no longer flickers when selecting `Runtime Objects`.
-- [x] Individual validation objects appear in the hierarchy.
-- [x] Oriented outline follows rotated cube geometry correctly.
+- [x] Repeated direct clicks select `Cube_A` reliably — 10/10.
+- [x] Repeated direct clicks select rotated `Cube_B` reliably — 10/10.
+- [x] Repeated direct clicks select rotated `Cube_C` reliably — 10/10.
+- [x] Repeated direct clicks select `Ground_Plane` reliably — 10/10.
+- [x] Empty viewport/sky click clears selection.
+- [x] Rotated-edge picking accuracy passes for `Cube_B`.
+- [x] Rotated-edge picking accuracy passes for `Cube_C`.
+- [x] Viewport selection consistently selects the matching hierarchy row.
+- [x] Picking remains correct after camera movement.
 
-### Still requires explicit local validation before Phase 14 completion
+### Locally confirmed — camera/navigation
 
-- [ ] Fresh `Debug x64` build after the latest documentation/code state completes with zero errors.
-- [ ] DX12 debug layer reports no relevant errors.
+- [x] RMB mouse-look works.
+- [x] WASD movement works.
+- [x] Q/E vertical movement works.
+- [x] Shift accelerated movement works.
+- [x] RMB release stops capture.
+- [x] Camera input focus isolation works.
+- [ ] Mouse-wheel camera-speed adjustment works. **FAIL — open defect.**
+
+### Still requires explicit local validation or investigation before Phase 14 completion
+
+- [ ] Diagnose and fix severe FPS/frame-pacing stuttering. **OPEN BLOCKER.**
+- [ ] Re-test mouse-wheel camera-speed adjustment after fix.
 - [ ] Latest constant-clearance outline is visually correct on `Ground_Plane`.
-- [ ] Repeated direct clicks reliably select `Cube_A`.
-- [ ] Repeated direct clicks reliably select rotated `Cube_B`.
-- [ ] Repeated direct clicks reliably select rotated `Cube_C`.
-- [ ] Repeated direct clicks reliably select `Ground_Plane` from visible areas.
-- [ ] Empty viewport/sky click clears selection according to the chosen UX behavior.
-- [ ] Viewport selection consistently selects the matching hierarchy row.
-- [ ] Hierarchy selection consistently selects the matching viewport object.
-- [ ] RMB editor-camera capture/navigation works reliably.
-- [ ] Camera input activates only under intended viewport focus/capture conditions.
+- [ ] Hierarchy selection consistently selects the matching viewport object after all remaining fixes.
 - [ ] Projection/aspect remains correct through viewport resizing.
 - [ ] Move gizmo interaction works reliably.
 - [ ] Rotate gizmo interaction works reliably.
 - [ ] Scale gizmo interaction works reliably.
 - [ ] Resize/maximize/restore is stable across repeated operations.
 - [ ] Zero/minimized viewport size paths remain safe.
-- [ ] Phase 13 menu/toolbar/panel chrome/Content Browser/Console/status bar/Tabler icon baseline remains intact.
+- [ ] DX12 debug layer reports no relevant errors during the final validation pass.
+- [ ] Phase 13 menu/toolbar/panel chrome/Content Browser/Console/status bar/Tabler icon baseline remains intact after final fixes.
 
-The GitHub connector cannot execute the local Windows/MSVC/DX12 editor binary, so these remaining runtime checks must stay open until they are explicitly tested locally.
+The GitHub connector cannot execute the local Windows/MSVC/DX12 editor binary, so runtime checks remain dependent on explicit local testing.
 
 ## 7. Common pitfalls
 
@@ -314,7 +362,8 @@ The GitHub connector cannot execute the local Windows/MSVC/DX12 editor binary, s
 - Do not introduce a second engine/device/main loop for the editor viewport.
 - Do not attach the swap chain to the top-level editor HWND.
 - Do not pull shadows/PBR/material authoring into Phase 14 as visual polish.
-- Do not mark Phase 14 complete until the remaining interaction and resize checks pass locally.
+- Do not guess at the cause of the FPS stuttering; measure and isolate it first.
+- Do not mark Phase 14 complete while the stuttering blocker, mouse-wheel defect and remaining gizmo/resize checks are open.
 
 ## 8. Files substantially introduced/changed by Phase 14
 
@@ -337,16 +386,14 @@ The cumulative Phase 14 implementation touches the editor integration and render
 - `Ide/VS2026/NocturneEditor/NocturneEditor.vcxproj`;
 - this implementation report.
 
-## 9. Next chat handoff
+## 9. Next validation focus
 
-Bring only:
+Before moving on to final gizmo/resize sign-off:
 
-1. fresh `Debug x64` build result after pulling the latest Phase 14 branch;
-2. confirmation/screenshot of `Ground_Plane` with the constant-clearance outline;
-3. repeated direct-picking results for `Cube_A`, `Cube_B`, `Cube_C` and `Ground_Plane`;
-4. RMB camera-navigation result;
-5. Move / Rotate / Scale gizmo interaction results;
-6. resize/maximize/restore result;
-7. any DX12 debug-layer errors.
+1. investigate and isolate the severe FPS/frame-pacing stuttering;
+2. diagnose the failed mouse-wheel camera-speed behavior;
+3. validate/fix both in code if necessary;
+4. re-run camera/navigation validation;
+5. then continue with Move / Rotate / Scale gizmo interaction and resize/maximize/restore stress checks.
 
-Do **not** mark Phase 14 complete until those remaining runtime checks pass.
+Do **not** mark Phase 14 complete until the remaining defects and runtime checks pass.
