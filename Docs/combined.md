@@ -4,6 +4,16 @@ _Last generated: 2026-02-15_
 
 This document consolidates the entire Markdown pack into a single coherent spec (**phases 1–10**), with **all implementation code moved into one up-to-date appendix**.
 
+> **Historical/generated snapshot notice:** this file remains useful for the earlier consolidated material, but it is **not the authoritative roadmap or acceptance standard for Phase 15+**.
+>
+> For all future phases use:
+>
+> - `Docs/nocturne_engine_architecture.md` — canonical roadmap and phase boundaries;
+> - `Docs/Production Engineering Standard.md` — mandatory production-grade completion standard from Phase 15 onward;
+> - the current phase handoff / implementation / completion reports.
+>
+> Any shorter future-phase descriptions embedded later in this generated snapshot are superseded by those documents.
+
 ## Table of Contents
 
 - [Architecture Overview](#architecture-overview)

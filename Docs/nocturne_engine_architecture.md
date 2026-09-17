@@ -435,144 +435,91 @@ project assumptions from leaking into engine code.
 - A **living architectural contract**
 - The reference used before adding any new system
 - The baseline against which refactors are judged
+- The roadmap authority for phase boundaries
+
+### 8.1 Production Engineering Standard — LOCKED FROM PHASE 15
+
+Starting with Phase 15, all implementation work is governed by:
+
+`Docs/Production Engineering Standard.md`
+
+Nocturne Engine is being developed as a commercial-quality product, not as a tutorial/prototype codebase.
+
+The standard requires production-grade implementation **within the scope of each phase**: explicit ownership, robust failure handling, invariants, diagnostics, regression coverage, measured hot-path behavior where relevant, accurate documentation and no hidden structural shortcuts.
+
+This quality policy is a **Design choice (not directly from the book)**. Architectural concepts and subsystem decisions remain grounded in the provided books.
+
+Professional-grade does not mean phase-scope expansion. Future features remain in their assigned phases unless a documented dependency makes earlier foundation work necessary.
 
 ---
 
 ## 9. Roadmap (Phase-Based)
 
-### Completed
+### Completed foundation
 
-- [x] **Phase 1 — Core Systems**  
-  (logging, asserts, memory, time, basic utilities)
+Phases 1–14 constitute the current implemented foundation. Their individual phase/completion documents remain the authority for exactly what was delivered.
 
-- [x] **Phase 2 — Window & Main Loop Skeleton**  
-  (Win32 window, message pump, frame lifecycle)
-
-- [x] **Phase 3 — Resources & Virtual File System**  
-  (virtual paths, mounts, loose + archive read)
-
-- [x] **Phase 4 — Resource Manager Core**  
-  (resource identity, cache, async load thread, states)
-
-- [x] **Phase 5 — Typed Resources & Loader Registry**  
-  (text/json/binary resources, decode/parse stage)
-
-- [x] **Phase 6 — Job System & Async Infrastructure**  
-  (thread pool, work stealing/queues, futures)
-
-- [x] **Phase 7 — Input System**  
-  (raw devices, action mapping, rebinding)
-
-- [x] **Phase 8 — Rendering Bootstrap**  
-  (graphics API setup, device, swapchain, command submission, clear/present)
-
-- [x] **Phase 9 — Rendering Engine Foundation**  
-  (SRP-based renderer, frame lifecycle,  
-  GPU resource foundation: default/upload heaps, descriptor heaps, root signature,  
-  PSO cache, asset-backed mesh upload, deferred GPU-safe destruction)
-
----
-
-### Full Roadmap
-
-1. **Phase 1 — Core Systems**  
-   (logging, asserts, memory, time, basic utilities)
-
-2. **Phase 2 — Window & Main Loop Skeleton**  
-   (Win32 window, message pump, frame lifecycle)
-
-3. **Phase 3 — Resources & Virtual File System**  
-   (virtual paths, mounts, loose + archive read)
-
-4. **Phase 4 — Resource Manager Core**  
-   (resource identity, cache, async load thread, states)
-
-5. **Phase 5 — Typed Resources & Loader Registry**  
-   (text/json/binary resources, decode/parse stage)
-
-6. **Phase 6 — Job System & Async Infrastructure**  
-   (thread pool, work stealing/queues, futures)
-
-7. **Phase 7 — Input System**  
-   (raw devices, action mapping, rebinding)
-
-8. **Phase 8 — Rendering Bootstrap**  
-   (graphics API setup, device, swapchain, command submission, clear/present)
-
-9. **Phase 9 — Rendering Engine Foundation**  
-   (SRP-based renderer, frame lifecycle,  
-   GPU resource foundation: default/upload heaps, descriptor heaps, root signature,  
-   PSO cache, asset-backed mesh upload, deferred GPU-safe destruction)
-
-10. **Phase 10 — Scene Representation**  
-    (world, transforms, spatial hierarchy, visibility basics)
-
-11. **Phase 11 — Asset Import Pipeline**  
-    (importers, intermediate formats, metadata, dependency graph)
-
-12. **Phase 12 — Cooker & Packager Tools**  
-    (cook step, deterministic outputs, archive build, versioning)
-
-13. **Phase 13 — Editor Framework Bootstrap**  
-    (desktop app shell, docking UI, project system, content browser)
-
-14. **Phase 14 — Editor Rendering Viewport**  
-    (viewport camera, gizmos, selection, debug draw)
+### Active
 
 15. **Phase 15 — Entity / Component System**  
-    (ECS or component model, serialization-ready data layout)
+    Production-grade runtime object model: safe entity identity and generational handles, component lifecycle/storage, transform/render/camera/name migration, component metadata/versioning, deterministic queries and editor/render integration. The result must be serialization-ready without implementing Phase 17 file I/O.
+
+### Future roadmap — production-grade scope
 
 16. **Phase 16 — Editor Scene Editing**  
-    (create/delete entities, component inspectors, prefab prototype)
+    Real scene-authoring workflows over the Phase 15 object model: create/delete/duplicate/reparent entities, component add/remove/edit, schema-driven inspectors, robust selection synchronization, transactional editing semantics, undo/redo integration for owned operations, prefab prototype and editor diagnostics. No scene-file persistence beyond interfaces required by the next phase.
 
 17. **Phase 17 — Serialization & Save / Load**  
-    (scene files, prefabs, savegame, version tolerance)
+    Versioned persistence for scenes, prefabs and savegame-relevant state: stable entity/component identity, reference fixups, deterministic output where required, compatibility/version checks, malformed-data diagnostics, transactional/atomic save behavior where applicable, round-trip tests and migration/rejection policy.
 
 18. **Phase 18 — Physics & Collision**  
-    (broadphase, narrowphase, rigid bodies, queries, character controller)
+    Production physics integration boundary: collision shapes/filtering, broadphase/narrowphase or middleware integration, rigid bodies, fixed-step simulation, scene queries, character-controller foundation, lifecycle synchronization with entities/components, debug visualization, invalid-shape handling and stress/performance validation.
 
 19. **Phase 19 — Animation System**  
-    (skeletons, clips, blend trees / state machines, retargeting baseline)
+    Runtime animation foundation: skeletons, clips, sampling, blending/state-machine layer, skinning integration, root-motion policy, animation events, retargeting baseline, resource lifetime rules, deterministic update ordering and representative CPU/GPU performance validation.
 
 20. **Phase 20 — Audio System**  
-    (device, voices, mixing, 3D spatialization, streaming audio)
+    Production audio runtime: device/voice ownership, buses/mixing, 2D/3D spatialization, streaming, resource lifetime, concurrency limits/voice policy, pause/focus behavior, diagnostics and failure recovery for missing/invalid audio resources.
 
 21. **Phase 21 — Lighting & Post-Processing**  
-    (deferred/forward+ choice, shadows, tone mapping, fog, bloom)
+    Production lighting/post foundation integrated with the existing renderer: chosen lighting architecture, shadow lifecycle, HDR/linear workflow, tone mapping, fog and bloom, resize/resource correctness, GPU diagnostics and measured frame cost. The chosen architecture must be documented before implementation.
 
 22. **Phase 22 — Materials & PBR Workflow**  
-    (material parameter system, texture sets, instancing)
+    Production material system: material assets/instances, parameter typing, texture-set binding, PBR conventions, shader/permutation policy, color-space correctness, fallback/error materials, editor integration, GPU binding efficiency and versionable material data.
 
 23. **Phase 23 — Editor Asset Previewers**  
-    (mesh/animation/texture/audio preview panes, reimport hooks)
+    Reliable isolated preview workflows for mesh/animation/texture/audio assets: async-safe loading, preview-world isolation, error states, reimport hooks, resource refresh, camera/control behavior and no mutation of the authored runtime scene.
 
 24. **Phase 24 — Scripting & Gameplay Runtime Layer**  
-    (bindings, events, triggers, gameplay framework)
+    Production gameplay extension boundary: scripting/binding architecture selected and documented, safe entity/component references, lifecycle hooks, events/triggers, error containment, deterministic ownership, debugging facilities and a gameplay framework that does not bypass engine subsystem contracts.
 
 25. **Phase 25 — AI & Navigation**  
-    (navmesh build, pathfinding, perception, BT/FSM framework)
+    Production navigation/AI foundation: navmesh build/runtime queries, pathfinding, agent movement interface, perception, BT/FSM framework, entity/component integration, debug visualization, invalid/unreachable-path handling and representative scalability measurements.
 
 26. **Phase 26 — Gameplay Systems for Horror**  
-    (interaction, inventory, doors/locks, stamina, sanity/fear hooks)
+    Commercial-game gameplay foundation for the target title: interaction, inventory, doors/locks, stamina and fear/sanity hooks, data-driven tuning, save/load compatibility, clear ownership between engine-generic and game-specific code, automated regression coverage for core gameplay rules.
 
 27. **Phase 27 — Editor Play-In-Editor (PIE)**  
-    (PIE launch, hot-reload of scripts/data, runtime ↔ editor bridge)
+    Robust PIE lifecycle using the real runtime: authored-state isolation, start/stop/pause/step semantics, runtime/editor bridge, policy for runtime changes, safe teardown/restart, scripting/data reload integration where supported, and proof that stopping PIE restores editor authoring state without corruption.
 
 28. **Phase 28 — Debug & Profiling Tooling**  
-    (in-engine profiler, GPU timings, capture tools, debug overlays)
+    Production observability: CPU/GPU timings, memory/allocation instrumentation, profiler markers, frame/system counters, capture hooks, debug overlays, diagnostic dumps and workflows that can identify regressions without ad-hoc code modification.
 
 29. **Phase 29 — Build & Deployment Pipeline**  
-    (configurations, packaging, crash reporting hooks, installer)
+    Repeatable commercial build/deployment flow: clearly separated development/shipping configurations, deterministic build/cook/package steps, symbol handling, crash-reporting hooks, installer/package generation, configuration validation and reproducible release artifacts.
 
 30. **Phase 30 — Optimization & Content Validation**  
-    (asset validation rules, LODs, streaming budgets, performance gates)
+    Measured optimization and automated content quality gates: frame/memory/streaming budgets, representative benchmarks, LOD/streaming policy, asset validation, cooker validation failures, regression thresholds and removal of known hot-path architectural debt discovered by profiling.
 
 31. **Phase 31 — Shipping Polish**  
-    (QA tools, regression tests, deterministic cooks, final editor UX passes)
+    Release-candidate hardening: QA/regression gates, crash/failure cleanup, deterministic cooks/builds, final editor UX consistency, configuration/settings validation, content validation closure, packaging verification and explicit ship/no-ship criteria for known defects.
 
+### Roadmap rule
 
+The one-line scope above defines **what** each future phase owns. `Docs/Production Engineering Standard.md` defines **how well** it must be implemented.
+
+A future phase is not complete because its headline feature exists. It is complete only when its applicable production quality gates pass.
 
 ---
 
-This document remains the top-level reference for all future work.
-
+This document remains the top-level architectural and roadmap reference for all future work.
