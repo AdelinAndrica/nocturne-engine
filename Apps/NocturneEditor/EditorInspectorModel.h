@@ -62,6 +62,32 @@ namespace nocturne::editor
             noc::PropertyId propertyId,
             noc::OwnedReflectedValue& outValue) const;
 
+        // Reads a nested reflected leaf by PropertyId path. Each hop is copied
+        // through reflection lifecycle/read callbacks; no interior pointer is
+        // retained beyond the call.
+        [[nodiscard]] bool ReadNestedValue(
+            EditorCommandContext& context,
+            noc::EntityHandle entity,
+            noc::TypeId componentTypeId,
+            noc::PropertyId propertyId,
+            const noc::PropertyId* nestedPath,
+            uint32_t nestedPathCount,
+            noc::OwnedReflectedValue& outValue) const;
+
+        // Read-modify-writes a nested reflected leaf inside a copy of the
+        // top-level component property, then authors that complete parent value
+        // through one SetReflectedPropertyCommand. This preserves semantic
+        // top-level setters and one-step undo/redo.
+        [[nodiscard]] bool CommitNestedTextEdit(
+            EditorCommandContext& context,
+            EditorCommandHistory& history,
+            noc::EntityHandle entity,
+            noc::TypeId componentTypeId,
+            noc::PropertyId propertyId,
+            const noc::PropertyId* nestedPath,
+            uint32_t nestedPathCount,
+            const char* utf8Text);
+
         // Parses generic editor text into the reflected value type and executes
         // the mutation through SetReflectedPropertyCommand + command history.
         [[nodiscard]] bool CommitTextEdit(

@@ -246,6 +246,120 @@ bool RunPhase16EditorSessionTests()
                     reflectedRotation.Data())->w == 1.0f,
             "Inspector reflected quaternion read failed");
 
+        {
+            const noc::PropertyId translationXPath[] = {
+                noc::MakePropertyId(
+                    "Nocturne.Vec3.x")
+            };
+
+            noc::OwnedReflectedValue translationX;
+            ok &= CheckEditorSession(
+                inspectorModel.ReadNestedValue(
+                    context,
+                    authored,
+                    noc::TypeId{
+                        noc::kTransformComponentTypeId.value },
+                    noc::MakePropertyId(
+                        "Nocturne.Transform.localTranslation"),
+                    translationXPath,
+                    1,
+                    translationX)
+                    && translationX.Type()
+                        == noc::BuiltinTypeIds::Float32
+                    && translationX.Data()
+                    && *static_cast<const float*>(
+                        translationX.Data()) == 0.0f,
+                "Inspector nested Vec3 leaf read failed");
+
+            session.History().Clear();
+
+            ok &= CheckEditorSession(
+                inspectorModel.CommitNestedTextEdit(
+                    context,
+                    session.History(),
+                    authored,
+                    noc::TypeId{
+                        noc::kTransformComponentTypeId.value },
+                    noc::MakePropertyId(
+                        "Nocturne.Transform.localTranslation"),
+                    translationXPath,
+                    1,
+                    "4.25")
+                    && world.GetTransform(authored)
+                    && world.GetTransform(authored)
+                        ->localTranslation.x == 4.25f
+                    && world.GetTransform(authored)
+                        ->localTranslation.y == 0.0f
+                    && world.GetTransform(authored)
+                        ->localTranslation.z == 0.0f,
+                "Inspector nested Vec3 semantic edit failed");
+
+            ok &= CheckEditorSession(
+                session.History().Undo(context)
+                    && world.GetTransform(authored)
+                    && world.GetTransform(authored)
+                        ->localTranslation.x == 0.0f,
+                "Inspector nested Vec3 edit undo failed");
+
+            session.History().Clear();
+
+            const noc::AABB initialBounds{
+                noc::Vec3{ -1.0f, -2.0f, -3.0f },
+                noc::Vec3{ 1.0f, 2.0f, 3.0f }
+            };
+
+            ok &= CheckEditorSession(
+                world.AddRenderable(
+                    authored,
+                    noc::ResourceHandle{},
+                    initialBounds)
+                    && inspectorModel.Refresh(
+                        context,
+                        authored),
+                "Inspector nested AABB setup failed");
+
+            const noc::PropertyId minXPath[] = {
+                noc::MakePropertyId(
+                    "Nocturne.AABB.min"),
+                noc::MakePropertyId(
+                    "Nocturne.Vec3.x")
+            };
+
+            ok &= CheckEditorSession(
+                inspectorModel.CommitNestedTextEdit(
+                    context,
+                    session.History(),
+                    authored,
+                    noc::TypeId{
+                        noc::kRenderableComponentTypeId.value },
+                    noc::MakePropertyId(
+                        "Nocturne.Renderable.localBounds"),
+                    minXPath,
+                    2,
+                    "-9.5")
+                    && world.GetRenderable(authored)
+                    && world.GetRenderable(authored)
+                        ->localBounds.min.x == -9.5f
+                    && world.GetRenderable(authored)
+                        ->localBounds.min.y == -2.0f
+                    && world.GetRenderable(authored)
+                        ->localBounds.max.z == 3.0f,
+                "Inspector nested AABB leaf edit failed");
+
+            ok &= CheckEditorSession(
+                session.History().Undo(context)
+                    && world.GetRenderable(authored)
+                    && world.GetRenderable(authored)
+                        ->localBounds.min.x == -1.0f
+                    && world.RemoveRenderable(authored)
+                    && inspectorModel.Refresh(
+                        context,
+                        authored),
+                "Inspector nested AABB edit undo/cleanup failed");
+
+            session.History().Clear();
+        }
+
         ok &= CheckEditorSession(
             world.AddCamera(authored)
                 && inspectorModel.Refresh(

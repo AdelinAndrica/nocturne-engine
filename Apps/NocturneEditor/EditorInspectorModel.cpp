@@ -174,6 +174,326 @@ namespace nocturne::editor
                 return false;
             }
         }
+
+        bool ParseNestedLeafValue(
+            EditorCommandContext& context,
+            const noc::TypeMetadata& valueType,
+            const char* utf8Text,
+            noc::OwnedReflectedValue& outValue)
+        {
+            if (!utf8Text
+                || outValue.IsValid()
+                || !outValue.InitDefault(
+                    context.allocator,
+                    valueType))
+            {
+                return false;
+            }
+
+            switch (valueType.kind)
+            {
+            case noc::TypeKind::Bool:
+            {
+                bool value = false;
+                if (std::strcmp(utf8Text, "true") == 0
+                    || std::strcmp(utf8Text, "1") == 0)
+                {
+                    value = true;
+                }
+                else if (std::strcmp(utf8Text, "false") != 0
+                    && std::strcmp(utf8Text, "0") != 0)
+                {
+                    return false;
+                }
+
+                *static_cast<bool*>(outValue.Data()) =
+                    value;
+                return true;
+            }
+
+            case noc::TypeKind::SignedInteger:
+            {
+                errno = 0;
+                char* end = nullptr;
+                const long long parsed =
+                    std::strtoll(
+                        utf8Text,
+                        &end,
+                        10);
+
+                if (end == utf8Text
+                    || *end != '\0'
+                    || errno == ERANGE)
+                {
+                    return false;
+                }
+
+                if (valueType.size == sizeof(int8_t))
+                {
+                    if (parsed < (std::numeric_limits<int8_t>::min)()
+                        || parsed > (std::numeric_limits<int8_t>::max)())
+                        return false;
+                    *static_cast<int8_t*>(outValue.Data()) =
+                        static_cast<int8_t>(parsed);
+                    return true;
+                }
+                if (valueType.size == sizeof(int16_t))
+                {
+                    if (parsed < (std::numeric_limits<int16_t>::min)()
+                        || parsed > (std::numeric_limits<int16_t>::max)())
+                        return false;
+                    *static_cast<int16_t*>(outValue.Data()) =
+                        static_cast<int16_t>(parsed);
+                    return true;
+                }
+                if (valueType.size == sizeof(int32_t))
+                {
+                    if (parsed < (std::numeric_limits<int32_t>::min)()
+                        || parsed > (std::numeric_limits<int32_t>::max)())
+                        return false;
+                    *static_cast<int32_t*>(outValue.Data()) =
+                        static_cast<int32_t>(parsed);
+                    return true;
+                }
+                if (valueType.size == sizeof(int64_t))
+                {
+                    *static_cast<int64_t*>(outValue.Data()) =
+                        static_cast<int64_t>(parsed);
+                    return true;
+                }
+                return false;
+            }
+
+            case noc::TypeKind::UnsignedInteger:
+            {
+                if (utf8Text[0] == '-')
+                    return false;
+
+                errno = 0;
+                char* end = nullptr;
+                const unsigned long long parsed =
+                    std::strtoull(
+                        utf8Text,
+                        &end,
+                        10);
+
+                if (end == utf8Text
+                    || *end != '\0'
+                    || errno == ERANGE)
+                {
+                    return false;
+                }
+
+                if (valueType.size == sizeof(uint8_t))
+                {
+                    if (parsed > (std::numeric_limits<uint8_t>::max)())
+                        return false;
+                    *static_cast<uint8_t*>(outValue.Data()) =
+                        static_cast<uint8_t>(parsed);
+                    return true;
+                }
+                if (valueType.size == sizeof(uint16_t))
+                {
+                    if (parsed > (std::numeric_limits<uint16_t>::max)())
+                        return false;
+                    *static_cast<uint16_t*>(outValue.Data()) =
+                        static_cast<uint16_t>(parsed);
+                    return true;
+                }
+                if (valueType.size == sizeof(uint32_t))
+                {
+                    if (parsed > (std::numeric_limits<uint32_t>::max)())
+                        return false;
+                    *static_cast<uint32_t*>(outValue.Data()) =
+                        static_cast<uint32_t>(parsed);
+                    return true;
+                }
+                if (valueType.size == sizeof(uint64_t))
+                {
+                    *static_cast<uint64_t*>(outValue.Data()) =
+                        static_cast<uint64_t>(parsed);
+                    return true;
+                }
+                return false;
+            }
+
+            case noc::TypeKind::FloatingPoint:
+            {
+                errno = 0;
+                char* end = nullptr;
+                const double parsed =
+                    std::strtod(
+                        utf8Text,
+                        &end);
+
+                if (end == utf8Text
+                    || *end != '\0'
+                    || errno == ERANGE
+                    || !std::isfinite(parsed))
+                {
+                    return false;
+                }
+
+                if (valueType.size == sizeof(float))
+                {
+                    const float value =
+                        static_cast<float>(parsed);
+                    if (!std::isfinite(value))
+                        return false;
+                    *static_cast<float*>(outValue.Data()) =
+                        value;
+                    return true;
+                }
+                if (valueType.size == sizeof(double))
+                {
+                    *static_cast<double*>(outValue.Data()) =
+                        parsed;
+                    return true;
+                }
+                return false;
+            }
+
+            case noc::TypeKind::String:
+                if (valueType.typeId
+                    != noc::BuiltinTypeIds::String)
+                {
+                    return false;
+                }
+                return static_cast<noc::ReflectionString*>(
+                    outValue.Data())->Assign(
+                        utf8Text);
+
+            case noc::TypeKind::Enum:
+            {
+                const noc::EnumValueMetadata* enumValue =
+                    context.reflection.FindEnumValueByName(
+                        valueType.typeId,
+                        utf8Text);
+
+                if (!enumValue
+                    || !valueType.enumMetadata)
+                {
+                    return false;
+                }
+
+                const noc::TypeMetadata* underlying =
+                    context.reflection.FindType(
+                        valueType.enumMetadata->underlyingTypeId);
+
+                if (!underlying
+                    || underlying->size != valueType.size
+                    || valueType.size > sizeof(uint64_t))
+                {
+                    return false;
+                }
+
+                // Enum types are scalar/trivially copyable. This copies only
+                // the validated underlying representation; non-trivial values
+                // still use lifecycle operations and never generic memcpy.
+                const uint64_t raw =
+                    enumValue->rawValue;
+                std::memcpy(
+                    outValue.Data(),
+                    &raw,
+                    valueType.size);
+                return true;
+            }
+
+            default:
+                return false;
+            }
+        }
+
+        bool EditNestedValue(
+            EditorCommandContext& context,
+            noc::TypeId ownerTypeId,
+            void* ownerValue,
+            const noc::PropertyId* nestedPath,
+            uint32_t nestedPathCount,
+            uint32_t pathIndex,
+            const char* utf8Text)
+        {
+            if (!ownerValue
+                || !nestedPath
+                || pathIndex >= nestedPathCount)
+            {
+                return false;
+            }
+
+            const noc::PropertyMetadata* property =
+                context.reflection.FindProperty(
+                    ownerTypeId,
+                    nestedPath[pathIndex]);
+
+            if (!property
+                || !property->read
+                || !property->write
+                || noc::HasFlag(
+                    property->flags,
+                    noc::PropertyFlags::ReadOnly))
+            {
+                return false;
+            }
+
+            noc::PropertyAccessContext propertyContext{};
+            propertyContext.object = ownerValue;
+            propertyContext.mutableObject = ownerValue;
+
+            const noc::TypeMetadata* valueType =
+                context.reflection.FindType(
+                    property->valueTypeId);
+            if (!valueType)
+                return false;
+
+            if (pathIndex + 1 == nestedPathCount)
+            {
+                noc::OwnedReflectedValue leafValue;
+                if (!ParseNestedLeafValue(
+                        context,
+                        *valueType,
+                        utf8Text,
+                        leafValue))
+                {
+                    return false;
+                }
+
+                return noc::WritePropertyValue(
+                        *property,
+                        propertyContext,
+                        leafValue)
+                    == noc::PropertyAccessStatus::Success;
+            }
+
+            noc::OwnedReflectedValue childValue;
+            if (noc::ReadPropertyValue(
+                    context.reflection,
+                    *property,
+                    propertyContext,
+                    context.allocator,
+                    childValue)
+                != noc::PropertyAccessStatus::Success)
+            {
+                return false;
+            }
+
+            if (!EditNestedValue(
+                    context,
+                    valueType->typeId,
+                    childValue.Data(),
+                    nestedPath,
+                    nestedPathCount,
+                    pathIndex + 1,
+                    utf8Text))
+            {
+                return false;
+            }
+
+            return noc::WritePropertyValue(
+                    *property,
+                    propertyContext,
+                    childValue)
+                == noc::PropertyAccessStatus::Success;
+        }
     }
 
     bool EditorInspectorModel::Refresh(
@@ -444,6 +764,159 @@ namespace nocturne::editor
                 context.allocator,
                 outValue)
             == noc::PropertyAccessStatus::Success;
+    }
+
+    bool EditorInspectorModel::ReadNestedValue(
+        EditorCommandContext& context,
+        noc::EntityHandle entity,
+        noc::TypeId componentTypeId,
+        noc::PropertyId propertyId,
+        const noc::PropertyId* nestedPath,
+        uint32_t nestedPathCount,
+        noc::OwnedReflectedValue& outValue) const
+    {
+        if (outValue.IsValid())
+            return false;
+
+        noc::OwnedReflectedValue current;
+        if (!ReadValue(
+                context,
+                entity,
+                componentTypeId,
+                propertyId,
+                current))
+        {
+            return false;
+        }
+
+        if (nestedPathCount == 0)
+        {
+            outValue = std::move(current);
+            return true;
+        }
+
+        if (!nestedPath)
+            return false;
+
+        for (uint32_t i = 0;
+             i < nestedPathCount;
+             ++i)
+        {
+            const noc::TypeMetadata* ownerType =
+                context.reflection.FindType(
+                    current.Type());
+            if (!ownerType)
+                return false;
+
+            const noc::PropertyMetadata* nested =
+                context.reflection.FindProperty(
+                    ownerType->typeId,
+                    nestedPath[i]);
+            if (!nested || !nested->read)
+                return false;
+
+            noc::PropertyAccessContext nestedContext{};
+            nestedContext.object = current.Data();
+
+            noc::OwnedReflectedValue child;
+            if (noc::ReadPropertyValue(
+                    context.reflection,
+                    *nested,
+                    nestedContext,
+                    context.allocator,
+                    child)
+                != noc::PropertyAccessStatus::Success)
+            {
+                return false;
+            }
+
+            current = std::move(child);
+        }
+
+        outValue = std::move(current);
+        return true;
+    }
+
+    bool EditorInspectorModel::CommitNestedTextEdit(
+        EditorCommandContext& context,
+        EditorCommandHistory& history,
+        noc::EntityHandle entity,
+        noc::TypeId componentTypeId,
+        noc::PropertyId propertyId,
+        const noc::PropertyId* nestedPath,
+        uint32_t nestedPathCount,
+        const char* utf8Text)
+    {
+        if (!nestedPath
+            || nestedPathCount == 0
+            || !utf8Text
+            || !context.world.IsAlive(entity)
+            || context.IsToolOwned(entity))
+        {
+            return false;
+        }
+
+        const noc::PropertyMetadata* topProperty =
+            context.reflection.FindProperty(
+                componentTypeId,
+                propertyId);
+
+        if (!topProperty
+            || !topProperty->write
+            || noc::HasFlag(
+                topProperty->flags,
+                noc::PropertyFlags::ReadOnly))
+        {
+            return false;
+        }
+
+        noc::OwnedReflectedValue parentValue;
+        if (!ReadValue(
+                context,
+                entity,
+                componentTypeId,
+                propertyId,
+                parentValue))
+        {
+            return false;
+        }
+
+        if (!EditNestedValue(
+                context,
+                parentValue.Type(),
+                parentValue.Data(),
+                nestedPath,
+                nestedPathCount,
+                0,
+                utf8Text))
+        {
+            return false;
+        }
+
+        try
+        {
+            auto command =
+                std::make_unique<
+                    SetReflectedPropertyCommand>();
+
+            if (!command->Init(
+                    context,
+                    entity,
+                    componentTypeId,
+                    propertyId,
+                    parentValue.ConstView()))
+            {
+                return false;
+            }
+
+            return history.Execute(
+                context,
+                std::move(command));
+        }
+        catch (const std::bad_alloc&)
+        {
+            return false;
+        }
     }
 
     bool EditorInspectorModel::CommitTextEdit(
