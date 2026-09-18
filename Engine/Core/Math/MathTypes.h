@@ -303,7 +303,7 @@ namespace noc
         M(result, 1, 3) = inverseTranslation.y;
         M(result, 2, 3) = inverseTranslation.z;
 
-        if (!IsFiniteMath(result)
+        if (!IsFiniteMath(result))
             return false;
 
         outInverse = result;
