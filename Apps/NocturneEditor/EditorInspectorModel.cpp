@@ -15,6 +15,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <memory>
 #include <new>
 
@@ -406,6 +407,11 @@ namespace nocturne::editor
 
             if (valueType->size == sizeof(int8_t))
             {
+                if (parsed < (std::numeric_limits<int8_t>::min)()
+                    || parsed > (std::numeric_limits<int8_t>::max)())
+                {
+                    return false;
+                }
                 const int8_t value =
                     static_cast<int8_t>(parsed);
                 return ExecuteValueCommand(
@@ -415,6 +421,11 @@ namespace nocturne::editor
             }
             if (valueType->size == sizeof(int16_t))
             {
+                if (parsed < (std::numeric_limits<int16_t>::min)()
+                    || parsed > (std::numeric_limits<int16_t>::max)())
+                {
+                    return false;
+                }
                 const int16_t value =
                     static_cast<int16_t>(parsed);
                 return ExecuteValueCommand(
@@ -424,6 +435,11 @@ namespace nocturne::editor
             }
             if (valueType->size == sizeof(int32_t))
             {
+                if (parsed < (std::numeric_limits<int32_t>::min)()
+                    || parsed > (std::numeric_limits<int32_t>::max)())
+                {
+                    return false;
+                }
                 const int32_t value =
                     static_cast<int32_t>(parsed);
                 return ExecuteValueCommand(
@@ -444,6 +460,9 @@ namespace nocturne::editor
         {
             errno = 0;
             char* end = nullptr;
+            if (utf8Text[0] == '-')
+                return false;
+
             const unsigned long long parsed =
                 std::strtoull(utf8Text, &end, 10);
             if (end == utf8Text
@@ -455,6 +474,8 @@ namespace nocturne::editor
 
             if (valueType->size == sizeof(uint8_t))
             {
+                if (parsed > (std::numeric_limits<uint8_t>::max)())
+                    return false;
                 const uint8_t value =
                     static_cast<uint8_t>(parsed);
                 return ExecuteValueCommand(
@@ -464,6 +485,8 @@ namespace nocturne::editor
             }
             if (valueType->size == sizeof(uint16_t))
             {
+                if (parsed > (std::numeric_limits<uint16_t>::max)())
+                    return false;
                 const uint16_t value =
                     static_cast<uint16_t>(parsed);
                 return ExecuteValueCommand(
@@ -473,6 +496,8 @@ namespace nocturne::editor
             }
             if (valueType->size == sizeof(uint32_t))
             {
+                if (parsed > (std::numeric_limits<uint32_t>::max)())
+                    return false;
                 const uint32_t value =
                     static_cast<uint32_t>(parsed);
                 return ExecuteValueCommand(
