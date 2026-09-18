@@ -119,6 +119,7 @@
     <ClInclude Include="..\..\..\Engine\Runtime\Reflection\ReflectionIds.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Reflection\ReflectionMetadata.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Reflection\ReflectionRegistry.h" />
+    <ClInclude Include="..\..\..\Engine\Runtime\Reflection\ReflectedValue.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\SceneObject.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\World.h" />
   </ItemGroup>
