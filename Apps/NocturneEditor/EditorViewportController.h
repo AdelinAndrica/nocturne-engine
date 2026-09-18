@@ -5,12 +5,14 @@
 
 #include "Core/Math/MathTypes.h"
 #include "Runtime/Bounds.h"
-#include "Runtime/SceneObject.h"
+#include "Runtime/Entity.h"
 
 namespace noc
 {
     class Engine;
     class WinWindow;
+    struct RenderableComponent;
+    struct TransformComponent;
 }
 
 namespace nocturne::editor
@@ -35,11 +37,7 @@ namespace nocturne::editor
 
         struct ValidationObject
         {
-            noc::SceneObjectHandle handle{};
-            noc::Vec3 t = noc::Vec3::Zero();
-            noc::Quat r = noc::Quat::Identity();
-            noc::Vec3 s = noc::Vec3::One();
-            noc::AABB localBounds{ noc::Vec3(-1.0f, -1.0f, -1.0f), noc::Vec3(1.0f, 1.0f, 1.0f) };
+            noc::EntityHandle handle{};
             bool selectable = true;
         };
 
@@ -65,6 +63,8 @@ namespace nocturne::editor
         bool RayAabb_(const noc::Vec3& origin, const noc::Vec3& dir, const noc::AABB& box, float& outT) const;
         bool RayValidationObject_(int index, const noc::Vec3& origin, const noc::Vec3& dir, float& outT) const;
         noc::AABB ValidationWorldBounds_(int index) const;
+        const noc::TransformComponent* ValidationTransform_(int index) const;
+        const noc::RenderableComponent* ValidationRenderable_(int index) const;
         int PickValidationObject_(const noc::Vec3& origin, const noc::Vec3& dir) const;
 
         void SetSelectedIndex_(int index, bool syncTree = true);
@@ -105,7 +105,7 @@ namespace nocturne::editor
         int pendingMouseDy_ = 0;
 
         ValidationObject validationObjects_[kValidationObjectCount]{};
-        noc::SceneObjectHandle cameraObject_{};
+        noc::EntityHandle cameraObject_{};
 
         noc::Vec3 dragStartT_{};
         noc::Quat dragStartR_ = noc::Quat::Identity();

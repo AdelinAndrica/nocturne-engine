@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <string>
 #include <vector>
 
 #include <CommCtrl.h>
@@ -196,31 +197,28 @@ namespace nocturne::editor
         auto& world = engine.GetWorld();
         const noc::ResourceHandle logicalMesh = engine.Resources().RequestBinary("Meshes/triangle.nmsh");
 
-        auto createValidationObject = [&](int index, const noc::Vec3& t, const noc::Quat& r,
+        auto createValidationObject = [&](int index, const char* name, const noc::Vec3& t, const noc::Quat& r,
             const noc::Vec3& s, bool selectable) -> bool
         {
             ValidationObject& object = validationObjects_[index];
             object.handle = world.CreateObject();
             if (!object.handle.IsValid())
                 return false;
-            object.t = t;
-            object.r = r;
-            object.s = s;
-            object.selectable = selectable;
-            object.localBounds = { noc::Vec3(-1.0f, -1.0f, -1.0f), noc::Vec3(1.0f, 1.0f, 1.0f) };
-            if (!world.SetLocalTRS(object.handle, object.t, object.r, object.s))
-            {
-                NOC_LOG_ERROR("Editor", "Failed to initialize validation object transform (index=%d)", index);
-                world.DestroyObject(object.handle);
-                object.handle = noc::SceneObjectHandle::Invalid();
-                return false;
-            }
 
-            if (!world.SetRenderable(object.handle, logicalMesh, object.localBounds))
+            object.selectable = selectable;
+
+            const noc::AABB localBounds{
+                noc::Vec3(-1.0f, -1.0f, -1.0f),
+                noc::Vec3(1.0f, 1.0f, 1.0f)
+            };
+
+            if (!world.AddName(object.handle, name)
+                || !world.SetLocalTRS(object.handle, t, r, s)
+                || !world.SetRenderable(object.handle, logicalMesh, localBounds))
             {
-                NOC_LOG_ERROR("Editor", "Failed to initialize validation object renderable (index=%d)", index);
+                NOC_LOG_ERROR("Editor", "Failed to initialize validation entity components (index=%d)", index);
                 world.DestroyObject(object.handle);
-                object.handle = noc::SceneObjectHandle::Invalid();
+                object.handle = noc::EntityHandle::Invalid();
                 return false;
             }
 
@@ -230,10 +228,10 @@ namespace nocturne::editor
         // Design choice (not directly from the book): deterministic Phase 14
         // viewport scene. Ground is selectable because it is exposed as a real
         // hierarchy object alongside the three validation cubes.
-        if (!createValidationObject(0, { 0.0f, -0.15f, 6.0f }, noc::Quat::Identity(), { 1.0f, 1.0f, 1.0f }, true) ||
-            !createValidationObject(1, { -2.5f, -0.10f, 9.0f }, AxisAngle({ 0,1,0 }, 0.38f), { 0.8f, 1.05f, 0.8f }, true) ||
-            !createValidationObject(2, { 2.4f, -0.35f, 11.0f }, AxisAngle({ 0,1,0 }, -0.52f), { 1.1f, 0.8f, 1.1f }, true) ||
-            !createValidationObject(3, { 0.0f, -1.25f, 9.0f }, noc::Quat::Identity(), { 6.5f, 0.10f, 7.5f }, true))
+        if (!createValidationObject(0, "Cube_A", { 0.0f, -0.15f, 6.0f }, noc::Quat::Identity(), { 1.0f, 1.0f, 1.0f }, true) ||
+            !createValidationObject(1, "Cube_B", { -2.5f, -0.10f, 9.0f }, AxisAngle({ 0,1,0 }, 0.38f), { 0.8f, 1.05f, 0.8f }, true) ||
+            !createValidationObject(2, "Cube_C", { 2.4f, -0.35f, 11.0f }, AxisAngle({ 0,1,0 }, -0.52f), { 1.1f, 0.8f, 1.1f }, true) ||
+            !createValidationObject(3, "Ground", { 0.0f, -1.25f, 9.0f }, noc::Quat::Identity(), { 6.5f, 0.10f, 7.5f }, true))
         {
             NOC_LOG_ERROR("Editor", "Failed to create Phase 14 validation scene objects");
             return false;
@@ -248,13 +246,14 @@ namespace nocturne::editor
 
         cameraRot_ = YawPitch(cameraYaw_, cameraPitch_);
 
-        if (!world.SetLocalTRS(cameraObject_, cameraPos_, cameraRot_, noc::Vec3::One())
+        if (!world.AddName(cameraObject_, "Main Camera")
+            || !world.SetLocalTRS(cameraObject_, cameraPos_, cameraRot_, noc::Vec3::One())
             || !world.SetCameraParams(fovY_, 16.0f / 9.0f, 0.05f, 500.0f)
             || !world.SetCameraFromObject(cameraObject_))
         {
             NOC_LOG_ERROR("Editor", "%s", "Failed to initialize Phase 14 editor camera components");
             world.DestroyObject(cameraObject_);
-            cameraObject_ = noc::SceneObjectHandle::Invalid();
+            cameraObject_ = noc::EntityHandle::Invalid();
             return false;
         }
 
@@ -582,29 +581,48 @@ namespace nocturne::editor
         return tmax >= 0.0f;
     }
 
+    const noc::TransformComponent* EditorViewportController::ValidationTransform_(int index) const
+    {
+        if (!engine_ || index < 0 || index >= kValidationObjectCount)
+            return nullptr;
+
+        return engine_->GetWorld().GetTransform(validationObjects_[index].handle);
+    }
+
+    const noc::RenderableComponent* EditorViewportController::ValidationRenderable_(int index) const
+    {
+        if (!engine_ || index < 0 || index >= kValidationObjectCount)
+            return nullptr;
+
+        return engine_->GetWorld().GetRenderable(validationObjects_[index].handle);
+    }
+
     bool EditorViewportController::RayValidationObject_(int index, const noc::Vec3& origin,
         const noc::Vec3& dir, float& outT) const
     {
-        if (index < 0 || index >= kValidationObjectCount)
-            return false;
-        const ValidationObject& object = validationObjects_[index];
-        if (std::fabs(object.s.x) <= 1e-6f || std::fabs(object.s.y) <= 1e-6f || std::fabs(object.s.z) <= 1e-6f)
+        const noc::TransformComponent* transform = ValidationTransform_(index);
+        const noc::RenderableComponent* renderable = ValidationRenderable_(index);
+        if (!transform || !renderable)
             return false;
 
-        const noc::Quat invRot{ -object.r.x, -object.r.y, -object.r.z, object.r.w };
-        noc::Vec3 localOrigin = noc::Rotate(invRot, origin - object.t);
+        const noc::Vec3& scale = transform->localScale;
+        if (std::fabs(scale.x) <= 1e-6f || std::fabs(scale.y) <= 1e-6f || std::fabs(scale.z) <= 1e-6f)
+            return false;
+
+        const noc::Quat& rotation = transform->localRotation;
+        const noc::Vec3& translation = transform->localTranslation;
+        const noc::Quat invRot{ -rotation.x, -rotation.y, -rotation.z, rotation.w };
+        noc::Vec3 localOrigin = noc::Rotate(invRot, origin - translation);
         noc::Vec3 localDir = noc::Rotate(invRot, dir);
-        localOrigin.x /= object.s.x; localOrigin.y /= object.s.y; localOrigin.z /= object.s.z;
-        localDir.x /= object.s.x; localDir.y /= object.s.y; localDir.z /= object.s.z;
-        return RayAabb_(localOrigin, localDir, object.localBounds, outT);
+        localOrigin.x /= scale.x; localOrigin.y /= scale.y; localOrigin.z /= scale.z;
+        localDir.x /= scale.x; localDir.y /= scale.y; localDir.z /= scale.z;
+        return RayAabb_(localOrigin, localDir, renderable->localBounds, outT);
     }
 
     noc::AABB EditorViewportController::ValidationWorldBounds_(int index) const
     {
-        if (index < 0 || index >= kValidationObjectCount)
-            return {};
-        const ValidationObject& object = validationObjects_[index];
-        return noc::TransformAabb(object.localBounds, noc::TRS(object.t, object.r, object.s));
+        const noc::RenderableComponent* renderable = ValidationRenderable_(index);
+        return renderable ? renderable->worldBounds : noc::AABB{};
     }
 
     int EditorViewportController::PickValidationObject_(const noc::Vec3& origin, const noc::Vec3& dir) const
@@ -632,7 +650,17 @@ namespace nocturne::editor
         if (selectedIndex_ >= 0 && selectedIndex_ < kValidationObjectCount)
         {
             const ValidationObject& object = validationObjects_[selectedIndex_];
-            engine_->SetDebugSelection(object.localBounds, noc::TRS(object.t, object.r, object.s));
+            const noc::RenderableComponent* renderable = ValidationRenderable_(selectedIndex_);
+            if (renderable)
+            {
+                engine_->SetDebugSelection(
+                    renderable->localBounds,
+                    engine_->GetWorld().GetWorldMatrix(object.handle));
+            }
+            else
+            {
+                engine_->ClearDebugSelectionBounds();
+            }
         }
         else
         {
@@ -676,10 +704,16 @@ namespace nocturne::editor
         if (tool != kMoveTool && tool != kRotateTool && tool != kScaleTool)
             return -1;
 
-        const ValidationObject& object = validationObjects_[selectedIndex_];
+        const noc::TransformComponent* transform = ValidationTransform_(selectedIndex_);
+        if (!transform)
+            return -1;
+
+        const noc::Vec3& translation = transform->localTranslation;
+        const noc::Quat& rotation = transform->localRotation;
+
         POINT center{};
-        if (!Project_(object.t, center)) return -1;
-        const float gizmoLength = GizmoWorldLength(renderHost_, cameraPos_, cameraRot_, fovY_, object.t);
+        if (!Project_(translation, center)) return -1;
+        const float gizmoLength = GizmoWorldLength(renderHost_, cameraPos_, cameraRot_, fovY_, translation);
         const noc::Vec3 axes[3] = { {1,0,0},{0,1,0},{0,0,1} };
         float best = kGizmoHitRadiusPixels;
         int bestAxis = -1;
@@ -696,7 +730,7 @@ namespace nocturne::editor
                     const float angle = kTwoPi * float(segment) / float(kGizmoRingSegments);
                     const noc::Vec3 local = GizmoRingLocalPoint(axis, angle);
                     POINT current{};
-                    const bool currentValid = Project_(object.t + noc::Rotate(object.r, local) * gizmoLength, current);
+                    const bool currentValid = Project_(translation + noc::Rotate(rotation, local) * gizmoLength, current);
                     if (currentValid && previousValid)
                     {
                         const float distance = PointSegmentDistance(p, previous, current);
@@ -716,8 +750,8 @@ namespace nocturne::editor
         for (int i = 0; i < 3; ++i)
         {
             POINT end{};
-            const noc::Vec3 axis = noc::Rotate(object.r, axes[i]);
-            if (!Project_(object.t + axis * gizmoLength, end)) continue;
+            const noc::Vec3 axis = noc::Rotate(rotation, axes[i]);
+            if (!Project_(translation + axis * gizmoLength, end)) continue;
             const float dist = PointSegmentDistance(p, center, end);
             if (dist < best) { best = dist; bestAxis = i; }
         }
@@ -727,14 +761,17 @@ namespace nocturne::editor
     void EditorViewportController::BeginGizmoDrag_(int axis, POINT mouse)
     {
         if (axis < 0 || axis > 2 || selectedIndex_ < 0) return;
+        const noc::TransformComponent* transform = ValidationTransform_(selectedIndex_);
+        if (!transform)
+            return;
+
         gizmoDragging_ = true;
         gizmoAxis_ = axis;
         dragObjectIndex_ = selectedIndex_;
         dragStartMouse_ = mouse;
-        const ValidationObject& object = validationObjects_[dragObjectIndex_];
-        dragStartT_ = object.t;
-        dragStartR_ = object.r;
-        dragStartS_ = object.s;
+        dragStartT_ = transform->localTranslation;
+        dragStartR_ = transform->localRotation;
+        dragStartS_ = transform->localScale;
         SetCapture(renderHost_);
         if (overlay_) InvalidateRect(overlay_, nullptr, FALSE);
     }
@@ -744,7 +781,12 @@ namespace nocturne::editor
         if (!gizmoDragging_ || !engine_ || gizmoAxis_ < 0 || dragObjectIndex_ < 0 || dragObjectIndex_ >= kValidationObjectCount)
             return;
 
-        ValidationObject& object = validationObjects_[dragObjectIndex_];
+        const ValidationObject& object = validationObjects_[dragObjectIndex_];
+
+        noc::Vec3 newTranslation = dragStartT_;
+        noc::Quat newRotation = dragStartR_;
+        noc::Vec3 newScale = dragStartS_;
+
         const noc::Vec3 unit[3] = { {1,0,0},{0,1,0},{0,0,1} };
         const noc::Vec3 axisWorld = noc::Rotate(dragStartR_, unit[gizmoAxis_]);
         const float gizmoLength = GizmoWorldLength(renderHost_, cameraPos_, cameraRot_, fovY_, dragStartT_);
@@ -781,7 +823,7 @@ namespace nocturne::editor
                     angle = -angle;
             }
 
-            object.r = NormalizeQuat(MulQuat(AxisAngle(axisWorld, angle), dragStartR_));
+            newRotation = NormalizeQuat(MulQuat(AxisAngle(axisWorld, angle), dragStartR_));
         }
         else
         {
@@ -797,12 +839,11 @@ namespace nocturne::editor
             if (tool == kMoveTool)
             {
                 const float worldDelta = (signedPixels / len) * gizmoLength;
-                object.t = dragStartT_ + axisWorld * worldDelta;
+                newTranslation = dragStartT_ + axisWorld * worldDelta;
             }
             else if (tool == kScaleTool)
             {
-                object.s = dragStartS_;
-                float* component = gizmoAxis_ == 0 ? &object.s.x : (gizmoAxis_ == 1 ? &object.s.y : &object.s.z);
+                float* component = gizmoAxis_ == 0 ? &newScale.x : (gizmoAxis_ == 1 ? &newScale.y : &newScale.z);
                 const float start = gizmoAxis_ == 0 ? dragStartS_.x : (gizmoAxis_ == 1 ? dragStartS_.y : dragStartS_.z);
                 const float reference = (std::max)(std::fabs(start), 0.25f);
                 *component = (std::max)(0.05f, start + (signedPixels / len) * reference);
@@ -815,9 +856,9 @@ namespace nocturne::editor
 
         if (!engine_->GetWorld().SetLocalTRS(
                 object.handle,
-                object.t,
-                object.r,
-                object.s))
+                newTranslation,
+                newRotation,
+                newScale))
         {
             NOC_LOG_WARN(
                 "Editor",
@@ -943,13 +984,19 @@ namespace nocturne::editor
         if (tool != kMoveTool && tool != kRotateTool && tool != kScaleTool)
             return;
 
-        const ValidationObject& object = validationObjects_[selectedIndex_];
+        const noc::TransformComponent* transform = ValidationTransform_(selectedIndex_);
+        if (!transform)
+            return;
+
+        const noc::Vec3& translation = transform->localTranslation;
+        const noc::Quat& rotation = transform->localRotation;
+
         const noc::Vec3 axes[3] = { {1,0,0},{0,1,0},{0,0,1} };
         const COLORREF colors[3] = { RGB(224,75,75), RGB(74,207,112), RGB(73,139,239) };
         constexpr COLORREF highlight = RGB(255,236,130);
-        const float gizmoLength = GizmoWorldLength(renderHost_, cameraPos_, cameraRot_, fovY_, object.t);
+        const float gizmoLength = GizmoWorldLength(renderHost_, cameraPos_, cameraRot_, fovY_, translation);
         POINT center{};
-        if (!Project_(object.t, center))
+        if (!Project_(translation, center))
             return;
 
         if (tool == kRotateTool)
@@ -968,7 +1015,7 @@ namespace nocturne::editor
                     const float angle = kTwoPi * float(segment) / float(kGizmoRingSegments);
                     const noc::Vec3 local = GizmoRingLocalPoint(axis, angle);
                     POINT current{};
-                    const bool currentValid = Project_(object.t + noc::Rotate(object.r, local) * gizmoLength, current);
+                    const bool currentValid = Project_(translation + noc::Rotate(rotation, local) * gizmoLength, current);
                     if (currentValid && previousValid)
                     {
                         MoveToEx(dc, previous.x, previous.y, nullptr);
@@ -986,7 +1033,7 @@ namespace nocturne::editor
         for (int i = 0; i < 3; ++i)
         {
             POINT end{};
-            if (!Project_(object.t + noc::Rotate(object.r, axes[i]) * gizmoLength, end)) continue;
+            if (!Project_(translation + noc::Rotate(rotation, axes[i]) * gizmoLength, end)) continue;
             const bool active = gizmoAxis_ == i;
             const COLORREF color = active ? highlight : colors[i];
             DrawLine(dc, center, end, color, active ? 4 : 3);
@@ -1026,18 +1073,62 @@ namespace nocturne::editor
             bool expanded;
         };
 
+        auto runtimeName = [&](noc::EntityHandle entity, const wchar_t* fallback) -> std::wstring
+        {
+            if (!engine_)
+                return fallback;
+
+            const noc::NameComponent* name = engine_->GetWorld().GetName(entity);
+            if (!name || name->value[0] == '\0')
+                return fallback;
+
+            const int required = MultiByteToWideChar(
+                CP_UTF8,
+                MB_ERR_INVALID_CHARS,
+                name->value,
+                -1,
+                nullptr,
+                0);
+
+            if (required <= 1)
+                return fallback;
+
+            std::wstring result(static_cast<size_t>(required), L'\0');
+            if (MultiByteToWideChar(
+                    CP_UTF8,
+                    MB_ERR_INVALID_CHARS,
+                    name->value,
+                    -1,
+                    result.data(),
+                    required) <= 0)
+            {
+                return fallback;
+            }
+
+            result.resize(static_cast<size_t>(required - 1));
+            return result;
+        };
+
+        std::wstring validationNames[kValidationObjectCount] = {
+            runtimeName(validationObjects_[0].handle, L"Cube_A"),
+            runtimeName(validationObjects_[1].handle, L"Cube_B"),
+            runtimeName(validationObjects_[2].handle, L"Cube_C"),
+            runtimeName(validationObjects_[3].handle, L"Ground")
+        };
+        const std::wstring cameraName = runtimeName(cameraObject_, L"Main Camera");
+
         std::vector<Row> rows;
         rows.reserve(8);
         rows.push_back({ L"Scene (Runtime World)", 0, EditorIconId::World, true, true });
         rows.push_back({ L"Runtime Objects (4)", 1, EditorIconId::Folder, true, hierarchyObjectsExpanded_ });
         if (hierarchyObjectsExpanded_)
         {
-            rows.push_back({ L"Cube_A", 2, EditorIconId::Cube, false, true });
-            rows.push_back({ L"Cube_B", 2, EditorIconId::Cube, false, true });
-            rows.push_back({ L"Cube_C", 2, EditorIconId::Cube, false, true });
-            rows.push_back({ L"Ground_Plane", 2, EditorIconId::Grid, false, true });
+            rows.push_back({ validationNames[0].c_str(), 2, EditorIconId::Cube, false, true });
+            rows.push_back({ validationNames[1].c_str(), 2, EditorIconId::Cube, false, true });
+            rows.push_back({ validationNames[2].c_str(), 2, EditorIconId::Cube, false, true });
+            rows.push_back({ validationNames[3].c_str(), 2, EditorIconId::Grid, false, true });
         }
-        rows.push_back({ L"Main Camera", 1, EditorIconId::Camera, false, true });
+        rows.push_back({ cameraName.c_str(), 1, EditorIconId::Camera, false, true });
         rows.push_back({ L"Environment (Procedural Sky)", 1, EditorIconId::World, false, true });
 
         int y = 0;
