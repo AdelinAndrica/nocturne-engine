@@ -242,6 +242,71 @@ namespace nocturne::editor
         return true;
     }
 
+    bool SetReflectedPropertyCommand::InitExplicit(
+        EditorCommandContext& context,
+        noc::EntityHandle entity,
+        noc::TypeId componentTypeId,
+        noc::PropertyId propertyId,
+        noc::ReflectedConstValueView oldValue,
+        noc::ReflectedConstValueView newValue)
+    {
+        if (entity_.IsValid()
+            || !context.world.IsAlive(entity)
+            || !oldValue.IsValid()
+            || !newValue.IsValid()
+            || oldValue.typeId != newValue.typeId)
+        {
+            return false;
+        }
+
+        const noc::TypeMetadata* componentType =
+            context.reflection.FindType(componentTypeId);
+        const noc::PropertyMetadata* property =
+            context.reflection.FindProperty(
+                componentTypeId,
+                propertyId);
+        const noc::TypeMetadata* valueType =
+            context.reflection.FindType(newValue.typeId);
+
+        if (!componentType
+            || componentType->kind != noc::TypeKind::Component
+            || !componentType->componentMetadata
+            || !property
+            || !valueType
+            || property->valueTypeId != newValue.typeId
+            || noc::HasFlag(
+                property->flags,
+                noc::PropertyFlags::ReadOnly)
+            || !componentType->componentMetadata->has(
+                context.world,
+                entity))
+        {
+            return false;
+        }
+
+        if (!oldValue_.InitCopy(
+                context.allocator,
+                *valueType,
+                oldValue.data))
+        {
+            return false;
+        }
+
+        if (!newValue_.InitCopy(
+                context.allocator,
+                *valueType,
+                newValue.data))
+        {
+            oldValue_.Clear();
+            return false;
+        }
+
+        entity_ = entity;
+        componentTypeId_ = componentTypeId;
+        propertyId_ = propertyId;
+        return true;
+    }
+
     const char* SetReflectedPropertyCommand::Label() const noexcept
     {
         return "Set Property";

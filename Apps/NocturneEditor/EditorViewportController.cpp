@@ -1,10 +1,13 @@
 #include "EditorViewportController.h"
 #include "EditorSession.h"
+#include "EditorCommands.h"
 
 #include "EditorShellV3.h"
 
 #include <algorithm>
 #include <cmath>
+#include <memory>
+#include <new>
 
 #include <CommCtrl.h>
 #include <Windowsx.h>
@@ -12,6 +15,8 @@
 #include "Core/Clock.h"
 #include "Core/Log.h"
 #include "Runtime/Engine.h"
+#include "Runtime/Components/TransformComponent.h"
+#include "Runtime/Reflection/BuiltinTypes.h"
 #include "Resources/ResourceManager.h"
 
 namespace nocturne::editor
@@ -778,6 +783,7 @@ namespace nocturne::editor
 
         gizmoDragging_ = true;
         gizmoAxis_ = axis;
+        dragToolId_ = ActiveTool_();
         dragEntity_ = selected;
         dragStartMouse_ = mouse;
         dragStartT_ = transform->localTranslation;
@@ -805,7 +811,7 @@ namespace nocturne::editor
         const noc::Vec3 unit[3] = { {1,0,0},{0,1,0},{0,0,1} };
         const noc::Vec3 axisWorld = noc::Rotate(dragStartR_, unit[gizmoAxis_]);
         const float gizmoLength = GizmoWorldLength(renderHost_, cameraPos_, cameraRot_, fovY_, dragStartT_);
-        const int tool = ActiveTool_();
+        const int tool = dragToolId_;
 
         if (tool == kRotateTool)
         {
@@ -890,12 +896,133 @@ namespace nocturne::editor
 
     void EditorViewportController::EndGizmoDrag_()
     {
-        if (!gizmoDragging_) return;
+        if (!gizmoDragging_)
+            return;
+
+        const noc::EntityHandle entity = dragEntity_;
+        const int completedTool = dragToolId_;
+
         gizmoDragging_ = false;
         gizmoAxis_ = -1;
+        dragToolId_ = 0;
         dragEntity_ = noc::EntityHandle::Invalid();
-        if (GetCapture() == renderHost_) ReleaseCapture();
-        if (overlay_) InvalidateRect(overlay_, nullptr, FALSE);
+
+        if (GetCapture() == renderHost_)
+            ReleaseCapture();
+
+        bool recorded = false;
+
+        if (engine_
+            && session_
+            && entity.IsValid()
+            && engine_->GetWorld().IsAlive(entity))
+        {
+            const noc::TransformComponent* finalTransform =
+                engine_->GetWorld().GetTransform(entity);
+
+            if (finalTransform)
+            {
+                noc::PropertyId propertyId{};
+                noc::TypeId valueType{};
+                const void* oldValue = nullptr;
+                const void* newValue = nullptr;
+                bool changed = false;
+
+                if (completedTool == kMoveTool)
+                {
+                    propertyId = noc::MakePropertyId(
+                        "Nocturne.Transform.localTranslation");
+                    valueType = noc::BuiltinTypeIds::Vec3;
+                    oldValue = &dragStartT_;
+                    newValue = &finalTransform->localTranslation;
+                    changed =
+                        dragStartT_.x != finalTransform->localTranslation.x
+                        || dragStartT_.y != finalTransform->localTranslation.y
+                        || dragStartT_.z != finalTransform->localTranslation.z;
+                }
+                else if (completedTool == kRotateTool)
+                {
+                    propertyId = noc::MakePropertyId(
+                        "Nocturne.Transform.localRotation");
+                    valueType = noc::BuiltinTypeIds::Quat;
+                    oldValue = &dragStartR_;
+                    newValue = &finalTransform->localRotation;
+                    changed =
+                        dragStartR_.x != finalTransform->localRotation.x
+                        || dragStartR_.y != finalTransform->localRotation.y
+                        || dragStartR_.z != finalTransform->localRotation.z
+                        || dragStartR_.w != finalTransform->localRotation.w;
+                }
+                else if (completedTool == kScaleTool)
+                {
+                    propertyId = noc::MakePropertyId(
+                        "Nocturne.Transform.localScale");
+                    valueType = noc::BuiltinTypeIds::Vec3;
+                    oldValue = &dragStartS_;
+                    newValue = &finalTransform->localScale;
+                    changed =
+                        dragStartS_.x != finalTransform->localScale.x
+                        || dragStartS_.y != finalTransform->localScale.y
+                        || dragStartS_.z != finalTransform->localScale.z;
+                }
+
+                if (changed && propertyId.IsValid())
+                {
+                    auto context = session_->CommandContext();
+
+                    try
+                    {
+                        auto command =
+                            std::make_unique<
+                                SetReflectedPropertyCommand>();
+
+                        if (command->InitExplicit(
+                                context,
+                                entity,
+                                noc::TypeId{
+                                    noc::kTransformComponentTypeId.value },
+                                propertyId,
+                                noc::ReflectedConstValueView{
+                                    valueType,
+                                    oldValue },
+                                noc::ReflectedConstValueView{
+                                    valueType,
+                                    newValue }))
+                        {
+                            recorded =
+                                session_->History().RecordExecuted(
+                                    context,
+                                    std::move(command));
+                        }
+                    }
+                    catch (const std::bad_alloc&)
+                    {
+                        recorded = false;
+                    }
+
+                    if (!recorded)
+                    {
+                        // Init/allocation failure happened before history could
+                        // own the command. Restore the full semantic baseline.
+                        (void)engine_->GetWorld().SetLocalTRS(
+                            entity,
+                            dragStartT_,
+                            dragStartR_,
+                            dragStartS_);
+                        engine_->GetWorld().Update();
+                    }
+                    else
+                    {
+                        session_->SetSceneDirty();
+                    }
+                }
+            }
+        }
+
+        RefreshDebugSelection_();
+
+        if (overlay_)
+            InvalidateRect(overlay_, nullptr, FALSE);
     }
 
     void EditorViewportController::HandleViewportMouse_(UINT msg, WPARAM wParam, LPARAM lParam)
@@ -983,10 +1110,7 @@ namespace nocturne::editor
             cameraCapturing_ = false;
             pendingMouseDx_ = 0;
             pendingMouseDy_ = 0;
-            gizmoDragging_ = false;
-            gizmoAxis_ = -1;
-            dragEntity_ = noc::EntityHandle::Invalid();
-            if (overlay_) InvalidateRect(overlay_, nullptr, FALSE);
+            EndGizmoDrag_();
             break;
         }
     }

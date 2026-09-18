@@ -50,6 +50,46 @@ namespace nocturne::editor
         return true;
     }
 
+    bool EditorCommandHistory::RecordExecuted(
+        EditorCommandContext& context,
+        std::unique_ptr<IEditorCommand> command)
+    {
+        if (!command || maxCommandCount_ == 0 || maxBytes_ == 0)
+        {
+            if (command)
+                (void)command->Undo(context);
+            return false;
+        }
+
+        const std::size_t cost = command->MemoryCostBytes();
+        if (cost == 0 || cost > maxBytes_)
+        {
+            (void)command->Undo(context);
+            return false;
+        }
+
+        try
+        {
+            if (commands_.capacity() < commands_.size() + 1u)
+                commands_.reserve(commands_.size() + 1u);
+        }
+        catch (const std::bad_alloc&)
+        {
+            (void)command->Undo(context);
+            return false;
+        }
+
+        DiscardRedoTail_();
+
+        usedBytes_ += cost;
+        commands_.push_back(std::move(command));
+        cursor_ = static_cast<uint32_t>(commands_.size());
+
+        EnforceBudget_();
+        ++version_;
+        return true;
+    }
+
     bool EditorCommandHistory::Undo(EditorCommandContext& context)
     {
         if (!CanUndo())

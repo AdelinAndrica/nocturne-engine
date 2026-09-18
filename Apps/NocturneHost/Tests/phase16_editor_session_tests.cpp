@@ -269,6 +269,68 @@ bool RunPhase16EditorSessionTests()
             "Command-created entity cleanup failed");
     }
 
+    {
+        session.History().Clear();
+
+        const noc::TransformComponent* before =
+            world.GetTransform(authored);
+        const noc::Vec3 liveOld =
+            before ? before->localTranslation : noc::Vec3::Zero();
+        const noc::Vec3 liveNew{ 14.0f, 3.0f, -2.0f };
+
+        ok &= CheckEditorSession(
+            world.SetLocalTRS(
+                authored,
+                liveNew,
+                before->localRotation,
+                before->localScale),
+            "Live transaction setup mutation failed");
+
+        auto liveCommand =
+            std::make_unique<
+                nocturne::editor::SetReflectedPropertyCommand>();
+
+        ok &= CheckEditorSession(
+            liveCommand->InitExplicit(
+                context,
+                authored,
+                noc::TypeId{
+                    noc::kTransformComponentTypeId.value },
+                noc::MakePropertyId(
+                    "Nocturne.Transform.localTranslation"),
+                noc::ReflectedConstValueView{
+                    noc::BuiltinTypeIds::Vec3,
+                    &liveOld },
+                noc::ReflectedConstValueView{
+                    noc::BuiltinTypeIds::Vec3,
+                    &liveNew }),
+            "Explicit live property command init failed");
+
+        ok &= CheckEditorSession(
+            session.History().RecordExecuted(
+                context,
+                std::move(liveCommand))
+                && session.History().CommandCount() == 1
+                && world.GetTransform(authored)
+                && world.GetTransform(authored)->localTranslation.x
+                    == liveNew.x,
+            "Live transaction was not recorded as one history entry");
+
+        ok &= CheckEditorSession(
+            session.History().Undo(context)
+                && world.GetTransform(authored)
+                && world.GetTransform(authored)->localTranslation.x
+                    == liveOld.x,
+            "Recorded live transaction undo failed");
+
+        ok &= CheckEditorSession(
+            session.History().Redo(context)
+                && world.GetTransform(authored)
+                && world.GetTransform(authored)->localTranslation.x
+                    == liveNew.x,
+            "Recorded live transaction redo failed");
+    }
+
     // Failed commands must not enter history.
     const uint32_t historyCountBeforeFailure =
         session.History().CommandCount();

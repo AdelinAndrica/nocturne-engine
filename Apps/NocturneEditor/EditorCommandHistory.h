@@ -56,6 +56,13 @@ namespace nocturne::editor
             EditorCommandContext& context,
             std::unique_ptr<IEditorCommand> command);
 
+        // Adopts a command whose final state is already live (for example a
+        // gizmo drag). Failure rolls the command back through Undo so runtime
+        // state cannot diverge from history ownership.
+        [[nodiscard]] bool RecordExecuted(
+            EditorCommandContext& context,
+            std::unique_ptr<IEditorCommand> command);
+
         [[nodiscard]] bool Undo(EditorCommandContext& context);
         [[nodiscard]] bool Redo(EditorCommandContext& context);
 

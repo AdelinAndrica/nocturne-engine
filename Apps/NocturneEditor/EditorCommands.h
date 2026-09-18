@@ -80,6 +80,17 @@ namespace nocturne::editor
             noc::PropertyId propertyId,
             noc::ReflectedConstValueView newValue);
 
+        // Used by live editor transactions (gizmo/text drag): both endpoints
+        // are already known, so no component pointer or mutable baseline is
+        // retained.
+        [[nodiscard]] bool InitExplicit(
+            EditorCommandContext& context,
+            noc::EntityHandle entity,
+            noc::TypeId componentTypeId,
+            noc::PropertyId propertyId,
+            noc::ReflectedConstValueView oldValue,
+            noc::ReflectedConstValueView newValue);
+
         [[nodiscard]] const char* Label() const noexcept override;
         [[nodiscard]] std::size_t MemoryCostBytes() const noexcept override;
 

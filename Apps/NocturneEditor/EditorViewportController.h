@@ -87,6 +87,7 @@ namespace nocturne::editor
         bool gizmoDragging_ = false;
         noc::EntityHandle dragEntity_{};
         int gizmoAxis_ = -1;
+        int dragToolId_ = 0;
 
         POINT lastMouse_{};
         POINT dragStartMouse_{};
