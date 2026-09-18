@@ -71,7 +71,7 @@
 - [ ] Documentăm Editor Session.
 - [ ] Documentăm selection model.
 - [ ] Documentăm command/history model.
-- [ ] Documentăm transaction semantics.
+- [x] Documentăm transaction semantics.
 - [ ] Documentăm snapshot semantics.
 - [ ] Documentăm authored vs tool-owned entities.
 - [ ] Documentăm hierarchy enumeration.
@@ -292,7 +292,7 @@ Reflection milestone:
 - [ ] Session deține transform orientation.
 - [ ] Session deține command history.
 - [ ] Session deține scene dirty state dacă este adoptat.
-- [ ] Session deține transient transaction state.
+- [x] Session deține transient transaction state.
 - [ ] Session cunoaște tool-owned entities.
 - [ ] Session nu deține copii autoritare ale componentelor.
 - [ ] Session lifecycle este explicit Init/Shutdown.
@@ -576,19 +576,19 @@ Grounding: Nystrom — Command / Undo and Redo.
 
 # 17. Transactions / compound commands
 
-- [ ] Transaction begin.
-- [ ] Transaction append.
-- [ ] Transaction commit.
-- [ ] Transaction cancel.
-- [ ] Nested transaction policy explicit.
-- [ ] Compound command order.
-- [ ] Undo reverse order.
-- [ ] Execute failure rollback.
-- [ ] Rollback failure diagnostic/assert policy.
-- [ ] Gizmo uses transaction/coalescing.
+- [x] Transaction begin.
+- [x] Transaction append.
+- [x] Transaction commit.
+- [x] Transaction cancel.
+- [x] Nested transaction policy explicit.
+- [x] Compound command order.
+- [x] Undo reverse order.
+- [x] Execute failure rollback.
+- [x] Rollback failure diagnostic/assert policy.
+- [x] Gizmo uses transaction/coalescing.
 - [ ] Multi-field Inspector edit can group where UX requires.
-- [ ] Delete subtree uses one logical command.
-- [ ] Duplicate subtree uses one logical command.
+- [x] Delete subtree uses one logical command.
+- [x] Duplicate subtree uses one logical command.
 
 ---
 
@@ -868,7 +868,7 @@ Dacă nu este implementat:
 - [x] Create.
 - [x] Rename.
 - [x] Duplicate.
-- [ ] Delete.
+- [x] Delete.
 - [x] Reparent/unparent where appropriate.
 - [x] Add Component location policy.
 - [x] Disabled states.
@@ -899,7 +899,7 @@ Dacă nu este implementat:
 - [ ] history budget failure.
 - [ ] compound rollback failure.
 - [ ] editor tool camera misuse.
-- [ ] shutdown with active transaction.
+- [x] shutdown with active transaction.
 
 Fiecare caz are:
 - [ ] return/result policy.

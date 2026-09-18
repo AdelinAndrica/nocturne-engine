@@ -303,6 +303,73 @@ namespace
         bool failUndo_ = false;
         bool failRedo_ = false;
     };
+
+    class SequenceProbeCommand final
+        : public nocturne::editor::IEditorCommand
+    {
+    public:
+        SequenceProbeCommand(
+            int& value,
+            int digit,
+            bool failExecute = false) noexcept
+            : value_(&value)
+            , digit_(digit)
+            , failExecute_(failExecute)
+        {
+        }
+
+        [[nodiscard]] const char* Label() const noexcept override
+        {
+            return "Sequence Probe";
+        }
+
+        [[nodiscard]] std::size_t MemoryCostBytes() const noexcept override
+        {
+            return sizeof(SequenceProbeCommand);
+        }
+
+        [[nodiscard]] bool Execute(
+            nocturne::editor::EditorCommandContext&) override
+        {
+            if (!value_ || failExecute_ || applied_)
+                return false;
+
+            before_ = *value_;
+            *value_ = (*value_ * 10) + digit_;
+            applied_ = true;
+            return true;
+        }
+
+        [[nodiscard]] bool Undo(
+            nocturne::editor::EditorCommandContext&) override
+        {
+            if (!value_ || !applied_)
+                return false;
+
+            *value_ = before_;
+            applied_ = false;
+            return true;
+        }
+
+        [[nodiscard]] bool Redo(
+            nocturne::editor::EditorCommandContext&) override
+        {
+            if (!value_ || applied_)
+                return false;
+
+            before_ = *value_;
+            *value_ = (*value_ * 10) + digit_;
+            applied_ = true;
+            return true;
+        }
+
+    private:
+        int* value_ = nullptr;
+        int digit_ = 0;
+        int before_ = 0;
+        bool failExecute_ = false;
+        bool applied_ = false;
+    };
 }
 
 bool RunPhase16EditorSessionTests()
@@ -425,6 +492,93 @@ bool RunPhase16EditorSessionTests()
 
     nocturne::editor::EditorCommandContext context =
         session.CommandContext();
+
+    {
+        int sequenceValue = 0;
+
+        session.History().Clear();
+
+        ok &= CheckEditorSession(
+            session.BeginTransaction(
+                "Compound Sequence")
+                && session.HasActiveTransaction()
+                && !session.BeginTransaction(
+                    "Nested Transaction"),
+            "Transaction begin/nested policy failed");
+
+        ok &= CheckEditorSession(
+            session.AppendTransactionCommand(
+                std::make_unique<SequenceProbeCommand>(
+                    sequenceValue,
+                    1))
+                && session.AppendTransactionCommand(
+                    std::make_unique<SequenceProbeCommand>(
+                        sequenceValue,
+                        2))
+                && session.ActiveTransactionCommandCount() == 2
+                && sequenceValue == 0,
+            "Transaction append mutated World/probe before commit");
+
+        ok &= CheckEditorSession(
+            session.CommitTransaction()
+                && !session.HasActiveTransaction()
+                && sequenceValue == 12
+                && session.History().CommandCount() == 1
+                && session.History().Cursor() == 1
+                && session.History().UndoLabel()
+                && std::strcmp(
+                    session.History().UndoLabel(),
+                    "Compound Sequence") == 0,
+            "Transaction commit/compound execution order failed");
+
+        ok &= CheckEditorSession(
+            session.History().Undo(context)
+                && sequenceValue == 0
+                && session.History().Redo(context)
+                && sequenceValue == 12,
+            "Compound reverse undo/forward redo order failed");
+
+        session.History().Clear();
+        sequenceValue = 0;
+
+        ok &= CheckEditorSession(
+            session.BeginTransaction(
+                "Cancelled Transaction")
+                && session.AppendTransactionCommand(
+                    std::make_unique<SequenceProbeCommand>(
+                        sequenceValue,
+                        7)),
+            "Transaction cancel setup failed");
+
+        session.CancelTransaction();
+
+        ok &= CheckEditorSession(
+            !session.HasActiveTransaction()
+                && sequenceValue == 0
+                && session.History().CommandCount() == 0,
+            "Transaction cancel executed or retained pending commands");
+
+        ok &= CheckEditorSession(
+            session.BeginTransaction(
+                "Rollback Transaction")
+                && session.AppendTransactionCommand(
+                    std::make_unique<SequenceProbeCommand>(
+                        sequenceValue,
+                        4))
+                && session.AppendTransactionCommand(
+                    std::make_unique<SequenceProbeCommand>(
+                        sequenceValue,
+                        9,
+                        true))
+                && !session.CommitTransaction()
+                && !session.HasActiveTransaction()
+                && sequenceValue == 0
+                && session.History().CommandCount() == 0
+                && session.History().Cursor() == 0,
+            "Compound execute failure did not rollback atomically");
+
+        session.History().Clear();
+    }
 
     {
         int probeValue = 0;
@@ -1900,6 +2054,34 @@ bool RunPhase16EditorSessionTests()
     ok &= CheckEditorSession(
         world.DestroyEntity(camera),
         "Tool-camera cleanup failed");
+
+    {
+        nocturne::editor::EditorSession shutdownSession;
+        int pendingValue = 0;
+
+        ok &= CheckEditorSession(
+            shutdownSession.Init(
+                world,
+                reflection,
+                allocator,
+                8,
+                4096)
+                && shutdownSession.BeginTransaction(
+                    "Shutdown Pending")
+                && shutdownSession.AppendTransactionCommand(
+                    std::make_unique<SequenceProbeCommand>(
+                        pendingValue,
+                        8)),
+            "Active-transaction shutdown setup failed");
+
+        shutdownSession.Shutdown();
+
+        ok &= CheckEditorSession(
+            !shutdownSession.IsInitialized()
+                && !shutdownSession.HasActiveTransaction()
+                && pendingValue == 0,
+            "Shutdown did not cancel deferred active transaction");
+    }
 
     gEnumDrawerStore = {};
     session.Shutdown();

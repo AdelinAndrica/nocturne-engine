@@ -316,10 +316,10 @@ Keyboard shortcuts, Actor menu actions, hierarchy drag/drop and hierarchy contex
 
 | Completion requirement | Current status |
 |---|---|
-| General Transaction / CompoundCommand system | OPEN — gizmo coalescing exists, but no reusable begin/append/commit/cancel/rollback abstraction |
-| EditorSession-owned active transient transaction | OPEN |
-| Nested transaction policy | OPEN |
-| Generic compound rollback semantics | OPEN |
+| General Transaction / CompoundCommand system | IMPLEMENTED — deferred Begin/Append/Commit/Cancel builder over CompoundEditorCommand |
+| EditorSession-owned active transient transaction | IMPLEMENTED |
+| Nested transaction policy | IMPLEMENTED — nested Begin is rejected |
+| Generic compound rollback semantics | IMPLEMENTED — execute/redo compensate prior children; failed undo restores already-undone suffix when possible |
 | Required-component policy | PARTIAL — mechanism exists, but foundation required-component case/policy still needs closure |
 | Full editor performance baseline | OPEN |
 | 10k hierarchy stress gate | OPEN |
@@ -343,26 +343,26 @@ Keyboard shortcuts, Actor menu actions, hierarchy drag/drop and hierarchy contex
 
 ## 11. Remaining structural work in detail
 
-### 10.1 Transaction / CompoundCommand
+### 11.1 Transaction / CompoundCommand — IMPLEMENTED
 
-The most visible structural gap is a reusable general transaction layer.
+**Design choice (not directly from the book):** EditorSession owns one deferred transaction builder. Nested Begin is rejected. Append only records child commands and does not mutate World. Commit moves the resulting CompoundEditorCommand through the same EditorCommandHistory::Execute path; Cancel discards the pending transaction.
 
-Still required:
+Compound semantics:
 
-- begin;
-- append;
-- commit;
-- cancel;
-- nested transaction policy;
-- ordered apply;
-- reverse-order undo;
-- execute failure rollback;
-- rollback failure diagnostics;
-- EditorSession ownership of active transient transaction.
+- execute children in append order;
+- undo children in reverse order;
+- redo children in append order;
+- execute/redo failure compensates already-applied children in reverse;
+- failed undo attempts to restore children that were already undone during that attempt;
+- compensation failure emits an EditorHistory error diagnostic and marks the compound rollback-failed;
+- commit is rejected if history changed after Begin, preventing an interleaved raw-history mutation from silently changing transaction ordering;
+- shutdown/reset cancel any deferred active transaction before history/runtime teardown.
 
-The current gizmo RecordExecuted path is useful behavior but is not a replacement for the general contract.
+Automated editor-session tests cover begin, append, nested-begin rejection, commit as one history entry, execution order, reverse undo, redo, cancel, execute-failure rollback and shutdown with an active deferred transaction.
 
-### 10.2 Editor stress/performance
+The existing gizmo preview remains the contract-approved coalescing exception: preview state is transient and a completed drag records one SetTransformTRSCommand rather than one command per mouse event.
+
+### 11.2 Editor stress/performance
 
 Reflection has a baseline. The broader editor still needs measurements for:
 
@@ -382,7 +382,7 @@ Reflection has a baseline. The broader editor still needs measurements for:
 
 Timings should be observations first; correctness/leak/allocation invariants remain hard gates.
 
-### 10.3 Completion test matrices
+### 11.3 Completion test matrices
 
 Hierarchy still needs explicit coverage for empty/one/many/deep/wide trees, expand/collapse, duplicate names, stale rows, deterministic generation and 10k stress.
 
@@ -390,13 +390,13 @@ Inspector still needs consolidated coverage for no/stale selection, structural m
 
 Gizmo still needs the complete Local/World/parent/non-uniform/cancel/capture-loss/tool-switch evidence matrix.
 
-### 10.4 Prefab prototype seam
+### 11.4 Prefab prototype seam
 
 ReflectedEntitySubtreeSnapshot already supplies much of the transient capture/instantiate mechanism.
 
 Phase 16 should make the prototype seam explicit without introducing prefab persistence, prefab files, persistent IDs or serialized references. Durable representation belongs to the appropriate later persistence/prefab phase.
 
-### 10.5 Manual regression and soak
+### 11.5 Manual regression and soak
 
 Before completion, validate the preserved editor baseline plus new authoring operations:
 
@@ -456,20 +456,18 @@ e7144560 — phase16: cover editor history failure and budget semantics
 
 ## 13. Recommended next implementation order
 
-1. Implement reusable Transaction / CompoundCommand.
-2. Add EditorSession transaction ownership and formal cancel/rollback/nested policy.
-3. Close Required-component semantics and tests.
-4. Add editor stress/performance workloads: hierarchy 100/1k/10k, history 10k, subtree 1k, Inspector refresh, representative history memory.
-5. Complete hierarchy/Inspector/gizmo negative and lifecycle test matrices.
-6. Add real-engine function reflection proof and remaining reflection performance measurements.
-7. Clarify the transient prefab-prototype seam without Phase 17 persistence.
-8. Run full manual Phase 13/14/15 regression plus 15+ minute edit-session soak.
-9. Resolve remaining in-scope repository/build hygiene.
-10. Update the Implementation Checklist with verified evidence.
-11. Produce Phase 16 Implementation Report.
-12. Produce Phase 16 Test and CI Validation Report.
-13. Produce Phase 16 Completion Report only after all completion gates pass.
-14. Write Phase 17 handoff and update roadmap.
+1. Close Required-component semantics and tests.
+2. Add editor stress/performance workloads: hierarchy 100/1k/10k, history 10k, subtree 1k, Inspector refresh, representative history memory.
+3. Complete hierarchy/Inspector/gizmo negative and lifecycle test matrices.
+4. Add real-engine function reflection proof and remaining reflection performance measurements.
+5. Clarify the transient prefab-prototype seam without Phase 17 persistence.
+6. Run full manual Phase 13/14/15 regression plus 15+ minute edit-session soak.
+7. Resolve remaining in-scope repository/build hygiene.
+8. Update the Implementation Checklist with verified evidence.
+9. Produce Phase 16 Implementation Report.
+10. Produce Phase 16 Test and CI Validation Report.
+11. Produce Phase 16 Completion Report only after all completion gates pass.
+12. Write Phase 17 handoff and update roadmap.
 
 ---
 

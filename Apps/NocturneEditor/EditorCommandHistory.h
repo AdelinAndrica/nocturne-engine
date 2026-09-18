@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace noc
@@ -46,6 +47,48 @@ namespace nocturne::editor
             EditorCommandContext& context) = 0;
         [[nodiscard]] virtual bool Redo(
             EditorCommandContext& context) = 0;
+    };
+
+    // Design choice (not directly from the book): compound commands are the
+    // transaction commit unit. Children execute in append order and undo in
+    // reverse order. Failed execute/redo attempts compensate already-applied
+    // children before returning failure so the history cursor can remain
+    // unchanged.
+    class CompoundEditorCommand final
+        : public IEditorCommand
+    {
+    public:
+        CompoundEditorCommand() = default;
+
+        CompoundEditorCommand(const CompoundEditorCommand&) = delete;
+        CompoundEditorCommand& operator=(const CompoundEditorCommand&) = delete;
+
+        [[nodiscard]] bool Init(const char* label) noexcept;
+        [[nodiscard]] bool Append(
+            std::unique_ptr<IEditorCommand> command);
+
+        [[nodiscard]] bool Empty() const noexcept;
+        [[nodiscard]] uint32_t CommandCount() const noexcept;
+        [[nodiscard]] bool HasRollbackFailure() const noexcept;
+
+        [[nodiscard]] const char* Label() const noexcept override;
+        [[nodiscard]] std::size_t MemoryCostBytes() const noexcept override;
+
+        [[nodiscard]] bool Execute(
+            EditorCommandContext& context) override;
+        [[nodiscard]] bool Undo(
+            EditorCommandContext& context) override;
+        [[nodiscard]] bool Redo(
+            EditorCommandContext& context) override;
+
+    private:
+        void ReportRollbackFailure_(
+            const char* phase) noexcept;
+
+        std::string label_;
+        std::vector<std::unique_ptr<IEditorCommand>> commands_;
+        bool applied_ = false;
+        bool rollbackFailure_ = false;
     };
 
     // Design choice (not directly from the book): editor history owns commands

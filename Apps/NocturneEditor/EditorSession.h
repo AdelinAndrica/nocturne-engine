@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 
 namespace noc
 {
@@ -74,6 +75,19 @@ namespace nocturne::editor
         // transient baseline, so selection/history/dirty state are cleared.
         [[nodiscard]] bool ResetAuthoredScene() noexcept;
 
+        // Design choice (not directly from the book): transactions are deferred
+        // compound-command builders. Append never mutates World. Commit executes
+        // the compound atomically through the same history; cancel simply drops
+        // the pending commands. Nested transactions are rejected.
+        [[nodiscard]] bool BeginTransaction(
+            const char* label) noexcept;
+        [[nodiscard]] bool AppendTransactionCommand(
+            std::unique_ptr<IEditorCommand> command);
+        [[nodiscard]] bool CommitTransaction();
+        void CancelTransaction() noexcept;
+        [[nodiscard]] bool HasActiveTransaction() const noexcept;
+        [[nodiscard]] uint32_t ActiveTransactionCommandCount() const noexcept;
+
         [[nodiscard]] EditorCommandHistory& History() noexcept;
         [[nodiscard]] const EditorCommandHistory& History() const noexcept;
 
@@ -95,6 +109,8 @@ namespace nocturne::editor
         TransformOrientation orientation_ = TransformOrientation::Local;
 
         EditorCommandHistory history_;
+        std::unique_ptr<CompoundEditorCommand> activeTransaction_;
+        uint64_t transactionHistoryVersion_ = 0;
         bool sceneDirty_ = false;
         uint64_t stateVersion_ = 0;
     };

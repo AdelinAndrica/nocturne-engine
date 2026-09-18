@@ -29,6 +29,8 @@ namespace nocturne::editor
         reflection_ = &reflection;
         allocator_ = &allocator;
         history_.Configure(historyMaxCount, historyMaxBytes);
+        activeTransaction_.reset();
+        transactionHistoryVersion_ = 0;
         selected_ = noc::EntityHandle::Invalid();
         toolCamera_ = noc::EntityHandle::Invalid();
         activeTool_ = EditorTool::Select;
@@ -43,9 +45,10 @@ namespace nocturne::editor
         if (!IsInitialized())
             return;
 
-        // Commands own value snapshots, never component pointers. Clearing
-        // history before releasing World/Reflection references makes shutdown
-        // order explicit and deterministic.
+        // Commands own value snapshots, never component pointers. Pending
+        // transactions are deferred and therefore can be cancelled without
+        // touching World. Clear them before history and runtime references.
+        CancelTransaction();
         history_.Clear();
         selected_ = noc::EntityHandle::Invalid();
         toolCamera_ = noc::EntityHandle::Invalid();
@@ -199,6 +202,7 @@ namespace nocturne::editor
         if (!IsInitialized())
             return false;
 
+        CancelTransaction();
         selected_ = noc::EntityHandle::Invalid();
 
         const uint32_t capacity =
@@ -225,6 +229,108 @@ namespace nocturne::editor
         sceneDirty_ = false;
         Touch_();
         return true;
+    }
+
+    bool EditorSession::BeginTransaction(
+        const char* label) noexcept
+    {
+        if (!IsInitialized()
+            || activeTransaction_
+            || !label
+            || label[0] == '\0')
+        {
+            return false;
+        }
+
+        try
+        {
+            auto transaction =
+                std::make_unique<CompoundEditorCommand>();
+
+            if (!transaction->Init(label))
+                return false;
+
+            activeTransaction_ =
+                std::move(transaction);
+        }
+        catch (const std::bad_alloc&)
+        {
+            return false;
+        }
+
+        transactionHistoryVersion_ =
+            history_.Version();
+        Touch_();
+        return true;
+    }
+
+    bool EditorSession::AppendTransactionCommand(
+        std::unique_ptr<IEditorCommand> command)
+    {
+        return IsInitialized()
+            && activeTransaction_
+            && activeTransaction_->Append(
+                std::move(command));
+    }
+
+    bool EditorSession::CommitTransaction()
+    {
+        if (!IsInitialized()
+            || !activeTransaction_)
+        {
+            return false;
+        }
+
+        if (activeTransaction_->Empty()
+            || history_.Version()
+                != transactionHistoryVersion_)
+        {
+            activeTransaction_.reset();
+            transactionHistoryVersion_ = 0;
+            Touch_();
+            return false;
+        }
+
+        std::unique_ptr<IEditorCommand> command =
+            std::move(activeTransaction_);
+        transactionHistoryVersion_ = 0;
+        Touch_();
+
+        EditorCommandContext context =
+            CommandContext();
+
+        if (!history_.Execute(
+                context,
+                std::move(command)))
+        {
+            return false;
+        }
+
+        SetSceneDirty();
+        return true;
+    }
+
+    void EditorSession::CancelTransaction() noexcept
+    {
+        if (!activeTransaction_)
+            return;
+
+        activeTransaction_.reset();
+        transactionHistoryVersion_ = 0;
+        Touch_();
+    }
+
+    bool EditorSession::HasActiveTransaction() const noexcept
+    {
+        return activeTransaction_ != nullptr;
+    }
+
+    uint32_t
+    EditorSession::ActiveTransactionCommandCount() const noexcept
+    {
+        return activeTransaction_
+            ? activeTransaction_->CommandCount()
+            : 0;
     }
 
     EditorCommandHistory& EditorSession::History() noexcept
