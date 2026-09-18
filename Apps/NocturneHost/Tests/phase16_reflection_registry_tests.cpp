@@ -1,6 +1,7 @@
 #include "Runtime/Reflection/BuiltinTypes.h"
 #include "Runtime/Reflection/ReflectionRegistry.h"
 #include "Runtime/Reflection/ReflectedValue.h"
+#include "Runtime/Reflection/PropertyAccess.h"
 
 #include "Core/Math/MathTypes.h"
 #include "Runtime/Bounds.h"
@@ -79,6 +80,41 @@ namespace
         explicit NoDefaultValue(int inValue) : value(inValue) {}
         int value = 0;
     };
+
+    struct SemanticOwner
+    {
+        int value = 0;
+    };
+
+    bool ReadSemanticInt(
+        const noc::PropertyAccessContext& context,
+        void* destination)
+    {
+        if (!context.object || !destination)
+            return false;
+        *static_cast<int*>(destination) =
+            static_cast<const SemanticOwner*>(context.object)->value;
+        return true;
+    }
+
+    bool WriteSemanticInt(
+        noc::PropertyAccessContext& context,
+        const void* source)
+    {
+        if (!context.mutableObject || !source)
+            return false;
+        static_cast<SemanticOwner*>(context.mutableObject)->value =
+            *static_cast<const int*>(source);
+        return true;
+    }
+
+    bool ValidateNonNegative(
+        const noc::PropertyAccessContext&,
+        const void* candidate)
+    {
+        return candidate
+            && *static_cast<const int*>(candidate) >= 0;
+    }
 
     enum class TestAccess : uint32_t
     {
@@ -677,6 +713,153 @@ bool RunPhase16ReflectionRegistryTests()
     ok &= CheckReflectionRegistry(
         allocator.OutstandingBytes() == 0,
         "Invalid enum Freeze path leaked allocator memory");
+
+    {
+        noc::ReflectionRegistry accessRegistry;
+        ok &= CheckReflectionRegistry(
+            accessRegistry.Init(allocator, 2),
+            "Property access registry init failed");
+
+        constexpr noc::TypeId kAccessInt{ 0x3100000000000001ull };
+        constexpr noc::TypeId kSemanticOwner{ 0x3100000000000002ull };
+
+        const noc::TypeMetadata accessInt =
+            noc::MakeTypeMetadata<int>(
+                kAccessInt,
+                "Nocturne.Tests.AccessInt",
+                noc::TypeKind::SignedInteger,
+                1);
+
+        const noc::PropertyMetadata semanticProperties[] = {
+            noc::PropertyMetadata{
+                noc::MakePropertyId(
+                    "Nocturne.Tests.SemanticOwner.value"),
+                "value",
+                kSemanticOwner,
+                kAccessInt,
+                noc::PropertyFlags::EditorVisible,
+                &ReadSemanticInt,
+                &WriteSemanticInt,
+                nullptr,
+                nullptr,
+                &ValidateNonNegative,
+                nullptr,
+                nullptr,
+                0
+            },
+            noc::PropertyMetadata{
+                noc::MakePropertyId(
+                    "Nocturne.Tests.SemanticOwner.readOnlyValue"),
+                "readOnlyValue",
+                kSemanticOwner,
+                kAccessInt,
+                noc::PropertyFlags::ReadOnly,
+                &ReadSemanticInt,
+                nullptr,
+                nullptr,
+                nullptr,
+                nullptr,
+                nullptr,
+                nullptr,
+                0
+            }
+        };
+
+        noc::TypeMetadata semanticOwnerType =
+            noc::MakeTypeMetadata<SemanticOwner>(
+                kSemanticOwner,
+                "Nocturne.Tests.SemanticOwner",
+                noc::TypeKind::Struct,
+                1);
+        semanticOwnerType.properties = semanticProperties;
+        semanticOwnerType.propertyCount = 2;
+
+        ok &= CheckReflectionRegistry(
+            accessRegistry.RegisterType(semanticOwnerType)
+                && accessRegistry.RegisterType(accessInt)
+                && accessRegistry.Freeze(),
+            "Semantic property access schema failed");
+
+        SemanticOwner semanticOwner{};
+        semanticOwner.value = 5;
+        noc::PropertyAccessContext semanticContext{};
+        semanticContext.object = &semanticOwner;
+        semanticContext.mutableObject = &semanticOwner;
+
+        const noc::PropertyMetadata* semanticValue =
+            accessRegistry.FindPropertyByName(
+                kSemanticOwner,
+                "value");
+        const noc::PropertyMetadata* readOnlyValue =
+            accessRegistry.FindPropertyByName(
+                kSemanticOwner,
+                "readOnlyValue");
+
+        noc::OwnedReflectedValue reflectedRead;
+        ok &= CheckReflectionRegistry(
+            semanticValue
+                && noc::ReadPropertyValue(
+                    accessRegistry,
+                    *semanticValue,
+                    semanticContext,
+                    allocator,
+                    reflectedRead)
+                    == noc::PropertyAccessStatus::Success
+                && *static_cast<const int*>(
+                    reflectedRead.Data()) == 5,
+            "Generic semantic property read failed");
+
+        int negative = -1;
+        ok &= CheckReflectionRegistry(
+            noc::WritePropertyValue(
+                *semanticValue,
+                semanticContext,
+                noc::ReflectedConstValueView{
+                    kAccessInt,
+                    &negative })
+                == noc::PropertyAccessStatus::ValidationFailed
+                && semanticOwner.value == 5,
+            "Semantic validation did not reject invalid value");
+
+        int positive = 12;
+        ok &= CheckReflectionRegistry(
+            noc::WritePropertyValue(
+                *semanticValue,
+                semanticContext,
+                noc::ReflectedConstValueView{
+                    kAccessInt,
+                    &positive })
+                == noc::PropertyAccessStatus::Success
+                && semanticOwner.value == 12,
+            "Generic semantic property write failed");
+
+        ok &= CheckReflectionRegistry(
+            noc::WritePropertyValue(
+                *semanticValue,
+                semanticContext,
+                noc::ReflectedConstValueView{
+                    kSemanticOwner,
+                    &positive })
+                == noc::PropertyAccessStatus::TypeMismatch,
+            "Property write did not reject mismatched TypeId");
+
+        ok &= CheckReflectionRegistry(
+            readOnlyValue
+                && noc::WritePropertyValue(
+                    *readOnlyValue,
+                    semanticContext,
+                    noc::ReflectedConstValueView{
+                        kAccessInt,
+                        &positive })
+                    == noc::PropertyAccessStatus::ReadOnly,
+            "Read-only property write was not rejected");
+
+        reflectedRead.Clear();
+        accessRegistry.Shutdown();
+        ok &= CheckReflectionRegistry(
+            allocator.OutstandingBytes() == 0,
+            "Semantic property access leaked allocator memory");
+    }
 
     {
         OwnedTestValue::liveCount = 0;
