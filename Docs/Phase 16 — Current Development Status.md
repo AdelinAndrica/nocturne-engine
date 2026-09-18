@@ -459,7 +459,30 @@ The generic Inspector model/command matrix now covers:
 
 Win32 text-control focus, Enter/focus-loss commit and Escape cancel remain intentionally assigned to the separate manual UI regression/input-routing gate; they are not properties of EditorInspectorModel.
 
-Gizmo still needs the complete Local/World/parent/non-uniform/cancel/capture-loss/tool-switch evidence matrix.
+#### Gizmo — VERIFIED / CLOSED for headless transform + lifecycle core
+
+The viewport now delegates gizmo drag state, transform previews and history commit/cancel to \`EditorGizmoDragTransaction\`, shared by production code and automated tests.
+
+Coverage includes:
+
+- Local Move;
+- World Move;
+- Local Rotate;
+- World Rotate;
+- Local Scale, including forced-Local policy when World orientation is requested;
+- parented transforms;
+- rotated parents;
+- non-uniform scaled parent World Move;
+- begin + cancel restoring original local TRS;
+- begin + commit as one history entry;
+- undo/redo;
+- no-op commit producing no history entry;
+- entity destruction during an active drag;
+- explicit termination policy: capture/focus loss commit, Escape/tool-switch/shutdown cancel;
+- tool/orientation changes invalidating an active interaction;
+- controller shutdown cancelling live preview state instead of silently dropping it.
+
+Win32 hit-testing and OS delivery of mouse/capture/focus messages remain part of manual UI regression, but production termination routing now resolves those events through the tested policy seam.
 
 ### 11.5 Prefab prototype seam
 
@@ -527,8 +550,7 @@ e7144560 — phase16: cover editor history failure and budget semantics
 
 ## 13. Recommended next implementation order
 
-1. Complete gizmo negative/lifecycle test matrix.
-2. Add real-engine function reflection proof and remaining reflection performance measurements.
+1. Add real-engine function reflection proof and remaining reflection performance measurements.
 3. Close remaining allocation-discipline evidence for editor presentation/hot paths.
 4. Clarify the transient prefab-prototype seam without Phase 17 persistence.
 5. Run full manual Phase 13/14/15 regression plus 15+ minute edit-session soak.

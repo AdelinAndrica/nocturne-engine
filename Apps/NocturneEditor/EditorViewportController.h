@@ -4,6 +4,7 @@
 #include <Windows.h>
 
 #include "Core/Math/MathTypes.h"
+#include "EditorGizmoTransaction.h"
 #include "Runtime/Bounds.h"
 #include "Runtime/Entity.h"
 
@@ -67,17 +68,13 @@ namespace nocturne::editor
             bool worldOrientation,
             noc::Vec3& outPivot,
             noc::Vec3 outAxes[3]) const;
-        [[nodiscard]] bool WorldToLocalTRS_(
-            noc::EntityHandle entity,
-            const noc::Mat4& desiredWorld,
-            noc::Vec3& outTranslation,
-            noc::Quat& outRotation,
-            noc::Vec3& outScale) const;
         int HitGizmoAxis_(POINT p) const;
         void BeginGizmoDrag_(int axis, POINT mouse);
         void UpdateGizmoDrag_(POINT mouse);
         void EndGizmoDrag_();
         void CancelGizmoDrag_();
+        void TerminateGizmoDrag_(
+            EditorGizmoTerminationReason reason);
         void HandleViewportMouse_(UINT msg, WPARAM wParam, LPARAM lParam);
 
         int ActiveTool_() const;
@@ -97,9 +94,8 @@ namespace nocturne::editor
         bool renderAttached_ = false;
         bool cameraCapturing_ = false;
         bool gizmoDragging_ = false;
-        noc::EntityHandle dragEntity_{};
         int gizmoAxis_ = -1;
-        int dragToolId_ = 0;
+        EditorGizmoDragTransaction gizmoTransaction_;
 
         POINT lastMouse_{};
         POINT dragStartMouse_{};
@@ -107,20 +103,6 @@ namespace nocturne::editor
         int pendingMouseDy_ = 0;
 
         noc::EntityHandle cameraObject_{};
-
-        noc::Vec3 dragStartT_{};
-        noc::Quat dragStartR_ = noc::Quat::Identity();
-        noc::Vec3 dragStartS_ = noc::Vec3::One();
-
-        noc::EntityHandle dragStartParent_{};
-        noc::Mat4 dragStartWorld_ = noc::Mat4::Identity();
-        noc::Vec3 dragStartPivot_{};
-        noc::Vec3 dragStartAxes_[3]{
-            { 1.0f, 0.0f, 0.0f },
-            { 0.0f, 1.0f, 0.0f },
-            { 0.0f, 0.0f, 1.0f }
-        };
-        bool dragWorldOrientation_ = false;
 
         noc::Vec3 cameraPos_{ 0.0f, 1.4f, -6.0f };
         noc::Quat cameraRot_ = noc::Quat::Identity();

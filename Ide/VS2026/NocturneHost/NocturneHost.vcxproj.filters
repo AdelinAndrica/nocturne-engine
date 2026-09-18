@@ -74,5 +74,8 @@
     <ClInclude Include="..\..\..\Apps\NocturneHost\ZipWriter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorGizmoTransaction.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

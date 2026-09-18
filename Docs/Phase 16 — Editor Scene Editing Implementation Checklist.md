@@ -594,9 +594,9 @@ Grounding: Nystrom — Command / Undo and Redo.
 
 # 18. Gizmo → history integration
 
-- [ ] Begin drag captures original local TRS.
+- [x] Begin drag captures original local TRS.
 - [ ] Mouse move preview does not push history.
-- [ ] Mouse up commits one command.
+- [x] Mouse up commits one command.
 - [ ] No movement => no command.
 - [ ] Escape reverts original.
 - [ ] Capture loss policy.
@@ -1069,22 +1069,22 @@ Măsurăm, nu ghicim:
 
 # 43. Gizmo tests
 
-- [ ] move local.
-- [ ] move world.
-- [ ] rotate local.
-- [ ] rotate world.
-- [ ] scale local.
-- [ ] parented transform.
-- [ ] rotated parent.
-- [ ] non-uniform scaled parent.
-- [ ] begin/cancel.
-- [ ] begin/commit.
-- [ ] undo.
-- [ ] redo.
-- [ ] no-op drag produces no history entry.
-- [ ] entity destroyed during transaction.
-- [ ] capture lost.
-- [ ] tool switch.
+- [x] move local.
+- [x] move world.
+- [x] rotate local.
+- [x] rotate world.
+- [x] scale local.
+- [x] parented transform.
+- [x] rotated parent.
+- [x] non-uniform scaled parent.
+- [x] begin/cancel.
+- [x] begin/commit.
+- [x] undo.
+- [x] redo.
+- [x] no-op drag produces no history entry.
+- [x] entity destroyed during transaction.
+- [x] capture lost.
+- [x] tool switch.
 
 ---
 

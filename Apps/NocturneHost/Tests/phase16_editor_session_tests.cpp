@@ -1,4 +1,5 @@
 #include "../../NocturneEditor/EditorCommands.h"
+#include "../../NocturneEditor/EditorGizmoTransaction.h"
 #include "../../NocturneEditor/EditorHierarchyModel.h"
 #include "../../NocturneEditor/EditorInspectorModel.h"
 #include "../../NocturneEditor/EditorSession.h"
@@ -2048,6 +2049,390 @@ bool RunPhase16EditorSessionTests()
         inspectorHistory.Clear();
         inspectorMatrixModel.Clear();
         inspectorWorld.Shutdown();
+    }
+
+    {
+        noc::World gizmoWorld;
+        nocturne::editor::EditorSession gizmoSession;
+
+        ok &= CheckEditorSession(
+            gizmoWorld.Init(allocator, reflection)
+                && gizmoSession.Init(
+                    gizmoWorld,
+                    reflection,
+                    allocator,
+                    128,
+                    4u * 1024u * 1024u),
+            "Gizmo matrix setup failed");
+
+        auto gizmoContext =
+            gizmoSession.CommandContext();
+
+        const noc::EntityHandle root =
+            gizmoWorld.CreateEntity();
+
+        const float halfQuarterTurn =
+            0.25f * 3.14159265358979323846f;
+        const noc::Quat rootRotation{
+            0.0f,
+            std::sin(halfQuarterTurn),
+            0.0f,
+            std::cos(halfQuarterTurn)
+        };
+
+        ok &= CheckEditorSession(
+            root.IsValid()
+                && gizmoWorld.AddTransform(root)
+                && gizmoWorld.SetLocalTRS(
+                    root,
+                    noc::Vec3{ 1.0f, 2.0f, 3.0f },
+                    rootRotation,
+                    noc::Vec3::One()),
+            "Gizmo root transform setup failed");
+
+        nocturne::editor::EditorGizmoDragTransaction
+            gizmoTransaction;
+
+        const noc::Vec3 rootStartTranslation =
+            gizmoWorld.GetTransform(root)
+                ->localTranslation;
+
+        ok &= CheckEditorSession(
+            gizmoTransaction.Begin(
+                gizmoContext,
+                root,
+                nocturne::editor::EditorTool::Move,
+                nocturne::editor::TransformOrientation::Local,
+                0),
+            "Gizmo local Move begin failed");
+
+        const noc::Vec3 localMoveAxis =
+            gizmoTransaction.Axis(0);
+        const noc::Vec3 localMoveStartPivot =
+            gizmoTransaction.Pivot();
+
+        ok &= CheckEditorSession(
+            gizmoTransaction.PreviewMove(
+                gizmoContext,
+                2.0f),
+            "Gizmo local Move preview failed");
+
+        const noc::Vec3 localMoveWorld =
+            nocturne::editor::EditorGizmoMatrixTranslation(
+                gizmoWorld.GetWorldMatrix(root));
+
+        ok &= CheckEditorSession(
+            std::fabs(
+                localMoveWorld.x
+                    - (localMoveStartPivot.x
+                        + localMoveAxis.x * 2.0f))
+                    < 1.0e-3f
+                && std::fabs(
+                    localMoveWorld.y
+                        - (localMoveStartPivot.y
+                            + localMoveAxis.y * 2.0f))
+                    < 1.0e-3f
+                && std::fabs(
+                    localMoveWorld.z
+                        - (localMoveStartPivot.z
+                            + localMoveAxis.z * 2.0f))
+                    < 1.0e-3f
+                && gizmoTransaction.Cancel(gizmoContext)
+                && gizmoWorld.GetTransform(root)
+                    ->localTranslation.x
+                    == rootStartTranslation.x
+                && gizmoWorld.GetTransform(root)
+                    ->localTranslation.y
+                    == rootStartTranslation.y
+                && gizmoWorld.GetTransform(root)
+                    ->localTranslation.z
+                    == rootStartTranslation.z,
+            "Gizmo local Move cancel did not restore start state");
+
+        gizmoSession.History().Clear();
+
+        ok &= CheckEditorSession(
+            gizmoTransaction.Begin(
+                gizmoContext,
+                root,
+                nocturne::editor::EditorTool::Move,
+                nocturne::editor::TransformOrientation::World,
+                0)
+                && gizmoTransaction.PreviewMove(
+                    gizmoContext,
+                    1.5f),
+            "Gizmo world Move preview failed");
+
+        const noc::Vec3 worldMovePreview =
+            nocturne::editor::EditorGizmoMatrixTranslation(
+                gizmoWorld.GetWorldMatrix(root));
+
+        ok &= CheckEditorSession(
+            std::fabs(
+                worldMovePreview.x
+                    - (localMoveStartPivot.x + 1.5f))
+                    < 1.0e-3f
+                && gizmoTransaction.Commit(gizmoSession)
+                    == nocturne::editor::EditorGizmoCommitResult::Committed
+                && gizmoSession.History().CommandCount() == 1,
+            "Gizmo world Move commit failed");
+
+        ok &= CheckEditorSession(
+            gizmoSession.History().Undo(gizmoContext)
+                && gizmoSession.History().Redo(gizmoContext),
+            "Gizmo Move undo/redo failed");
+
+        gizmoSession.History().Clear();
+
+        const noc::Quat rotationBeforeLocal =
+            gizmoWorld.GetTransform(root)
+                ->localRotation;
+
+        ok &= CheckEditorSession(
+            gizmoTransaction.Begin(
+                gizmoContext,
+                root,
+                nocturne::editor::EditorTool::Rotate,
+                nocturne::editor::TransformOrientation::Local,
+                2)
+                && gizmoTransaction.PreviewRotate(
+                    gizmoContext,
+                    0.35f)
+                && gizmoTransaction.Commit(gizmoSession)
+                    == nocturne::editor::EditorGizmoCommitResult::Committed,
+            "Gizmo local Rotate commit failed");
+
+        const noc::Quat rotationAfterLocal =
+            gizmoWorld.GetTransform(root)
+                ->localRotation;
+
+        ok &= CheckEditorSession(
+            std::fabs(rotationAfterLocal.x - rotationBeforeLocal.x) > 1.0e-5f
+                || std::fabs(rotationAfterLocal.y - rotationBeforeLocal.y) > 1.0e-5f
+                || std::fabs(rotationAfterLocal.z - rotationBeforeLocal.z) > 1.0e-5f
+                || std::fabs(rotationAfterLocal.w - rotationBeforeLocal.w) > 1.0e-5f,
+            "Gizmo local Rotate produced no rotation delta");
+
+        ok &= CheckEditorSession(
+            gizmoSession.History().Undo(gizmoContext)
+                && gizmoSession.History().Redo(gizmoContext),
+            "Gizmo Rotate undo/redo failed");
+
+        gizmoSession.History().Clear();
+
+        const noc::EntityHandle parent =
+            gizmoWorld.CreateEntity();
+        const noc::EntityHandle child =
+            gizmoWorld.CreateEntity();
+
+        const noc::Quat parentRotation =
+            nocturne::editor::EditorQuatFromEulerXYZDegrees(
+                noc::Vec3{ 10.0f, 35.0f, -15.0f });
+
+        ok &= CheckEditorSession(
+            parent.IsValid()
+                && child.IsValid()
+                && gizmoWorld.AddTransform(parent)
+                && gizmoWorld.AddTransform(child)
+                && gizmoWorld.SetLocalTRS(
+                    parent,
+                    noc::Vec3{ 3.0f, -1.0f, 2.0f },
+                    parentRotation,
+                    noc::Vec3::One())
+                && gizmoWorld.SetLocalTRS(
+                    child,
+                    noc::Vec3{ 1.0f, 0.5f, -2.0f },
+                    noc::Quat::Identity(),
+                    noc::Vec3::One())
+                && gizmoWorld.SetParent(child, parent),
+            "Gizmo parented/rotated-parent setup failed");
+
+        gizmoWorld.Update();
+
+        const noc::Mat4 childWorldBeforeRotate =
+            gizmoWorld.GetWorldMatrix(child);
+
+        ok &= CheckEditorSession(
+            gizmoTransaction.Begin(
+                gizmoContext,
+                child,
+                nocturne::editor::EditorTool::Rotate,
+                nocturne::editor::TransformOrientation::World,
+                1)
+                && gizmoTransaction.PreviewRotate(
+                    gizmoContext,
+                    0.2f)
+                && gizmoTransaction.Commit(gizmoSession)
+                    == nocturne::editor::EditorGizmoCommitResult::Committed,
+            "Gizmo world Rotate with rotated parent failed");
+
+        const noc::Mat4 childWorldAfterRotate =
+            gizmoWorld.GetWorldMatrix(child);
+
+        ok &= CheckEditorSession(
+            std::fabs(
+                noc::M(childWorldAfterRotate, 0, 0)
+                    - noc::M(childWorldBeforeRotate, 0, 0))
+                    > 1.0e-5f
+                || std::fabs(
+                    noc::M(childWorldAfterRotate, 2, 0)
+                    - noc::M(childWorldBeforeRotate, 2, 0))
+                    > 1.0e-5f,
+            "Gizmo world Rotate did not change world basis");
+
+        gizmoSession.History().Clear();
+
+        ok &= CheckEditorSession(
+            gizmoTransaction.Begin(
+                gizmoContext,
+                child,
+                nocturne::editor::EditorTool::Scale,
+                nocturne::editor::TransformOrientation::World,
+                0)
+                && gizmoTransaction.Orientation()
+                    == nocturne::editor::TransformOrientation::Local
+                && gizmoTransaction.PreviewScale(
+                    gizmoContext,
+                    0.5f)
+                && gizmoWorld.GetTransform(child)
+                    ->localScale.x > 1.0f
+                && gizmoTransaction.Commit(gizmoSession)
+                    == nocturne::editor::EditorGizmoCommitResult::Committed,
+            "Gizmo Local Scale policy/commit failed");
+
+        gizmoSession.History().Clear();
+
+        ok &= CheckEditorSession(
+            gizmoWorld.SetLocalTRS(
+                parent,
+                noc::Vec3{ 3.0f, -1.0f, 2.0f },
+                parentRotation,
+                noc::Vec3{ 2.0f, 1.0f, 0.5f }),
+            "Gizmo non-uniform parent setup failed");
+
+        gizmoWorld.Update();
+
+        const noc::Vec3 nonUniformStart =
+            nocturne::editor::EditorGizmoMatrixTranslation(
+                gizmoWorld.GetWorldMatrix(child));
+
+        ok &= CheckEditorSession(
+            gizmoTransaction.Begin(
+                gizmoContext,
+                child,
+                nocturne::editor::EditorTool::Move,
+                nocturne::editor::TransformOrientation::World,
+                0)
+                && gizmoTransaction.PreviewMove(
+                    gizmoContext,
+                    0.75f),
+            "Gizmo world Move under non-uniform parent failed");
+
+        const noc::Vec3 nonUniformMoved =
+            nocturne::editor::EditorGizmoMatrixTranslation(
+                gizmoWorld.GetWorldMatrix(child));
+
+        ok &= CheckEditorSession(
+            std::fabs(
+                nonUniformMoved.x
+                    - (nonUniformStart.x + 0.75f))
+                    < 1.0e-3f
+                && gizmoTransaction.Cancel(gizmoContext),
+            "Gizmo non-uniform-parent Move/cancel mismatch");
+
+        gizmoSession.History().Clear();
+
+        ok &= CheckEditorSession(
+            gizmoTransaction.Begin(
+                gizmoContext,
+                root,
+                nocturne::editor::EditorTool::Move,
+                nocturne::editor::TransformOrientation::Local,
+                0)
+                && gizmoTransaction.Commit(gizmoSession)
+                    == nocturne::editor::EditorGizmoCommitResult::NoChange
+                && gizmoSession.History().CommandCount() == 0,
+            "Gizmo no-op drag produced a history entry");
+
+        const noc::EntityHandle staleDrag =
+            gizmoWorld.CreateEntity();
+
+        ok &= CheckEditorSession(
+            staleDrag.IsValid()
+                && gizmoWorld.AddTransform(staleDrag)
+                && gizmoTransaction.Begin(
+                    gizmoContext,
+                    staleDrag,
+                    nocturne::editor::EditorTool::Move,
+                    nocturne::editor::TransformOrientation::Local,
+                    0)
+                && gizmoWorld.DestroyEntity(staleDrag)
+                && !gizmoTransaction.TargetStillValid(gizmoContext)
+                && gizmoTransaction.Commit(gizmoSession)
+                    == nocturne::editor::EditorGizmoCommitResult::StaleTarget
+                && gizmoSession.History().CommandCount() == 0,
+            "Gizmo destroyed-entity transaction was not stale-safe");
+
+        const noc::Vec3 beforeToolSwitch =
+            gizmoWorld.GetTransform(root)
+                ->localTranslation;
+
+        ok &= CheckEditorSession(
+            gizmoTransaction.Begin(
+                gizmoContext,
+                root,
+                nocturne::editor::EditorTool::Move,
+                nocturne::editor::TransformOrientation::Local,
+                0)
+                && gizmoTransaction.PreviewMove(gizmoContext, 1.0f)
+                && !gizmoTransaction.InteractionModeMatches(
+                    nocturne::editor::EditorTool::Rotate,
+                    nocturne::editor::TransformOrientation::Local)
+                && nocturne::editor::EditorGizmoTerminationActionFor(
+                    nocturne::editor::EditorGizmoTerminationReason::ToolChanged)
+                    == nocturne::editor::EditorGizmoTerminationAction::Cancel
+                && gizmoTransaction.Cancel(gizmoContext)
+                && gizmoWorld.GetTransform(root)->localTranslation.x
+                    == beforeToolSwitch.x
+                && gizmoWorld.GetTransform(root)->localTranslation.y
+                    == beforeToolSwitch.y
+                && gizmoWorld.GetTransform(root)->localTranslation.z
+                    == beforeToolSwitch.z,
+            "Gizmo tool-switch cancel policy failed");
+
+        gizmoSession.History().Clear();
+
+        ok &= CheckEditorSession(
+            nocturne::editor::EditorGizmoTerminationActionFor(
+                nocturne::editor::EditorGizmoTerminationReason::CaptureLost)
+                    == nocturne::editor::EditorGizmoTerminationAction::Commit
+                && nocturne::editor::EditorGizmoTerminationActionFor(
+                    nocturne::editor::EditorGizmoTerminationReason::FocusLost)
+                    == nocturne::editor::EditorGizmoTerminationAction::Commit
+                && nocturne::editor::EditorGizmoTerminationActionFor(
+                    nocturne::editor::EditorGizmoTerminationReason::Escape)
+                    == nocturne::editor::EditorGizmoTerminationAction::Cancel
+                && nocturne::editor::EditorGizmoTerminationActionFor(
+                    nocturne::editor::EditorGizmoTerminationReason::Shutdown)
+                    == nocturne::editor::EditorGizmoTerminationAction::Cancel,
+            "Gizmo termination policy mismatch");
+
+        ok &= CheckEditorSession(
+            gizmoTransaction.Begin(
+                gizmoContext,
+                root,
+                nocturne::editor::EditorTool::Move,
+                nocturne::editor::TransformOrientation::World,
+                1)
+                && gizmoTransaction.PreviewMove(gizmoContext, 0.5f)
+                && gizmoTransaction.Commit(gizmoSession)
+                    == nocturne::editor::EditorGizmoCommitResult::Committed
+                && gizmoSession.History().CommandCount() == 1,
+            "Gizmo capture-loss commit path simulation failed");
+
+        gizmoSession.History().Clear();
+        gizmoSession.Shutdown();
+        gizmoWorld.Shutdown();
     }
 
     const noc::Vec3 first{ 1.0f, 2.0f, 3.0f };

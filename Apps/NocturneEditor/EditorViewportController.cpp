@@ -1,13 +1,10 @@
 #include "EditorViewportController.h"
 #include "EditorSession.h"
-#include "EditorCommands.h"
 
 #include "EditorShellV3.h"
 
 #include <algorithm>
 #include <cmath>
-#include <memory>
-#include <new>
 
 #include <CommCtrl.h>
 #include <Windowsx.h>
@@ -435,6 +432,27 @@ namespace nocturne::editor
         {
             session_->ValidateSelection();
 
+            if (gizmoDragging_
+                && engine_
+                && gizmoTransaction_.IsActive())
+            {
+                auto context =
+                    session_->CommandContext();
+
+                if (!gizmoTransaction_.InteractionModeMatches(
+                        session_->ActiveTool(),
+                        session_->Orientation()))
+                {
+                    TerminateGizmoDrag_(
+                        EditorGizmoTerminationReason::ToolChanged);
+                }
+                else if (!gizmoTransaction_.TargetStillValid(context))
+                {
+                    TerminateGizmoDrag_(
+                        EditorGizmoTerminationReason::ContextInvalid);
+                }
+            }
+
             const uint64_t version =
                 session_->StateVersion();
             if (version != observedSessionVersion_)
@@ -455,6 +473,12 @@ namespace nocturne::editor
 
     void EditorViewportController::Shutdown()
     {
+        if (gizmoDragging_)
+        {
+            TerminateGizmoDrag_(
+                EditorGizmoTerminationReason::Shutdown);
+        }
+
         if (engine_)
             engine_->ClearDebugSelectionBounds();
         if (body_)
@@ -468,10 +492,8 @@ namespace nocturne::editor
         gizmoDragging_ = false;
         pendingMouseDx_ = 0;
         pendingMouseDy_ = 0;
-        dragEntity_ = noc::EntityHandle::Invalid();
-        dragStartParent_ = noc::EntityHandle::Invalid();
-        dragWorldOrientation_ = false;
         gizmoAxis_ = -1;
+        gizmoTransaction_.Reset();
         session_ = nullptr;
         shell_ = nullptr;
         window_ = nullptr;
@@ -779,91 +801,13 @@ namespace nocturne::editor
         noc::Vec3& outPivot,
         noc::Vec3 outAxes[3]) const
     {
-        if (!engine_
-            || !outAxes
-            || !entity.IsValid()
-            || !engine_->GetWorld().IsAlive(entity)
-            || !engine_->GetWorld().HasTransform(entity))
-        {
-            return false;
-        }
-
-        const noc::Mat4 world =
-            engine_->GetWorld().GetWorldMatrix(entity);
-
-        outPivot = MatrixTranslation(world);
-
-        if (worldOrientation)
-        {
-            outAxes[0] = { 1.0f, 0.0f, 0.0f };
-            outAxes[1] = { 0.0f, 1.0f, 0.0f };
-            outAxes[2] = { 0.0f, 0.0f, 1.0f };
-            return true;
-        }
-
-        for (int axis = 0; axis < 3; ++axis)
-        {
-            const noc::Vec3 column =
-                MatrixColumn(world, axis);
-
-            if (!noc::IsFiniteMath(column)
-                || noc::LengthSq(column) <= 1.0e-10f)
-            {
-                return false;
-            }
-
-            outAxes[axis] =
-                noc::Normalize(column);
-        }
-
-        return true;
-    }
-
-    bool EditorViewportController::WorldToLocalTRS_(
-        noc::EntityHandle entity,
-        const noc::Mat4& desiredWorld,
-        noc::Vec3& outTranslation,
-        noc::Quat& outRotation,
-        noc::Vec3& outScale) const
-    {
-        if (!engine_
-            || !entity.IsValid()
-            || !engine_->GetWorld().IsAlive(entity)
-            || !engine_->GetWorld().HasTransform(entity))
-        {
-            return false;
-        }
-
-        noc::Mat4 desiredLocal =
-            desiredWorld;
-
-        const noc::EntityHandle parent =
-            engine_->GetWorld().ParentOf(entity);
-
-        if (parent.IsValid())
-        {
-            const noc::Mat4 parentWorld =
-                engine_->GetWorld().GetWorldMatrix(parent);
-            noc::Mat4 inverseParent{};
-
-            if (!noc::TryInverseAffine(
-                    parentWorld,
-                    inverseParent))
-            {
-                return false;
-            }
-
-            desiredLocal =
-                noc::Mul(
-                    inverseParent,
-                    desiredWorld);
-        }
-
-        return noc::TryDecomposeTRS(
-            desiredLocal,
-            outTranslation,
-            outRotation,
-            outScale);
+        return engine_
+            && EditorBuildGizmoFrame(
+                engine_->GetWorld(),
+                entity,
+                worldOrientation,
+                outPivot,
+                outAxes);
     }
 
     int EditorViewportController::HitGizmoAxis_(POINT p) const
@@ -1004,69 +948,32 @@ namespace nocturne::editor
         if (axis < 0
             || axis > 2
             || !selected.IsValid()
-            || !engine_)
+            || !engine_
+            || !session_)
         {
             return;
         }
 
-        const noc::TransformComponent* transform =
-            engine_->GetWorld().GetTransform(selected);
-        if (!transform)
-            return;
+        auto context =
+            session_->CommandContext();
 
-        const int tool =
-            ActiveTool_();
-
-        const bool worldOrientation =
-            tool != kScaleTool
-            && session_
-            && session_->Orientation()
-                == TransformOrientation::World;
-
-        noc::Vec3 pivot{};
-        noc::Vec3 axes[3]{};
-
-        if (!BuildGizmoFrame_(
+        if (!gizmoTransaction_.Begin(
+                context,
                 selected,
-                worldOrientation,
-                pivot,
-                axes))
+                session_->ActiveTool(),
+                session_->Orientation(),
+                axis))
         {
             return;
         }
 
-        dragToolId_ = tool;
-        dragEntity_ = selected;
-        dragStartParent_ =
-            engine_->GetWorld().ParentOf(selected);
         dragStartMouse_ = mouse;
-
-        dragStartT_ =
-            transform->localTranslation;
-        dragStartR_ =
-            transform->localRotation;
-        dragStartS_ =
-            transform->localScale;
-
-        dragStartWorld_ =
-            engine_->GetWorld().GetWorldMatrix(selected);
-        dragStartPivot_ = pivot;
-        dragStartAxes_[0] = axes[0];
-        dragStartAxes_[1] = axes[1];
-        dragStartAxes_[2] = axes[2];
-        dragWorldOrientation_ =
-            worldOrientation;
-
         gizmoDragging_ = true;
         gizmoAxis_ = axis;
-
         SetCapture(renderHost_);
 
         if (overlay_)
-            InvalidateRect(
-                overlay_,
-                nullptr,
-                FALSE);
+            InvalidateRect(overlay_, nullptr, FALSE);
     }
 
     void EditorViewportController::UpdateGizmoDrag_(
@@ -1074,31 +981,36 @@ namespace nocturne::editor
     {
         if (!gizmoDragging_
             || !engine_
+            || !session_
             || gizmoAxis_ < 0
-            || !dragEntity_.IsValid()
-            || !engine_->GetWorld().IsAlive(
-                dragEntity_)
-            || engine_->GetWorld().ParentOf(
-                dragEntity_) != dragStartParent_)
+            || !gizmoTransaction_.IsActive())
         {
             return;
         }
 
-        noc::Vec3 newTranslation =
-            dragStartT_;
-        noc::Quat newRotation =
-            dragStartR_;
-        noc::Vec3 newScale =
-            dragStartS_;
+        auto context =
+            session_->CommandContext();
 
-        const noc::Vec3 unit[3] = {
-            { 1,0,0 },
-            { 0,1,0 },
-            { 0,0,1 }
-        };
+        if (!gizmoTransaction_.InteractionModeMatches(
+                session_->ActiveTool(),
+                session_->Orientation()))
+        {
+            TerminateGizmoDrag_(
+                EditorGizmoTerminationReason::ToolChanged);
+            return;
+        }
+
+        if (!gizmoTransaction_.TargetStillValid(context))
+        {
+            TerminateGizmoDrag_(
+                EditorGizmoTerminationReason::ContextInvalid);
+            return;
+        }
 
         const noc::Vec3 axisWorld =
-            dragStartAxes_[gizmoAxis_];
+            gizmoTransaction_.Axis(gizmoAxis_);
+        const noc::Vec3 pivot =
+            gizmoTransaction_.Pivot();
 
         const float gizmoLength =
             GizmoWorldLength(
@@ -1106,20 +1018,16 @@ namespace nocturne::editor
                 cameraPos_,
                 cameraRot_,
                 fovY_,
-                dragStartPivot_);
+                pivot);
 
-        const int tool =
-            dragToolId_;
+        bool applied = false;
 
-        if (tool == kRotateTool)
+        if (gizmoTransaction_.Tool()
+            == EditorTool::Rotate)
         {
             POINT center{};
-            if (!Project_(
-                    dragStartPivot_,
-                    center))
-            {
+            if (!Project_(pivot, center))
                 return;
-            }
 
             const float sx =
                 float(dragStartMouse_.x - center.x);
@@ -1153,26 +1061,26 @@ namespace nocturne::editor
                 localU,
                 localV);
 
+            const noc::Vec3 capturedAxes[3] = {
+                gizmoTransaction_.Axis(0),
+                gizmoTransaction_.Axis(1),
+                gizmoTransaction_.Axis(2)
+            };
+
             const noc::Vec3 worldU =
                 ExpandGizmoBasisVector(
-                    dragStartAxes_,
+                    capturedAxes,
                     localU);
             const noc::Vec3 worldV =
                 ExpandGizmoBasisVector(
-                    dragStartAxes_,
+                    capturedAxes,
                     localV);
 
             POINT uScreen{};
             POINT vScreen{};
 
-            if (Project_(
-                    dragStartPivot_
-                        + worldU * gizmoLength,
-                    uScreen)
-                && Project_(
-                    dragStartPivot_
-                        + worldV * gizmoLength,
-                    vScreen))
+            if (Project_(pivot + worldU * gizmoLength, uScreen)
+                && Project_(pivot + worldV * gizmoLength, vScreen))
             {
                 const float ux =
                     float(uScreen.x - center.x);
@@ -1187,86 +1095,28 @@ namespace nocturne::editor
                     angle = -angle;
             }
 
-            if (dragWorldOrientation_)
-            {
-                const noc::Quat delta =
-                    AxisAngle(
-                        axisWorld,
-                        angle);
-
-                noc::Mat4 desiredWorld =
-                    dragStartWorld_;
-
-                for (int column = 0;
-                     column < 3;
-                     ++column)
-                {
-                    const noc::Vec3 rotated =
-                        noc::Rotate(
-                            delta,
-                            MatrixColumn(
-                                dragStartWorld_,
-                                column));
-
-                    noc::M(
-                        desiredWorld,
-                        0,
-                        column) = rotated.x;
-                    noc::M(
-                        desiredWorld,
-                        1,
-                        column) = rotated.y;
-                    noc::M(
-                        desiredWorld,
-                        2,
-                        column) = rotated.z;
-                }
-
-                if (!WorldToLocalTRS_(
-                        dragEntity_,
-                        desiredWorld,
-                        newTranslation,
-                        newRotation,
-                        newScale))
-                {
-                    return;
-                }
-            }
-            else
-            {
-                newRotation =
-                    NormalizeQuat(
-                        MulQuat(
-                            dragStartR_,
-                            AxisAngle(
-                                unit[gizmoAxis_],
-                                angle)));
-            }
+            applied =
+                gizmoTransaction_.PreviewRotate(
+                    context,
+                    angle);
         }
         else
         {
             POINT startScreen{};
             POINT axisScreen{};
 
-            if (!Project_(
-                    dragStartPivot_,
-                    startScreen)
+            if (!Project_(pivot, startScreen)
                 || !Project_(
-                    dragStartPivot_
-                        + axisWorld * gizmoLength,
+                    pivot + axisWorld * gizmoLength,
                     axisScreen))
             {
                 return;
             }
 
             const float vx =
-                float(
-                    axisScreen.x
-                    - startScreen.x);
+                float(axisScreen.x - startScreen.x);
             const float vy =
-                float(
-                    axisScreen.y
-                    - startScreen.y);
+                float(axisScreen.y - startScreen.y);
             const float length =
                 std::sqrt(vx * vx + vy * vy);
 
@@ -1274,110 +1124,38 @@ namespace nocturne::editor
                 return;
 
             const float dx =
-                float(
-                    mouse.x
-                    - dragStartMouse_.x);
+                float(mouse.x - dragStartMouse_.x);
             const float dy =
-                float(
-                    mouse.y
-                    - dragStartMouse_.y);
-
+                float(mouse.y - dragStartMouse_.y);
             const float signedPixels =
-                (dx * vx + dy * vy)
-                / length;
+                (dx * vx + dy * vy) / length;
 
-            if (tool == kMoveTool)
+            if (gizmoTransaction_.Tool()
+                == EditorTool::Move)
             {
-                const float worldDelta =
-                    (signedPixels / length)
-                    * gizmoLength;
-
-                noc::Mat4 desiredWorld =
-                    dragStartWorld_;
-
-                const noc::Vec3 desiredPosition =
-                    dragStartPivot_
-                    + axisWorld * worldDelta;
-
-                noc::M(
-                    desiredWorld,
-                    0,
-                    3) = desiredPosition.x;
-                noc::M(
-                    desiredWorld,
-                    1,
-                    3) = desiredPosition.y;
-                noc::M(
-                    desiredWorld,
-                    2,
-                    3) = desiredPosition.z;
-
-                if (!WorldToLocalTRS_(
-                        dragEntity_,
-                        desiredWorld,
-                        newTranslation,
-                        newRotation,
-                        newScale))
-                {
-                    return;
-                }
+                applied =
+                    gizmoTransaction_.PreviewMove(
+                        context,
+                        (signedPixels / length)
+                            * gizmoLength);
             }
-            else if (tool == kScaleTool)
+            else if (gizmoTransaction_.Tool()
+                == EditorTool::Scale)
             {
-                float* component =
-                    gizmoAxis_ == 0
-                        ? &newScale.x
-                        : (gizmoAxis_ == 1
-                            ? &newScale.y
-                            : &newScale.z);
-
-                const float start =
-                    gizmoAxis_ == 0
-                        ? dragStartS_.x
-                        : (gizmoAxis_ == 1
-                            ? dragStartS_.y
-                            : dragStartS_.z);
-
-                const float reference =
-                    (std::max)(
-                        std::fabs(start),
-                        0.25f);
-
-                *component =
-                    (std::max)(
-                        0.05f,
-                        start
-                            + (signedPixels / length)
-                                * reference);
-            }
-            else
-            {
-                return;
+                applied =
+                    gizmoTransaction_.PreviewScale(
+                        context,
+                        signedPixels / length);
             }
         }
 
-        if (!engine_->GetWorld().SetLocalTRS(
-                dragEntity_,
-                newTranslation,
-                newRotation,
-                newScale))
-        {
-            NOC_LOG_WARN(
-                "Editor",
-                "Gizmo transform update rejected (entity=%u:%u)",
-                dragEntity_.index,
-                dragEntity_.generation);
+        if (!applied)
             return;
-        }
 
-        engine_->GetWorld().Update();
         RefreshDebugSelection_();
 
         if (overlay_)
-            InvalidateRect(
-                overlay_,
-                nullptr,
-                FALSE);
+            InvalidateRect(overlay_, nullptr, FALSE);
     }
 
     void EditorViewportController::EndGizmoDrag_()
@@ -1385,116 +1163,31 @@ namespace nocturne::editor
         if (!gizmoDragging_)
             return;
 
-        const noc::EntityHandle entity =
-            dragEntity_;
-
         gizmoDragging_ = false;
         gizmoAxis_ = -1;
-        dragToolId_ = 0;
-        dragEntity_ =
-            noc::EntityHandle::Invalid();
 
         if (GetCapture() == renderHost_)
             ReleaseCapture();
 
-        bool recorded = false;
-        bool changed = false;
+        EditorGizmoCommitResult result =
+            EditorGizmoCommitResult::NoActiveDrag;
 
-        if (engine_
-            && session_
-            && entity.IsValid()
-            && engine_->GetWorld().IsAlive(entity))
+        if (session_)
+            result = gizmoTransaction_.Commit(*session_);
+        else
+            gizmoTransaction_.Reset();
+
+        if (result == EditorGizmoCommitResult::Failed)
         {
-            const noc::TransformComponent* finalTransform =
-                engine_->GetWorld().GetTransform(entity);
-
-            if (finalTransform)
-            {
-                changed =
-                    dragStartT_.x
-                        != finalTransform->localTranslation.x
-                    || dragStartT_.y
-                        != finalTransform->localTranslation.y
-                    || dragStartT_.z
-                        != finalTransform->localTranslation.z
-                    || dragStartR_.x
-                        != finalTransform->localRotation.x
-                    || dragStartR_.y
-                        != finalTransform->localRotation.y
-                    || dragStartR_.z
-                        != finalTransform->localRotation.z
-                    || dragStartR_.w
-                        != finalTransform->localRotation.w
-                    || dragStartS_.x
-                        != finalTransform->localScale.x
-                    || dragStartS_.y
-                        != finalTransform->localScale.y
-                    || dragStartS_.z
-                        != finalTransform->localScale.z;
-
-                if (changed)
-                {
-                    auto context =
-                        session_->CommandContext();
-
-                    try
-                    {
-                        auto command =
-                            std::make_unique<
-                                SetTransformTRSCommand>();
-
-                        if (command->InitExplicit(
-                                context,
-                                entity,
-                                dragStartT_,
-                                dragStartR_,
-                                dragStartS_,
-                                finalTransform->localTranslation,
-                                finalTransform->localRotation,
-                                finalTransform->localScale))
-                        {
-                            recorded =
-                                session_->History().RecordExecuted(
-                                    context,
-                                    std::move(command));
-                        }
-                    }
-                    catch (const std::bad_alloc&)
-                    {
-                        recorded = false;
-                    }
-
-                    if (!recorded)
-                    {
-                        (void)engine_->GetWorld().SetLocalTRS(
-                            entity,
-                            dragStartT_,
-                            dragStartR_,
-                            dragStartS_);
-                        engine_->GetWorld().Update();
-                    }
-                    else
-                    {
-                        session_->SetSceneDirty();
-                    }
-                }
-            }
+            NOC_LOG_WARN(
+                "Editor",
+                "%s",
+                "Gizmo commit failed; preview was rolled back when possible.");
         }
 
-        dragStartParent_ =
-            noc::EntityHandle::Invalid();
-        dragWorldOrientation_ = false;
-
         RefreshDebugSelection_();
-
-        if (shell_)
-            shell_->RefreshInspector();
-
-        if (overlay_)
-            InvalidateRect(
-                overlay_,
-                nullptr,
-                FALSE);
+        if (shell_) shell_->RefreshInspector();
+        if (overlay_) InvalidateRect(overlay_, nullptr, FALSE);
     }
 
     void EditorViewportController::CancelGizmoDrag_()
@@ -1502,45 +1195,43 @@ namespace nocturne::editor
         if (!gizmoDragging_)
             return;
 
-        const noc::EntityHandle entity =
-            dragEntity_;
-
         gizmoDragging_ = false;
         gizmoAxis_ = -1;
-        dragToolId_ = 0;
-        dragEntity_ =
-            noc::EntityHandle::Invalid();
 
         if (GetCapture() == renderHost_)
             ReleaseCapture();
 
-        if (engine_
-            && entity.IsValid()
-            && engine_->GetWorld().IsAlive(entity)
-            && engine_->GetWorld().HasTransform(entity))
+        if (session_)
         {
-            (void)engine_->GetWorld().SetLocalTRS(
-                entity,
-                dragStartT_,
-                dragStartR_,
-                dragStartS_);
-            engine_->GetWorld().Update();
+            auto context =
+                session_->CommandContext();
+            (void)gizmoTransaction_.Cancel(context);
+        }
+        else
+        {
+            gizmoTransaction_.Reset();
         }
 
-        dragStartParent_ =
-            noc::EntityHandle::Invalid();
-        dragWorldOrientation_ = false;
-
         RefreshDebugSelection_();
+        if (shell_) shell_->RefreshInspector();
+        if (overlay_) InvalidateRect(overlay_, nullptr, FALSE);
+    }
 
-        if (shell_)
-            shell_->RefreshInspector();
+    void EditorViewportController::TerminateGizmoDrag_(
+        EditorGizmoTerminationReason reason)
+    {
+        if (!gizmoDragging_)
+            return;
 
-        if (overlay_)
-            InvalidateRect(
-                overlay_,
-                nullptr,
-                FALSE);
+        if (EditorGizmoTerminationActionFor(reason)
+            == EditorGizmoTerminationAction::Commit)
+        {
+            EndGizmoDrag_();
+        }
+        else
+        {
+            CancelGizmoDrag_();
+        }
     }
 
     void EditorViewportController::HandleViewportMouse_(UINT msg, WPARAM wParam, LPARAM lParam)
@@ -1586,7 +1277,8 @@ namespace nocturne::editor
             break;
         }
         case WM_LBUTTONUP:
-            EndGizmoDrag_();
+            TerminateGizmoDrag_(
+                EditorGizmoTerminationReason::PointerRelease);
             break;
         case WM_MOUSEMOVE:
             if (cameraCapturing_)
@@ -1628,7 +1320,8 @@ namespace nocturne::editor
             cameraCapturing_ = false;
             pendingMouseDx_ = 0;
             pendingMouseDy_ = 0;
-            EndGizmoDrag_();
+            TerminateGizmoDrag_(
+                EditorGizmoTerminationReason::CaptureLost);
             break;
         }
     }
@@ -1875,7 +1568,8 @@ namespace nocturne::editor
             if (wParam == VK_ESCAPE
                 && self->gizmoDragging_)
             {
-                self->CancelGizmoDrag_();
+                self->TerminateGizmoDrag_(
+                    EditorGizmoTerminationReason::Escape);
                 return 0;
             }
             break;
@@ -1886,7 +1580,8 @@ namespace nocturne::editor
             self->cameraCapturing_ = false;
             self->pendingMouseDx_ = 0;
             self->pendingMouseDy_ = 0;
-            self->EndGizmoDrag_();
+            self->TerminateGizmoDrag_(
+                EditorGizmoTerminationReason::FocusLost);
             return 0;
         }
         return DefSubclassProc(hwnd, msg, wParam, lParam);
