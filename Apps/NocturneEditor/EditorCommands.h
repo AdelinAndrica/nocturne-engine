@@ -6,9 +6,63 @@
 #include "Runtime/Reflection/ReflectionIds.h"
 
 #include <cstddef>
+#include <string>
 
 namespace nocturne::editor
 {
+    // Design choice (not directly from the book): editor-created authored
+    // entities begin with Name + Transform. Runtime World itself keeps generic
+    // entity creation component-free.
+    class CreateEntityCommand final : public IEditorCommand
+    {
+    public:
+        [[nodiscard]] bool Init(
+            const char* name,
+            noc::EntityHandle parent = noc::EntityHandle::Invalid());
+
+        [[nodiscard]] noc::EntityHandle CurrentEntity() const noexcept;
+
+        [[nodiscard]] const char* Label() const noexcept override;
+        [[nodiscard]] std::size_t MemoryCostBytes() const noexcept override;
+
+        [[nodiscard]] bool Execute(EditorCommandContext& context) override;
+        [[nodiscard]] bool Undo(EditorCommandContext& context) override;
+        [[nodiscard]] bool Redo(EditorCommandContext& context) override;
+
+    private:
+        [[nodiscard]] bool Create_(EditorCommandContext& context);
+
+        std::string name_;
+        noc::EntityHandle requestedParent_{};
+        noc::EntityHandle currentEntity_{};
+        bool initialized_ = false;
+    };
+
+    class RenameEntityCommand final : public IEditorCommand
+    {
+    public:
+        [[nodiscard]] bool Init(
+            EditorCommandContext& context,
+            noc::EntityHandle entity,
+            const char* newName);
+
+        [[nodiscard]] const char* Label() const noexcept override;
+        [[nodiscard]] std::size_t MemoryCostBytes() const noexcept override;
+
+        [[nodiscard]] bool Execute(EditorCommandContext& context) override;
+        [[nodiscard]] bool Undo(EditorCommandContext& context) override;
+        [[nodiscard]] bool Redo(EditorCommandContext& context) override;
+
+    private:
+        [[nodiscard]] bool Apply_(
+            EditorCommandContext& context,
+            const std::string& value);
+
+        noc::EntityHandle entity_{};
+        std::string oldName_;
+        std::string newName_;
+    };
+
     class SetReflectedPropertyCommand final : public IEditorCommand
     {
     public:

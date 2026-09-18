@@ -10,6 +10,7 @@
 #include "Runtime/Reflection/ReflectionRegistry.h"
 #include "Runtime/World.h"
 
+#include <cstring>
 #include <memory>
 
 namespace
@@ -155,6 +156,118 @@ bool RunPhase16EditorSessionTests()
             && !session.History().CanRedo()
             && world.GetTransform(authored)->localTranslation.x == 9.0f,
         "New command after undo did not invalidate redo tail");
+
+    {
+        auto create =
+            std::make_unique<
+                nocturne::editor::CreateEntityCommand>();
+
+        ok &= CheckEditorSession(
+            create->Init("Created Entity"),
+            "CreateEntityCommand init failed");
+
+        auto* createRaw = create.get();
+
+        ok &= CheckEditorSession(
+            session.History().Execute(
+                context,
+                std::move(create)),
+            "CreateEntityCommand execute failed");
+
+        const noc::EntityHandle firstCreated =
+            createRaw->CurrentEntity();
+
+        ok &= CheckEditorSession(
+            firstCreated.IsValid()
+                && world.IsAlive(firstCreated)
+                && world.HasName(firstCreated)
+                && world.HasTransform(firstCreated)
+                && world.GetName(firstCreated)
+                && std::strcmp(
+                    world.GetName(firstCreated)->value,
+                    "Created Entity") == 0,
+            "Created entity default component policy mismatch");
+
+        ok &= CheckEditorSession(
+            session.History().Undo(context)
+                && !world.IsAlive(firstCreated)
+                && !createRaw->CurrentEntity().IsValid(),
+            "CreateEntityCommand undo failed");
+
+        ok &= CheckEditorSession(
+            session.History().Redo(context),
+            "CreateEntityCommand redo failed");
+
+        const noc::EntityHandle recreated =
+            createRaw->CurrentEntity();
+
+        ok &= CheckEditorSession(
+            recreated.IsValid()
+                && world.IsAlive(recreated)
+                && recreated != firstCreated,
+            "CreateEntityCommand redo reused stale runtime identity");
+
+        auto rename =
+            std::make_unique<
+                nocturne::editor::RenameEntityCommand>();
+
+        ok &= CheckEditorSession(
+            rename->Init(
+                context,
+                recreated,
+                "Renamed Entity"),
+            "RenameEntityCommand init failed");
+
+        ok &= CheckEditorSession(
+            session.History().Execute(
+                context,
+                std::move(rename))
+                && std::strcmp(
+                    world.GetName(recreated)->value,
+                    "Renamed Entity") == 0,
+            "RenameEntityCommand execute failed");
+
+        ok &= CheckEditorSession(
+            session.History().Undo(context)
+                && std::strcmp(
+                    world.GetName(recreated)->value,
+                    "Created Entity") == 0,
+            "RenameEntityCommand undo failed");
+
+        ok &= CheckEditorSession(
+            session.History().Redo(context)
+                && std::strcmp(
+                    world.GetName(recreated)->value,
+                    "Renamed Entity") == 0,
+            "RenameEntityCommand redo failed");
+
+        char tooLong[noc::kNameComponentCapacity + 1u]{};
+        for (uint32_t i = 0;
+             i < noc::kNameComponentCapacity;
+             ++i)
+        {
+            tooLong[i] = 'X';
+        }
+        tooLong[noc::kNameComponentCapacity] = '\0';
+
+        auto invalidRename =
+            std::make_unique<
+                nocturne::editor::RenameEntityCommand>();
+
+        ok &= CheckEditorSession(
+            !invalidRename->Init(
+                context,
+                recreated,
+                tooLong),
+            "Rename command accepted over-limit UTF-8 payload");
+
+        // Clear history before deleting the command-created entity because
+        // older create/rename commands intentionally validate stale handles.
+        session.History().Clear();
+        ok &= CheckEditorSession(
+            world.DestroyEntity(recreated),
+            "Command-created entity cleanup failed");
+    }
 
     // Failed commands must not enter history.
     const uint32_t historyCountBeforeFailure =
