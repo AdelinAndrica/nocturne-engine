@@ -89,6 +89,8 @@ namespace nocturne::editor
                 return InspectorEditPresentation::Vector3Axis;
             if (property.valueTypeId == noc::BuiltinTypeIds::Vec4)
                 return InspectorEditPresentation::Vector4Axis;
+            if (property.valueTypeId == noc::BuiltinTypeIds::AABB)
+                return InspectorEditPresentation::AabbMinMaxAxes;
 
             return InspectorEditPresentation::Generic;
         }
@@ -108,9 +110,23 @@ namespace nocturne::editor
                 return 3u;
             case InspectorEditPresentation::Vector4Axis:
                 return 4u;
+            case InspectorEditPresentation::AabbMinMaxAxes:
+                return 6u;
             default:
                 return 1u;
             }
+        }
+
+        uint32_t InspectorPropertyRowCount(
+            noc::TypeId componentTypeId,
+            const InspectorPropertyView& property) noexcept
+        {
+            return InspectorPresentationFor(
+                       componentTypeId,
+                       property)
+                    == InspectorEditPresentation::AabbMinMaxAxes
+                ? 2u
+                : 1u;
         }
 
         noc::PropertyId InspectorVectorAxisPropertyId(
@@ -2710,6 +2726,21 @@ namespace nocturne::editor
                                 axisProperty;
                             binding.nestedPathCount = 1;
                         }
+                        else if (presentation
+                            == InspectorEditPresentation::AabbMinMaxAxes)
+                        {
+                            binding.nestedPath[0] =
+                                axis < 3
+                                    ? noc::MakePropertyId(
+                                        "Nocturne.AABB.min")
+                                    : noc::MakePropertyId(
+                                        "Nocturne.AABB.max");
+                            binding.nestedPath[1] =
+                                InspectorVectorAxisPropertyId(
+                                    InspectorEditPresentation::Vector3Axis,
+                                    axis % 3u);
+                            binding.nestedPathCount = 2;
+                        }
                     }
                     catch (const std::bad_alloc&)
                     {
@@ -2942,6 +2973,11 @@ namespace nocturne::editor
                 }
                 else if (property.editable)
                 {
+                    const InspectorEditPresentation presentation =
+                        InspectorPresentationFor(
+                            component.typeId,
+                            property);
+
                     const uint32_t controlCount =
                         InspectorEditControlCount(
                             component.typeId,
@@ -2964,7 +3000,67 @@ namespace nocturne::editor
                         y >= 40
                         && y + 24 <= bodyHeight - 40;
 
-                    if (controlCount == 1)
+                    if (presentation
+                        == InspectorEditPresentation::AabbMinMaxAxes)
+                    {
+                        constexpr int kAxisGap = 4;
+                        constexpr int kAxisLabelWidth = 11;
+                        const int totalGap = kAxisGap * 2;
+                        const int segmentWidth =
+                            (std::max)(
+                                24,
+                                (width - totalGap) / 3);
+
+                        for (uint32_t control = 0;
+                             control < 6;
+                             ++control)
+                        {
+                            const uint32_t row =
+                                control / 3u;
+                            const uint32_t axis =
+                                control % 3u;
+
+                            const int rowY =
+                                y + static_cast<int>(row) * 27;
+                            const bool rowVisible =
+                                rowY >= 40
+                                && rowY + 24 <= bodyHeight - 40;
+
+                            const int segmentLeft =
+                                x
+                                + static_cast<int>(axis)
+                                    * (segmentWidth + kAxisGap);
+                            const int editLeft =
+                                segmentLeft + kAxisLabelWidth;
+                            const int segmentRight =
+                                axis == 2
+                                    ? x + width
+                                    : segmentLeft + segmentWidth;
+                            const int editWidth =
+                                (std::max)(
+                                    20,
+                                    segmentRight - editLeft);
+
+                            HWND edit =
+                                inspectorEdits_[
+                                    bindingIndex + control].hwnd;
+
+                            if (edit)
+                            {
+                                MoveWindow(
+                                    edit,
+                                    bodyLeft + editLeft,
+                                    bodyTop + rowY + 1,
+                                    editWidth,
+                                    22,
+                                    TRUE);
+                                ShowWindow(
+                                    edit,
+                                    rowVisible ? SW_SHOW : SW_HIDE);
+                            }
+                        }
+                    }
+                    else if (controlCount == 1)
                     {
                         HWND edit =
                             inspectorEdits_[bindingIndex].hwnd;
@@ -3040,7 +3136,10 @@ namespace nocturne::editor
                     bindingIndex += controlCount;
                 }
 
-                y += 27;
+                y += 27 * static_cast<int>(
+                    InspectorPropertyRowCount(
+                        component.typeId,
+                        property));
             }
 
             y += 7;
@@ -3058,8 +3157,16 @@ namespace nocturne::editor
              inspectorModel_.Components())
         {
             y += 31;
-            y += static_cast<int>(
-                component.properties.size()) * 27;
+
+            for (const InspectorPropertyView& property :
+                 component.properties)
+            {
+                y += 27 * static_cast<int>(
+                    InspectorPropertyRowCount(
+                        component.typeId,
+                        property));
+            }
+
             y += 7;
         }
 
@@ -5546,14 +5653,20 @@ namespace nocturne::editor
                             y + 23
                         };
 
-                        DrawTextUi(
-                            dis->hDC,
-                            propertyName.c_str(),
-                            labelRc,
-                            c.textMuted,
-                            smallFont_,
-                            DT_LEFT | DT_VCENTER
-                                | DT_SINGLELINE | DT_END_ELLIPSIS);
+                        if (InspectorPresentationFor(
+                                component.typeId,
+                                property)
+                            != InspectorEditPresentation::AabbMinMaxAxes)
+                        {
+                            DrawTextUi(
+                                dis->hDC,
+                                propertyName.c_str(),
+                                labelRc,
+                                c.textMuted,
+                                smallFont_,
+                                DT_LEFT | DT_VCENTER
+                                    | DT_SINGLELINE | DT_END_ELLIPSIS);
+                        }
 
                         const bool resourcePicker =
                             IsResourcePickerProperty(
@@ -5568,6 +5681,11 @@ namespace nocturne::editor
                                     : nullptr,
                                 property);
 
+                        const InspectorEditPresentation presentation =
+                            InspectorPresentationFor(
+                                component.typeId,
+                                property);
+
                         const uint32_t controlCount =
                             property.editable
                                 ? InspectorEditControlCount(
@@ -5580,6 +5698,97 @@ namespace nocturne::editor
                             || enumPicker)
                         {
                             // The child button owns the value field chrome.
+                        }
+                        else if (presentation
+                            == InspectorEditPresentation::AabbMinMaxAxes)
+                        {
+                            constexpr int kAxisGap = 4;
+                            constexpr int kAxisLabelWidth = 11;
+                            const int width =
+                                static_cast<int>(
+                                    valueRc.right - valueRc.left);
+                            const int segmentWidth =
+                                (std::max)(
+                                    24,
+                                    (width - kAxisGap * 2) / 3);
+                            constexpr const wchar_t* kAxisNames[] = {
+                                L"X", L"Y", L"Z"
+                            };
+                            constexpr const wchar_t* kRowNames[] = {
+                                L"Min", L"Max"
+                            };
+
+                            for (uint32_t row = 0;
+                                 row < 2;
+                                 ++row)
+                            {
+                                const int rowY =
+                                    y + static_cast<int>(row) * 27;
+
+                                RECT rowLabel{
+                                    rc.left + 14,
+                                    rowY,
+                                    rc.left + labelWidth,
+                                    rowY + 24
+                                };
+
+                                std::wstring nestedLabel =
+                                    propertyName;
+                                nestedLabel += L" ";
+                                nestedLabel += kRowNames[row];
+
+                                DrawTextUi(
+                                    dis->hDC,
+                                    nestedLabel.c_str(),
+                                    rowLabel,
+                                    c.textMuted,
+                                    smallFont_,
+                                    DT_LEFT | DT_VCENTER
+                                        | DT_SINGLELINE
+                                        | DT_END_ELLIPSIS);
+
+                                for (uint32_t axis = 0;
+                                     axis < 3;
+                                     ++axis)
+                                {
+                                    const int segmentLeft =
+                                        valueRc.left
+                                        + static_cast<int>(axis)
+                                            * (segmentWidth + kAxisGap);
+                                    const int segmentRight =
+                                        axis == 2
+                                            ? valueRc.right
+                                            : segmentLeft + segmentWidth;
+
+                                    RECT axisRc{
+                                        segmentLeft,
+                                        rowY,
+                                        segmentLeft + kAxisLabelWidth,
+                                        rowY + 24
+                                    };
+                                    DrawTextUi(
+                                        dis->hDC,
+                                        kAxisNames[axis],
+                                        axisRc,
+                                        c.textMuted,
+                                        smallFont_,
+                                        DT_CENTER | DT_VCENTER
+                                            | DT_SINGLELINE);
+
+                                    RECT fieldRc{
+                                        segmentLeft + kAxisLabelWidth,
+                                        rowY + 1,
+                                        segmentRight,
+                                        rowY + 23
+                                    };
+                                    RoundBox(
+                                        dis->hDC,
+                                        fieldRc,
+                                        c.inputBg,
+                                        c.border,
+                                        3);
+                                }
+                            }
                         }
                         else if (controlCount > 1)
                         {
@@ -5673,7 +5882,10 @@ namespace nocturne::editor
                             }
                         }
 
-                        y += 27;
+                        y += 27 * static_cast<int>(
+                            InspectorPropertyRowCount(
+                                component.typeId,
+                                property));
                     }
 
                     y += 7;

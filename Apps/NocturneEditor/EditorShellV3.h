@@ -26,6 +26,7 @@ namespace nocturne::editor
         Vector2Axis,
         Vector3Axis,
         Vector4Axis,
+        AabbMinMaxAxes,
         EulerDegreesAxis,
         AngleDegrees
     };
