@@ -73,8 +73,11 @@ namespace
     constexpr noc::TypeId kEnumDrawerModeTypeId{
         0xE160000000000001ull
     };
+    // Reflected component TypeIds must remain representable by the runtime
+    // ComponentTypeId compatibility facade. Enum/value TypeIds remain full
+    // 64-bit reflection identities.
     constexpr noc::TypeId kEnumDrawerComponentTypeId{
-        0xE160000000000002ull
+        0x00001601ull
     };
 
     struct EnumDrawerTestStore
