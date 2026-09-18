@@ -1,3 +1,4 @@
+#include "EditorSession.h"
 #include "EditorShellV3.h"
 #include "EditorViewportController.h"
 
@@ -26,12 +27,23 @@ int main()
         return 1;
     }
 
-    // Prepare the Phase 14 viewport scene before EditorShellV3 populates its
-    // hierarchy, so the Phase 13 hierarchy reflects the runtime object count.
+    nocturne::editor::EditorSession session;
+    if (!session.Init(
+            engine.GetWorld(),
+            engine.Reflection(),
+            engine.Allocator()))
+    {
+        NOC_LOG_FATAL("Editor", "Editor session initialization failed");
+        engine.Shutdown();
+        return 1;
+    }
+
+    // Prepare the viewport bootstrap scene through the same authoritative World.
     nocturne::editor::EditorViewportController viewport;
-    if (!viewport.PrepareScene(engine))
+    if (!viewport.PrepareScene(engine, session))
     {
         NOC_LOG_FATAL("Editor", "Phase 14 viewport scene preparation failed");
+        session.Shutdown();
         engine.Shutdown();
         return 1;
     }
@@ -53,18 +65,20 @@ int main()
     }
 
     nocturne::editor::EditorShellV3 shell;
-    if (!shell.Init(engine, window))
+    if (!shell.Init(engine, window, session))
     {
         NOC_LOG_FATAL("Editor", "Editor shell initialization failed");
         window.Destroy();
+        session.Shutdown();
         engine.Shutdown();
         return 1;
     }
 
-    if (!viewport.Attach(engine, window, shell))
+    if (!viewport.Attach(engine, window, shell, session))
     {
         NOC_LOG_FATAL("Editor", "Phase 14 viewport attachment failed");
         shell.Shutdown();
+        session.Shutdown();
         engine.Shutdown();
         window.Destroy();
         return 1;
@@ -83,6 +97,7 @@ int main()
 
     viewport.Shutdown();
     shell.Shutdown();
+    session.Shutdown();
     // Release DXGI presentation resources while their child HWND is still valid.
     engine.Shutdown();
     window.Destroy();

@@ -17,6 +17,7 @@ namespace noc
 
 namespace nocturne::editor
 {
+    class EditorSession;
     class EditorShellV3;
 
     // Phase 14 editor-only viewport behavior. Runtime still owns frame execution;
@@ -24,8 +25,14 @@ namespace nocturne::editor
     class EditorViewportController final
     {
     public:
-        bool PrepareScene(noc::Engine& engine);
-        bool Attach(noc::Engine& engine, noc::WinWindow& window, EditorShellV3& shell);
+        bool PrepareScene(
+            noc::Engine& engine,
+            EditorSession& session);
+        bool Attach(
+            noc::Engine& engine,
+            noc::WinWindow& window,
+            EditorShellV3& shell,
+            EditorSession& session);
         void TickFrame();
         void Shutdown();
 
@@ -67,7 +74,15 @@ namespace nocturne::editor
         const noc::RenderableComponent* ValidationRenderable_(int index) const;
         int PickValidationObject_(const noc::Vec3& origin, const noc::Vec3& dir) const;
 
-        void SetSelectedIndex_(int index, bool syncTree = true);
+        [[nodiscard]] int ValidationIndexForEntity_(
+            noc::EntityHandle entity) const;
+        [[nodiscard]] noc::EntityHandle SelectedEntity_() const;
+        void SetSelectedEntity_(
+            noc::EntityHandle entity,
+            bool syncTree = true);
+        void SetSelectedValidationIndex_(
+            int index,
+            bool syncTree = true);
         void RefreshDebugSelection_();
         int HitGizmoAxis_(POINT p) const;
         void BeginGizmoDrag_(int axis, POINT mouse);
@@ -81,6 +96,7 @@ namespace nocturne::editor
         noc::Engine* engine_ = nullptr;
         noc::WinWindow* window_ = nullptr;
         EditorShellV3* shell_ = nullptr;
+        EditorSession* session_ = nullptr;
 
         HWND topLevel_ = nullptr;
         HWND body_ = nullptr;
@@ -93,8 +109,7 @@ namespace nocturne::editor
         bool cameraCapturing_ = false;
         bool gizmoDragging_ = false;
         bool hierarchyObjectsExpanded_ = true;
-        int selectedIndex_ = -1;
-        int dragObjectIndex_ = -1;
+        noc::EntityHandle dragEntity_{};
         int gizmoAxis_ = -1;
         int hierarchySelectedRow_ = 0;
         int hierarchyHoverRow_ = -1;

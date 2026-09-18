@@ -1,4 +1,5 @@
 #include "EditorViewportController.h"
+#include "EditorSession.h"
 
 #include "EditorShellV3.h"
 #include "EditorTheme.h"
@@ -188,12 +189,15 @@ namespace nocturne::editor
         }
     }
 
-    bool EditorViewportController::PrepareScene(noc::Engine& engine)
+    bool EditorViewportController::PrepareScene(
+        noc::Engine& engine,
+        EditorSession& session)
     {
         if (scenePrepared_)
             return true;
 
         engine_ = &engine;
+        session_ = &session;
         auto& world = engine.GetWorld();
         const noc::ResourceHandle logicalMesh = engine.Resources().RequestBinary("Meshes/triangle.nmsh");
 
@@ -259,6 +263,12 @@ namespace nocturne::editor
 
         world.Update();
 
+        if (!session.SetToolCamera(cameraObject_))
+        {
+            NOC_LOG_ERROR("Editor", "%s", "Failed to register editor camera as tool-owned");
+            return false;
+        }
+
         scenePrepared_ = true;
         NOC_LOG_INFO("Editor", "Phase 14 3D validation scene prepared (3 cubes + selectable ground + editor camera)");
         return true;
@@ -283,9 +293,13 @@ namespace nocturne::editor
         return RegisterClassExW(&wc) != 0;
     }
 
-    bool EditorViewportController::Attach(noc::Engine& engine, noc::WinWindow& window, EditorShellV3& shell)
+    bool EditorViewportController::Attach(
+        noc::Engine& engine,
+        noc::WinWindow& window,
+        EditorShellV3& shell,
+        EditorSession& session)
     {
-        if (!scenePrepared_ && !PrepareScene(engine))
+        if (!scenePrepared_ && !PrepareScene(engine, session))
             return false;
         if (!RegisterOverlayClass_())
         {
@@ -296,6 +310,7 @@ namespace nocturne::editor
         engine_ = &engine;
         window_ = &window;
         shell_ = &shell;
+        session_ = &session;
         topLevel_ = static_cast<HWND>(window.Handle());
         body_ = shell.ViewportBody();
         sceneTree_ = shell.SceneTree();
@@ -381,11 +396,11 @@ namespace nocturne::editor
         gizmoDragging_ = false;
         pendingMouseDx_ = 0;
         pendingMouseDy_ = 0;
-        selectedIndex_ = -1;
-        dragObjectIndex_ = -1;
+        dragEntity_ = noc::EntityHandle::Invalid();
         gizmoAxis_ = -1;
         hierarchySelectedRow_ = 0;
         hierarchyHoverRow_ = -1;
+        session_ = nullptr;
         shell_ = nullptr;
         window_ = nullptr;
         topLevel_ = nullptr;
@@ -509,7 +524,7 @@ namespace nocturne::editor
         // grid are already part of the DX12 frame, so avoid invalidating the
         // layered overlay for every camera frame unless a gizmo is visible.
         const int tool = ActiveTool_();
-        if (overlay_ && selectedIndex_ >= 0 &&
+        if (overlay_ && SelectedEntity_().IsValid() &&
             (tool == kMoveTool || tool == kRotateTool || tool == kScaleTool))
         {
             InvalidateRect(overlay_, nullptr, FALSE);
@@ -643,53 +658,108 @@ namespace nocturne::editor
         return nearestIndex;
     }
 
+    int EditorViewportController::ValidationIndexForEntity_(
+        noc::EntityHandle entity) const
+    {
+        if (!entity.IsValid())
+            return -1;
+
+        for (int i = 0; i < kValidationObjectCount; ++i)
+        {
+            if (validationObjects_[i].handle == entity)
+                return i;
+        }
+
+        return -1;
+    }
+
+    noc::EntityHandle EditorViewportController::SelectedEntity_() const
+    {
+        return session_
+            ? session_->SelectedEntity()
+            : noc::EntityHandle::Invalid();
+    }
+
     void EditorViewportController::RefreshDebugSelection_()
     {
         if (!engine_)
             return;
-        if (selectedIndex_ >= 0 && selectedIndex_ < kValidationObjectCount)
-        {
-            const ValidationObject& object = validationObjects_[selectedIndex_];
-            const noc::RenderableComponent* renderable = ValidationRenderable_(selectedIndex_);
-            if (renderable)
-            {
-                engine_->SetDebugSelection(
-                    renderable->localBounds,
-                    engine_->GetWorld().GetWorldMatrix(object.handle));
-            }
-            else
-            {
-                engine_->ClearDebugSelectionBounds();
-            }
-        }
-        else
+
+        const noc::EntityHandle selected = SelectedEntity_();
+        if (!selected.IsValid())
         {
             engine_->ClearDebugSelectionBounds();
+            return;
         }
+
+        const noc::RenderableComponent* renderable =
+            engine_->GetWorld().GetRenderable(selected);
+        if (!renderable)
+        {
+            engine_->ClearDebugSelectionBounds();
+            return;
+        }
+
+        engine_->SetDebugSelection(
+            renderable->localBounds,
+            engine_->GetWorld().GetWorldMatrix(selected));
     }
 
-    void EditorViewportController::SetSelectedIndex_(int index, bool syncTree)
+    void EditorViewportController::SetSelectedEntity_(
+        noc::EntityHandle entity,
+        bool syncTree)
     {
-        if (index < 0 || index >= kValidationObjectCount || !validationObjects_[index].selectable)
-            index = -1;
-        selectedIndex_ = index;
+        if (!session_)
+            return;
+
+        if (!entity.IsValid())
+            session_->ClearSelection();
+        else if (!session_->SetSelection(entity))
+            return;
+
         gizmoAxis_ = -1;
         RefreshDebugSelection_();
 
         if (syncTree)
         {
-            if (selectedIndex_ >= 0)
+            const int index =
+                ValidationIndexForEntity_(session_->SelectedEntity());
+
+            if (index >= 0)
             {
                 hierarchyObjectsExpanded_ = true;
-                hierarchySelectedRow_ = 2 + selectedIndex_;
+                hierarchySelectedRow_ = 2 + index;
             }
             else
             {
                 hierarchySelectedRow_ = 0;
             }
-            if (sceneTree_) InvalidateRect(sceneTree_, nullptr, FALSE);
+
+            if (sceneTree_)
+                InvalidateRect(sceneTree_, nullptr, FALSE);
         }
-        if (overlay_) InvalidateRect(overlay_, nullptr, FALSE);
+
+        if (overlay_)
+            InvalidateRect(overlay_, nullptr, FALSE);
+    }
+
+    void EditorViewportController::SetSelectedValidationIndex_(
+        int index,
+        bool syncTree)
+    {
+        if (index < 0
+            || index >= kValidationObjectCount
+            || !validationObjects_[index].selectable)
+        {
+            SetSelectedEntity_(
+                noc::EntityHandle::Invalid(),
+                syncTree);
+            return;
+        }
+
+        SetSelectedEntity_(
+            validationObjects_[index].handle,
+            syncTree);
     }
 
     int EditorViewportController::ActiveTool_() const
@@ -699,12 +769,14 @@ namespace nocturne::editor
 
     int EditorViewportController::HitGizmoAxis_(POINT p) const
     {
-        if (selectedIndex_ < 0) return -1;
+        const noc::EntityHandle selected = SelectedEntity_();
+        if (!selected.IsValid()) return -1;
         const int tool = ActiveTool_();
         if (tool != kMoveTool && tool != kRotateTool && tool != kScaleTool)
             return -1;
 
-        const noc::TransformComponent* transform = ValidationTransform_(selectedIndex_);
+        const noc::TransformComponent* transform =
+            engine_ ? engine_->GetWorld().GetTransform(selected) : nullptr;
         if (!transform)
             return -1;
 
@@ -760,14 +832,18 @@ namespace nocturne::editor
 
     void EditorViewportController::BeginGizmoDrag_(int axis, POINT mouse)
     {
-        if (axis < 0 || axis > 2 || selectedIndex_ < 0) return;
-        const noc::TransformComponent* transform = ValidationTransform_(selectedIndex_);
+        const noc::EntityHandle selected = SelectedEntity_();
+        if (axis < 0 || axis > 2 || !selected.IsValid() || !engine_)
+            return;
+
+        const noc::TransformComponent* transform =
+            engine_->GetWorld().GetTransform(selected);
         if (!transform)
             return;
 
         gizmoDragging_ = true;
         gizmoAxis_ = axis;
-        dragObjectIndex_ = selectedIndex_;
+        dragEntity_ = selected;
         dragStartMouse_ = mouse;
         dragStartT_ = transform->localTranslation;
         dragStartR_ = transform->localRotation;
@@ -778,10 +854,14 @@ namespace nocturne::editor
 
     void EditorViewportController::UpdateGizmoDrag_(POINT mouse)
     {
-        if (!gizmoDragging_ || !engine_ || gizmoAxis_ < 0 || dragObjectIndex_ < 0 || dragObjectIndex_ >= kValidationObjectCount)
+        if (!gizmoDragging_
+            || !engine_
+            || gizmoAxis_ < 0
+            || !dragEntity_.IsValid()
+            || !engine_->GetWorld().IsAlive(dragEntity_))
+        {
             return;
-
-        const ValidationObject& object = validationObjects_[dragObjectIndex_];
+        }
 
         noc::Vec3 newTranslation = dragStartT_;
         noc::Quat newRotation = dragStartR_;
@@ -855,15 +935,16 @@ namespace nocturne::editor
         }
 
         if (!engine_->GetWorld().SetLocalTRS(
-                object.handle,
+                dragEntity_,
                 newTranslation,
                 newRotation,
                 newScale))
         {
             NOC_LOG_WARN(
                 "Editor",
-                "Gizmo transform update rejected (object=%d)",
-                dragObjectIndex_);
+                "Gizmo transform update rejected (entity=%u:%u)",
+                dragEntity_.index,
+                dragEntity_.generation);
             return;
         }
 
@@ -877,7 +958,7 @@ namespace nocturne::editor
         if (!gizmoDragging_) return;
         gizmoDragging_ = false;
         gizmoAxis_ = -1;
-        dragObjectIndex_ = -1;
+        dragEntity_ = noc::EntityHandle::Invalid();
         if (GetCapture() == renderHost_) ReleaseCapture();
         if (overlay_) InvalidateRect(overlay_, nullptr, FALSE);
     }
@@ -910,12 +991,18 @@ namespace nocturne::editor
         {
             SetFocus(renderHost_);
             const int tool = ActiveTool_();
-            if (selectedIndex_ >= 0 && (tool == kMoveTool || tool == kRotateTool || tool == kScaleTool))
+            if (SelectedEntity_().IsValid()
+                && (tool == kMoveTool
+                    || tool == kRotateTool
+                    || tool == kScaleTool))
             {
                 const int axis = HitGizmoAxis_(mouse);
                 if (axis >= 0) { BeginGizmoDrag_(axis, mouse); break; }
             }
-            SetSelectedIndex_(PickValidationObject_(cameraPos_, MakePickRay_(mouse.x, mouse.y)));
+            SetSelectedValidationIndex_(
+                PickValidationObject_(
+                    cameraPos_,
+                    MakePickRay_(mouse.x, mouse.y)));
             break;
         }
         case WM_LBUTTONUP:
@@ -963,7 +1050,7 @@ namespace nocturne::editor
             pendingMouseDy_ = 0;
             gizmoDragging_ = false;
             gizmoAxis_ = -1;
-            dragObjectIndex_ = -1;
+            dragEntity_ = noc::EntityHandle::Invalid();
             if (overlay_) InvalidateRect(overlay_, nullptr, FALSE);
             break;
         }
@@ -977,14 +1064,16 @@ namespace nocturne::editor
 
         // Grid and oriented selection bounds are depth-tested DX12 debug geometry.
         // The Win32 overlay is intentionally limited to transform gizmo handles.
-        if (selectedIndex_ < 0)
+        const noc::EntityHandle selected = SelectedEntity_();
+        if (!selected.IsValid())
             return;
 
         const int tool = ActiveTool_();
         if (tool != kMoveTool && tool != kRotateTool && tool != kScaleTool)
             return;
 
-        const noc::TransformComponent* transform = ValidationTransform_(selectedIndex_);
+        const noc::TransformComponent* transform =
+            engine_ ? engine_->GetWorld().GetTransform(selected) : nullptr;
         if (!transform)
             return;
 
@@ -1292,7 +1381,7 @@ namespace nocturne::editor
                 if (x >= arrowX && x <= arrowX + 14)
                     self->hierarchyObjectsExpanded_ = !self->hierarchyObjectsExpanded_;
 
-                self->SetSelectedIndex_(-1, false);
+                self->SetSelectedEntity_(noc::EntityHandle::Invalid(), false);
                 self->hierarchySelectedRow_ = 1;
             }
             else
@@ -1300,12 +1389,12 @@ namespace nocturne::editor
                 const int objectIndex = self->HierarchyObjectIndexFromRow_(row);
                 if (objectIndex >= 0)
                 {
-                    self->SetSelectedIndex_(objectIndex, false);
+                    self->SetSelectedValidationIndex_(objectIndex, false);
                     self->hierarchySelectedRow_ = row;
                 }
                 else
                 {
-                    self->SetSelectedIndex_(-1, false);
+                    self->SetSelectedEntity_(noc::EntityHandle::Invalid(), false);
                     self->hierarchySelectedRow_ = row;
                 }
             }

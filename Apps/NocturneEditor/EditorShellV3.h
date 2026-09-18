@@ -13,6 +13,7 @@
 #include "Platform/Win32/WinWindow.h"
 
 namespace noc { class Engine; }
+namespace nocturne::editor { class EditorSession; }
 
 namespace nocturne::editor
 {
@@ -22,7 +23,10 @@ namespace nocturne::editor
     class EditorShellV3 final : public noc::platform::IWindowMessageSink
     {
     public:
-        bool Init(noc::Engine& engine, noc::WinWindow& window);
+        bool Init(
+            noc::Engine& engine,
+            noc::WinWindow& window,
+            EditorSession& session);
         void Shutdown();
 
         bool OnWindowMessage(void* hwnd, uint32_t msg, uintptr_t wParam,
@@ -101,6 +105,7 @@ namespace nocturne::editor
     private:
         noc::Engine* engine_ = nullptr;
         noc::WinWindow* window_ = nullptr;
+        EditorSession* session_ = nullptr;
         HWND hwnd_ = nullptr;
 
         HFONT uiFont_ = nullptr;

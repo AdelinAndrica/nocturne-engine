@@ -1,4 +1,5 @@
 #include "EditorShellV3.h"
+#include "EditorSession.h"
 #include "EditorTheme.h"
 #include "EditorIconRenderer.h"
 #include "NocturneEditorResource.h"
@@ -696,9 +697,12 @@ namespace nocturne::editor
         }
     }
 
-    bool EditorShellV3::Init(noc::Engine& engine, noc::WinWindow& window)
+    bool EditorShellV3::Init(
+        noc::Engine& engine,
+        noc::WinWindow& window,
+        EditorSession& session)
     {
-        engine_ = &engine; window_ = &window; hwnd_ = static_cast<HWND>(window.Handle()); if (!hwnd_) return false;
+        engine_ = &engine; window_ = &window; session_ = &session; hwnd_ = static_cast<HWND>(window.Handle()); if (!hwnd_) return false;
         const HINSTANCE instance = GetModuleHandleW(nullptr);
         const auto appIcon = reinterpret_cast<HICON>(LoadImageW(
             instance, MAKEINTRESOURCEW(IDI_NOCTURNE_EDITOR), IMAGE_ICON,
@@ -734,7 +738,7 @@ namespace nocturne::editor
         if (window_) window_->SetMessageSink(nullptr); if (fileMenu_) DestroyMenu(fileMenu_); if (buildMenu_) DestroyMenu(buildMenu_); fileMenu_ = buildMenu_ = nullptr;
         if (uiFont_) DeleteObject(uiFont_); if (uiBold_) DeleteObject(uiBold_); if (menuFont_) DeleteObject(menuFont_); if (smallFont_) DeleteObject(smallFont_); if (consoleFont_) DeleteObject(consoleFont_); if (brandFont_) DeleteObject(brandFont_);
         if (windowBrush_) DeleteObject(windowBrush_); if (editBrush_) DeleteObject(editBrush_);
-        uiFont_ = uiBold_ = menuFont_ = smallFont_ = consoleFont_ = brandFont_ = nullptr; windowBrush_ = editBrush_ = nullptr; engine_ = nullptr; window_ = nullptr; hwnd_ = nullptr;
+        uiFont_ = uiBold_ = menuFont_ = smallFont_ = consoleFont_ = brandFont_ = nullptr; windowBrush_ = editBrush_ = nullptr; session_ = nullptr; engine_ = nullptr; window_ = nullptr; hwnd_ = nullptr;
     }
 
     void EditorShellV3::CreateChrome_()
@@ -823,9 +827,48 @@ namespace nocturne::editor
         case IdToolbarNew: AppendConsole_(L"New Scene requested. Scene authoring is scheduled for Phase 16."); break;
         case IdToolbarOpen: AppendConsole_(L"Open Scene requested. Scene serialization is scheduled for Phase 17."); break;
         case IdToolbarSave: AppendConsole_(L"Save requested. Serialization remains Phase 17 scope."); break;
-        case IdToolbarUndo: case IdToolbarRedo: AppendConsole_(L"Undo/Redo received; edit history arrives with scene editing."); break;
+        case IdToolbarUndo:
+            if (session_ && session_->History().CanUndo())
+            {
+                auto context = session_->CommandContext();
+                if (session_->History().Undo(context))
+                {
+                    session_->SetSceneDirty();
+                    AppendConsole_(L"Undo applied.");
+                }
+                else AppendConsole_(L"Undo failed; history cursor preserved.");
+            }
+            break;
+        case IdToolbarRedo:
+            if (session_ && session_->History().CanRedo())
+            {
+                auto context = session_->CommandContext();
+                if (session_->History().Redo(context))
+                {
+                    session_->SetSceneDirty();
+                    AppendConsole_(L"Redo applied.");
+                }
+                else AppendConsole_(L"Redo failed; history cursor preserved.");
+            }
+            break;
         case IdToolbarSelect: case IdToolbarMove: case IdToolbarRotate: case IdToolbarScale:
-            activeToolId_ = id; for (HWND h : toolbarButtons_) { const int bid = GetDlgCtrlID(h); if (bid >= IdToolbarSelect && bid <= IdToolbarScale) ButtonActive(h, bid == activeToolId_); } AppendConsole_(L"Viewport tool selected. Interactive gizmos remain Phase 14 scope."); break;
+            activeToolId_ = id;
+            if (session_)
+            {
+                EditorTool tool = EditorTool::Select;
+                if (id == IdToolbarMove) tool = EditorTool::Move;
+                else if (id == IdToolbarRotate) tool = EditorTool::Rotate;
+                else if (id == IdToolbarScale) tool = EditorTool::Scale;
+                session_->SetActiveTool(tool);
+            }
+            for (HWND h : toolbarButtons_)
+            {
+                const int bid = GetDlgCtrlID(h);
+                if (bid >= IdToolbarSelect && bid <= IdToolbarScale)
+                    ButtonActive(h, bid == activeToolId_);
+            }
+            AppendConsole_(L"Viewport tool selected.");
+            break;
         case IdToolbarPlay: case IdPlay: AppendConsole_(L"Play requested. Full Play-In-Editor remains Phase 27 scope."); break;
         case IdToolbarStop: AppendConsole_(L"Stop requested."); break;
         case IdToolbarBuild: case IdBuild:
