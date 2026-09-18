@@ -29,6 +29,7 @@
 #include "Runtime/World.h"
 #include "Runtime/Components/TransformComponent.h"
 #include "Runtime/Reflection/BuiltinTypes.h"
+#include "Resources/Typed/MeshResource.h"
 
 #pragma comment(lib, "Comctl32.lib")
 #pragma comment(lib, "Dwmapi.lib")
@@ -151,6 +152,19 @@ namespace nocturne::editor
 
             outValue = value;
             return true;
+        }
+
+        bool IsResourcePickerProperty(
+            const InspectorPropertyView& property) noexcept
+        {
+            return property.valueTypeId
+                    == noc::BuiltinTypeIds::ResourceHandle
+                && noc::HasFlag(
+                    property.flags,
+                    noc::PropertyFlags::ResourceReference)
+                && !noc::HasFlag(
+                    property.flags,
+                    noc::PropertyFlags::ReadOnly);
         }
 
         enum class Icon
@@ -1793,8 +1807,17 @@ namespace nocturne::editor
             binding.hwnd = nullptr;
         }
 
+        for (InspectorResourceBinding& binding :
+             inspectorResourceButtons_)
+        {
+            if (binding.hwnd)
+                DestroyWindow(binding.hwnd);
+            binding.hwnd = nullptr;
+        }
+
         inspectorEdits_.clear();
         inspectorRemoveButtons_.clear();
+        inspectorResourceButtons_.clear();
         inspectorControlsRefreshing_ = false;
     }
 
@@ -1811,6 +1834,7 @@ namespace nocturne::editor
 
         size_t editableCount = 0;
         size_t removableCount = 0;
+        size_t resourceCount = 0;
 
         for (const InspectorComponentView& component :
              inspectorModel_.Components())
@@ -1821,7 +1845,11 @@ namespace nocturne::editor
             for (const InspectorPropertyView& property :
                  component.properties)
             {
-                if (property.editable)
+                if (IsResourcePickerProperty(property))
+                {
+                    ++resourceCount;
+                }
+                else if (property.editable)
                 {
                     editableCount +=
                         InspectorEditControlCount(
@@ -1835,6 +1863,7 @@ namespace nocturne::editor
         {
             inspectorEdits_.reserve(editableCount);
             inspectorRemoveButtons_.reserve(removableCount);
+            inspectorResourceButtons_.reserve(resourceCount);
         }
         catch (const std::bad_alloc&)
         {
@@ -1892,6 +1921,72 @@ namespace nocturne::editor
             for (const InspectorPropertyView& property :
                  component.properties)
             {
+                if (IsResourcePickerProperty(property))
+                {
+                    const size_t resourceIndex =
+                        inspectorResourceButtons_.size();
+
+                    if (resourceIndex
+                        > static_cast<size_t>(
+                            0xFFFF - IdInspectorResourceBase))
+                    {
+                        DestroyInspectorControls_();
+                        return false;
+                    }
+
+                    const noc::AttributeMetadata* constraint =
+                        engine_
+                            ? engine_->Reflection().FindPropertyAttribute(
+                                component.typeId,
+                                property.propertyId,
+                                noc::AttributeKind::ResourceTypeConstraint)
+                            : nullptr;
+
+                    const noc::TypeId resourceConstraint =
+                        constraint
+                            && constraint->valueKind
+                                == noc::AttributeValueKind::TypeId
+                            ? constraint->typeIdValue
+                            : noc::TypeId::Invalid();
+
+                    HWND picker = MakeButton(
+                        hwnd_,
+                        IdInspectorResourceBase
+                            + static_cast<int>(resourceIndex),
+                        L"<None>",
+                        Icon::Mesh,
+                        ButtonKind::Neutral,
+                        uiFont_);
+
+                    if (!picker)
+                    {
+                        DestroyInspectorControls_();
+                        return false;
+                    }
+
+                    ShowWindow(picker, SW_HIDE);
+
+                    try
+                    {
+                        inspectorResourceButtons_.push_back({
+                            picker,
+                            component.typeId,
+                            property.propertyId,
+                            resourceConstraint
+                        });
+                    }
+                    catch (const std::bad_alloc&)
+                    {
+                        DestroyWindow(picker);
+                        DestroyInspectorControls_();
+                        return false;
+                    }
+
+                    (void)SyncInspectorResourceValue_(
+                        inspectorResourceButtons_.back());
+                    continue;
+                }
+
                 if (!property.editable)
                     continue;
 
@@ -2046,6 +2141,7 @@ namespace nocturne::editor
 
         size_t bindingIndex = 0;
         size_t removeIndex = 0;
+        size_t resourceIndex = 0;
         int y = 43;
 
         for (const InspectorComponentView& component :
@@ -2086,7 +2182,44 @@ namespace nocturne::editor
             for (const InspectorPropertyView& property :
                  component.properties)
             {
-                if (property.editable)
+                if (IsResourcePickerProperty(property))
+                {
+                    if (resourceIndex
+                        >= inspectorResourceButtons_.size())
+                    {
+                        return;
+                    }
+
+                    HWND picker =
+                        inspectorResourceButtons_[resourceIndex].hwnd;
+
+                    const int x =
+                        labelWidth + 4;
+                    const int width =
+                        (std::max)(
+                            32,
+                            bodyWidth - x - 12);
+                    const bool visible =
+                        y >= 0
+                        && y + 24 <= bodyHeight - 40;
+
+                    if (picker)
+                    {
+                        MoveWindow(
+                            picker,
+                            bodyLeft + x,
+                            bodyTop + y + 1,
+                            width,
+                            22,
+                            TRUE);
+                        ShowWindow(
+                            picker,
+                            visible ? SW_SHOW : SW_HIDE);
+                    }
+
+                    ++resourceIndex;
+                }
+                else if (property.editable)
                 {
                     const uint32_t controlCount =
                         InspectorEditControlCount(
@@ -2226,6 +2359,382 @@ namespace nocturne::editor
         return nullptr;
     }
 
+    EditorShellV3::InspectorResourceBinding*
+    EditorShellV3::FindInspectorResourceButton_(
+        HWND source) noexcept
+    {
+        for (InspectorResourceBinding& binding :
+             inspectorResourceButtons_)
+        {
+            if (binding.hwnd == source)
+                return &binding;
+        }
+
+        return nullptr;
+    }
+
+    bool EditorShellV3::SyncInspectorResourceValue_(
+        const InspectorResourceBinding& binding)
+    {
+        if (!binding.hwnd
+            || !session_
+            || !inspectorModel_.Entity().IsValid())
+        {
+            return false;
+        }
+
+        auto context =
+            session_->CommandContext();
+
+        noc::OwnedReflectedValue value;
+        if (!inspectorModel_.ReadValue(
+                context,
+                inspectorModel_.Entity(),
+                binding.componentTypeId,
+                binding.propertyId,
+                value)
+            || value.Type()
+                != noc::BuiltinTypeIds::ResourceHandle
+            || !value.Data())
+        {
+            return false;
+        }
+
+        const noc::ResourceHandle handle =
+            *static_cast<const noc::ResourceHandle*>(
+                value.Data());
+
+        wchar_t label[96]{};
+        if (!handle.IsValid())
+        {
+            wcscpy_s(label, L"<None>");
+        }
+        else
+        {
+            swprintf_s(
+                label,
+                L"Mesh %u:%u",
+                handle.index,
+                handle.generation);
+        }
+
+        SetWindowTextW(
+            binding.hwnd,
+            label);
+        return true;
+    }
+
+    void EditorShellV3::ShowResourcePicker_(
+        InspectorResourceBinding& binding)
+    {
+        if (!engine_
+            || !session_
+            || !binding.hwnd
+            || !inspectorModel_.Entity().IsValid())
+        {
+            return;
+        }
+
+        if (binding.resourceConstraint
+            != noc::BuiltinTypeIds::MeshResource)
+        {
+            AppendConsole_(
+                L"Resource picker: reflected resource type is not supported by the Phase 16 picker.");
+            return;
+        }
+
+        struct MeshCandidate
+        {
+            std::wstring label;
+            std::string runtimeVPath;
+        };
+
+        std::vector<MeshCandidate> candidates;
+        namespace fs = std::filesystem;
+        std::error_code ec;
+        const fs::path contentRoot(contentRoot_);
+
+        try
+        {
+            if (fs::exists(contentRoot, ec))
+            {
+                for (fs::recursive_directory_iterator it(
+                         contentRoot,
+                         fs::directory_options::skip_permission_denied,
+                         ec),
+                     end;
+                     it != end;
+                     it.increment(ec))
+                {
+                    if (ec)
+                    {
+                        ec.clear();
+                        continue;
+                    }
+
+                    if (!it->is_regular_file(ec))
+                        continue;
+
+                    fs::path extension =
+                        it->path().extension();
+                    std::wstring ext =
+                        extension.wstring();
+                    std::transform(
+                        ext.begin(),
+                        ext.end(),
+                        ext.begin(),
+                        ::towlower);
+
+                    if (ext != L".obj"
+                        && ext != L".nmsh")
+                    {
+                        continue;
+                    }
+
+                    fs::path relative =
+                        fs::relative(
+                            it->path(),
+                            contentRoot,
+                            ec);
+                    if (ec)
+                    {
+                        ec.clear();
+                        continue;
+                    }
+
+                    std::wstring relativeWide =
+                        relative.generic_wstring();
+
+                    std::string relativeUtf8;
+                    if (!WideToUtf8_(
+                            relativeWide.c_str(),
+                            relativeUtf8))
+                    {
+                        continue;
+                    }
+
+                    std::string runtimeVPath =
+                        relativeUtf8;
+
+                    if (ext == L".obj")
+                    {
+                        runtimeVPath += ".nmsh";
+
+                        const fs::path artifact =
+                            fs::path(L"DerivedDataCache")
+                            / fs::path(
+                                relativeWide + L".nmsh");
+
+                        if (!fs::exists(artifact, ec))
+                        {
+                            ec.clear();
+                            continue;
+                        }
+                    }
+
+                    candidates.push_back({
+                        relativeWide,
+                        std::move(runtimeVPath)
+                    });
+                }
+            }
+
+            std::sort(
+                candidates.begin(),
+                candidates.end(),
+                [](const MeshCandidate& a,
+                   const MeshCandidate& b)
+                {
+                    return a.label < b.label;
+                });
+        }
+        catch (const std::bad_alloc&)
+        {
+            AppendConsole_(
+                L"Resource picker failed: allocation failure.");
+            return;
+        }
+
+        HMENU menu = CreatePopupMenu();
+        if (!menu)
+            return;
+
+        AppendMenuW(
+            menu,
+            MF_STRING,
+            1,
+            L"<None>");
+
+        if (candidates.empty())
+        {
+            AppendMenuW(
+                menu,
+                MF_STRING | MF_GRAYED,
+                0,
+                L"No imported mesh assets");
+        }
+        else
+        {
+            for (size_t i = 0;
+                 i < candidates.size();
+                 ++i)
+            {
+                if (i
+                    > static_cast<size_t>(
+                        0xFFFF - 2))
+                {
+                    break;
+                }
+
+                AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    static_cast<UINT_PTR>(i + 2),
+                    candidates[i].label.c_str());
+            }
+        }
+
+        RECT buttonRect{};
+        GetWindowRect(
+            binding.hwnd,
+            &buttonRect);
+
+        const int command =
+            TrackPopupMenuEx(
+                menu,
+                TPM_RETURNCMD
+                    | TPM_LEFTALIGN
+                    | TPM_TOPALIGN,
+                buttonRect.left,
+                buttonRect.bottom + 2,
+                hwnd_,
+                nullptr);
+
+        DestroyMenu(menu);
+
+        if (command <= 0)
+            return;
+
+        noc::ResourceHandle newHandle{};
+
+        if (command > 1)
+        {
+            const size_t candidateIndex =
+                static_cast<size_t>(command - 2);
+
+            if (candidateIndex >= candidates.size())
+                return;
+
+            auto typedHandle =
+                engine_->Resources().RequestMesh(
+                    candidates[candidateIndex]
+                        .runtimeVPath.c_str());
+
+            if (!typedHandle.IsValid())
+            {
+                AppendConsole_(
+                    L"Mesh assignment failed: ResourceManager rejected the runtime vpath.");
+                return;
+            }
+
+            // Design choice (not directly from the book): Phase 16 validates
+            // a picker selection before authoring it so a failed decode never
+            // replaces the previously assigned mesh. A bounded wait avoids an
+            // unbounded editor-main-thread stall; async picker UX is deferred.
+            constexpr uint32_t kEditorMeshValidationTimeoutMs =
+                2000;
+
+            if (!engine_->Resources().WaitUntilReady(
+                    typedHandle.Untyped(),
+                    kEditorMeshValidationTimeoutMs)
+                || !engine_->Resources().GetMesh(
+                    typedHandle))
+            {
+                const char* error =
+                    engine_->Resources().GetError(
+                        typedHandle.Untyped());
+
+                std::wstring message =
+                    L"Mesh assignment failed; previous mesh retained";
+                if (error && error[0] != '\0')
+                {
+                    message += L": ";
+                    message += Utf8ToWide_(error);
+                }
+                message += L".";
+                AppendConsole_(message.c_str());
+                return;
+            }
+
+            newHandle =
+                typedHandle.Untyped();
+        }
+
+        const noc::EntityHandle entity =
+            inspectorModel_.Entity();
+
+        auto context =
+            session_->CommandContext();
+
+        try
+        {
+            auto propertyCommand =
+                std::make_unique<
+                    SetReflectedPropertyCommand>();
+
+            if (!propertyCommand->Init(
+                    context,
+                    entity,
+                    binding.componentTypeId,
+                    binding.propertyId,
+                    noc::ReflectedConstValueView{
+                        noc::BuiltinTypeIds::ResourceHandle,
+                        &newHandle })
+                || !session_->History().Execute(
+                    context,
+                    std::move(propertyCommand)))
+            {
+                AppendConsole_(
+                    L"Mesh assignment rejected by reflected semantic setter.");
+                return;
+            }
+        }
+        catch (const std::bad_alloc&)
+        {
+            AppendConsole_(
+                L"Mesh assignment failed: allocation failure.");
+            return;
+        }
+
+        session_->SetSceneDirty();
+
+        if (!inspectorModel_.Refresh(
+                context,
+                entity))
+        {
+            AppendConsole_(
+                L"Inspector refresh after mesh assignment failed.");
+            return;
+        }
+
+        (void)SyncInspectorResourceValue_(
+            binding);
+
+        if (inspector_.body)
+        {
+            InvalidateRect(
+                inspector_.body,
+                nullptr,
+                FALSE);
+        }
+
+        UpdateStatus_();
+        AppendConsole_(
+            newHandle.IsValid()
+                ? L"Mesh assigned through reflected ResourceHandle property."
+                : L"Mesh assignment cleared.");
+    }
+
     bool EditorShellV3::SyncInspectorBindingValue_(
         const InspectorEditBinding& binding)
     {
@@ -2336,6 +2845,12 @@ namespace nocturne::editor
              inspectorEdits_)
         {
             (void)SyncInspectorBindingValue_(binding);
+        }
+
+        for (const InspectorResourceBinding& binding :
+             inspectorResourceButtons_)
+        {
+            (void)SyncInspectorResourceValue_(binding);
         }
 
         inspectorControlsRefreshing_ = false;
@@ -3408,6 +3923,17 @@ namespace nocturne::editor
 
             if (source)
             {
+                InspectorResourceBinding* resourceBinding =
+                    FindInspectorResourceButton_(source);
+
+                if (resourceBinding)
+                {
+                    ShowResourcePicker_(
+                        *resourceBinding);
+                    result = 0;
+                    return true;
+                }
+
                 InspectorComponentActionBinding* removeBinding =
                     FindInspectorRemoveButton_(source);
 
@@ -3717,6 +4243,10 @@ namespace nocturne::editor
                             DT_LEFT | DT_VCENTER
                                 | DT_SINGLELINE | DT_END_ELLIPSIS);
 
+                        const bool resourcePicker =
+                            IsResourcePickerProperty(
+                                property);
+
                         const uint32_t controlCount =
                             property.editable
                                 ? InspectorEditControlCount(
@@ -3724,7 +4254,11 @@ namespace nocturne::editor
                                     property)
                                 : 1u;
 
-                        if (controlCount == 3)
+                        if (resourcePicker)
+                        {
+                            // The child button owns the value field chrome.
+                        }
+                        else if (controlCount == 3)
                         {
                             constexpr int kAxisGap = 4;
                             constexpr int kAxisLabelWidth = 11;

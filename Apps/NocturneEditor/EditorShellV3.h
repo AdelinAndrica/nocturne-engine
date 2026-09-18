@@ -105,7 +105,8 @@ namespace nocturne::editor
 
             IdInspectorAddComponent = 11000,
             IdInspectorEditBase = 12000,
-            IdInspectorRemoveBase = 13000
+            IdInspectorRemoveBase = 13000,
+            IdInspectorResourceBase = 14000
         };
 
         struct Panel
@@ -128,6 +129,14 @@ namespace nocturne::editor
         {
             HWND hwnd = nullptr;
             noc::TypeId componentTypeId{};
+        };
+
+        struct InspectorResourceBinding
+        {
+            HWND hwnd = nullptr;
+            noc::TypeId componentTypeId{};
+            noc::PropertyId propertyId{};
+            noc::TypeId resourceConstraint{};
         };
 
         void CreateChrome_();
@@ -177,6 +186,12 @@ namespace nocturne::editor
             HWND source) const noexcept;
         [[nodiscard]] InspectorComponentActionBinding*
         FindInspectorRemoveButton_(HWND source) noexcept;
+        [[nodiscard]] InspectorResourceBinding*
+        FindInspectorResourceButton_(HWND source) noexcept;
+        [[nodiscard]] bool SyncInspectorResourceValue_(
+            const InspectorResourceBinding& binding);
+        void ShowResourcePicker_(
+            InspectorResourceBinding& binding);
 
         static LRESULT CALLBACK InspectorEditSubclassProc_(
             HWND hwnd,
@@ -249,6 +264,8 @@ namespace nocturne::editor
         std::vector<InspectorEditBinding> inspectorEdits_;
         std::vector<InspectorComponentActionBinding>
             inspectorRemoveButtons_;
+        std::vector<InspectorResourceBinding>
+            inspectorResourceButtons_;
         HWND inspectorAddComponent_ = nullptr;
         bool inspectorControlsRefreshing_ = false;
 
