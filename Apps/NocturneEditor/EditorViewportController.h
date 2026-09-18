@@ -38,20 +38,9 @@ namespace nocturne::editor
 
     private:
         static constexpr UINT_PTR kSubclassIdBody = 0x1401;
-        static constexpr UINT_PTR kSubclassIdTree = 0x1403;
         static constexpr UINT_PTR kSubclassIdRenderHost = 0x1404;
-        static constexpr int kValidationObjectCount = 4;
-
-        struct ValidationObject
-        {
-            noc::EntityHandle handle{};
-            bool selectable = true;
-        };
-
         static LRESULT CALLBACK OverlayProc_(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
         static LRESULT CALLBACK BodySubclassProc_(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam,
-            UINT_PTR subclassId, DWORD_PTR refData);
-        static LRESULT CALLBACK SceneTreeSubclassProc_(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam,
             UINT_PTR subclassId, DWORD_PTR refData);
         static LRESULT CALLBACK RenderHostSubclassProc_(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam,
             UINT_PTR subclassId, DWORD_PTR refData);
@@ -61,27 +50,16 @@ namespace nocturne::editor
         void UpdateCamera_();
         void ApplyCameraTransform_();
         void PaintOverlay_(HDC dc, const RECT& rc);
-        void PaintSceneHierarchy_(HWND hwnd, HDC dc, const RECT& rc);
-        int HierarchyRowFromY_(int y) const;
-        int HierarchyObjectIndexFromRow_(int row) const;
-
         bool Project_(const noc::Vec3& world, POINT& out) const;
         noc::Vec3 MakePickRay_(int x, int y) const;
         bool RayAabb_(const noc::Vec3& origin, const noc::Vec3& dir, const noc::AABB& box, float& outT) const;
-        bool RayValidationObject_(int index, const noc::Vec3& origin, const noc::Vec3& dir, float& outT) const;
-        noc::AABB ValidationWorldBounds_(int index) const;
-        const noc::TransformComponent* ValidationTransform_(int index) const;
-        const noc::RenderableComponent* ValidationRenderable_(int index) const;
-        int PickValidationObject_(const noc::Vec3& origin, const noc::Vec3& dir) const;
+        [[nodiscard]] noc::EntityHandle PickWorldEntity_(
+            const noc::Vec3& origin,
+            const noc::Vec3& dir) const;
 
-        [[nodiscard]] int ValidationIndexForEntity_(
-            noc::EntityHandle entity) const;
         [[nodiscard]] noc::EntityHandle SelectedEntity_() const;
         void SetSelectedEntity_(
             noc::EntityHandle entity,
-            bool syncTree = true);
-        void SetSelectedValidationIndex_(
-            int index,
             bool syncTree = true);
         void RefreshDebugSelection_();
         int HitGizmoAxis_(POINT p) const;
@@ -102,24 +80,19 @@ namespace nocturne::editor
         HWND body_ = nullptr;
         HWND renderHost_ = nullptr;
         HWND overlay_ = nullptr;
-        HWND sceneTree_ = nullptr;
 
         bool scenePrepared_ = false;
         bool renderAttached_ = false;
         bool cameraCapturing_ = false;
         bool gizmoDragging_ = false;
-        bool hierarchyObjectsExpanded_ = true;
         noc::EntityHandle dragEntity_{};
         int gizmoAxis_ = -1;
-        int hierarchySelectedRow_ = 0;
-        int hierarchyHoverRow_ = -1;
 
         POINT lastMouse_{};
         POINT dragStartMouse_{};
         int pendingMouseDx_ = 0;
         int pendingMouseDy_ = 0;
 
-        ValidationObject validationObjects_[kValidationObjectCount]{};
         noc::EntityHandle cameraObject_{};
 
         noc::Vec3 dragStartT_{};

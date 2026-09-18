@@ -2,13 +2,9 @@
 #include "EditorSession.h"
 
 #include "EditorShellV3.h"
-#include "EditorTheme.h"
-#include "EditorIconRenderer.h"
 
 #include <algorithm>
 #include <cmath>
-#include <string>
-#include <vector>
 
 #include <CommCtrl.h>
 #include <Windowsx.h>
@@ -29,7 +25,6 @@ namespace nocturne::editor
         constexpr int kMoveTool = 1007;
         constexpr int kRotateTool = 1008;
         constexpr int kScaleTool = 1009;
-        constexpr int kHierarchyRowHeight = 24;
         constexpr int kGizmoRingSegments = 64;
         constexpr float kGizmoTargetPixels = 88.0f;
         constexpr float kGizmoHitRadiusPixels = 9.0f;
@@ -163,30 +158,6 @@ namespace nocturne::editor
             DeleteObject(brush);
         }
 
-        COLORREF BlendColor(COLORREF a, COLORREF b, int bPercent)
-        {
-            const int aPercent = 100 - bPercent;
-            return RGB(
-                (GetRValue(a) * aPercent + GetRValue(b) * bPercent) / 100,
-                (GetGValue(a) * aPercent + GetGValue(b) * bPercent) / 100,
-                (GetBValue(a) * aPercent + GetBValue(b) * bPercent) / 100);
-        }
-
-        void FillColor(HDC dc, const RECT& rc, COLORREF color)
-        {
-            HBRUSH brush = CreateSolidBrush(color);
-            FillRect(dc, &rc, brush);
-            DeleteObject(brush);
-        }
-
-        void DrawHierarchyText(HDC dc, const wchar_t* text, RECT rc, COLORREF color, HFONT font)
-        {
-            SetBkMode(dc, TRANSPARENT);
-            SetTextColor(dc, color);
-            HGDIOBJ oldFont = font ? SelectObject(dc, font) : nullptr;
-            DrawTextW(dc, text, -1, &rc, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
-            if (oldFont) SelectObject(dc, oldFont);
-        }
     }
 
     bool EditorViewportController::PrepareScene(
@@ -201,43 +172,82 @@ namespace nocturne::editor
         auto& world = engine.GetWorld();
         const noc::ResourceHandle logicalMesh = engine.Resources().RequestBinary("Meshes/triangle.nmsh");
 
-        auto createValidationObject = [&](int index, const char* name, const noc::Vec3& t, const noc::Quat& r,
-            const noc::Vec3& s, bool selectable) -> bool
+        auto createBootstrapObject = [&](
+            const char* name,
+            const noc::Vec3& translation,
+            const noc::Quat& rotation,
+            const noc::Vec3& scale) -> noc::EntityHandle
         {
-            ValidationObject& object = validationObjects_[index];
-            object.handle = world.CreateObject();
-            if (!object.handle.IsValid())
-                return false;
-
-            object.selectable = selectable;
+            const noc::EntityHandle entity = world.CreateObject();
+            if (!entity.IsValid())
+                return noc::EntityHandle::Invalid();
 
             const noc::AABB localBounds{
                 noc::Vec3(-1.0f, -1.0f, -1.0f),
                 noc::Vec3(1.0f, 1.0f, 1.0f)
             };
 
-            if (!world.AddName(object.handle, name)
-                || !world.SetLocalTRS(object.handle, t, r, s)
-                || !world.SetRenderable(object.handle, logicalMesh, localBounds))
+            if (!world.AddName(entity, name)
+                || !world.SetLocalTRS(
+                    entity,
+                    translation,
+                    rotation,
+                    scale)
+                || !world.SetRenderable(
+                    entity,
+                    logicalMesh,
+                    localBounds))
             {
-                NOC_LOG_ERROR("Editor", "Failed to initialize validation entity components (index=%d)", index);
-                world.DestroyObject(object.handle);
-                object.handle = noc::EntityHandle::Invalid();
-                return false;
+                (void)world.DestroyEntity(entity);
+                return noc::EntityHandle::Invalid();
             }
 
-            return true;
+            return entity;
         };
 
-        // Design choice (not directly from the book): deterministic Phase 14
-        // viewport scene. Ground is selectable because it is exposed as a real
-        // hierarchy object alongside the three validation cubes.
-        if (!createValidationObject(0, "Cube_A", { 0.0f, -0.15f, 6.0f }, noc::Quat::Identity(), { 1.0f, 1.0f, 1.0f }, true) ||
-            !createValidationObject(1, "Cube_B", { -2.5f, -0.10f, 9.0f }, AxisAngle({ 0,1,0 }, 0.38f), { 0.8f, 1.05f, 0.8f }, true) ||
-            !createValidationObject(2, "Cube_C", { 2.4f, -0.35f, 11.0f }, AxisAngle({ 0,1,0 }, -0.52f), { 1.1f, 0.8f, 1.1f }, true) ||
-            !createValidationObject(3, "Ground", { 0.0f, -1.25f, 9.0f }, noc::Quat::Identity(), { 6.5f, 0.10f, 7.5f }, true))
+        // Design choice (not directly from the book): retain the deterministic
+        // Phase 14 demo scene as startup content only. No editor subsystem stores
+        // these handles as authoring identity; hierarchy and picking discover
+        // authored entities directly from World.
+        noc::EntityHandle bootstrap[4]{
+            createBootstrapObject(
+                "Cube_A",
+                { 0.0f, -0.15f, 6.0f },
+                noc::Quat::Identity(),
+                { 1.0f, 1.0f, 1.0f }),
+            createBootstrapObject(
+                "Cube_B",
+                { -2.5f, -0.10f, 9.0f },
+                AxisAngle({ 0,1,0 }, 0.38f),
+                { 0.8f, 1.05f, 0.8f }),
+            createBootstrapObject(
+                "Cube_C",
+                { 2.4f, -0.35f, 11.0f },
+                AxisAngle({ 0,1,0 }, -0.52f),
+                { 1.1f, 0.8f, 1.1f }),
+            createBootstrapObject(
+                "Ground",
+                { 0.0f, -1.25f, 9.0f },
+                noc::Quat::Identity(),
+                { 6.5f, 0.10f, 7.5f })
+        };
+
+        bool bootstrapOk = true;
+        for (const noc::EntityHandle entity : bootstrap)
+            bootstrapOk = bootstrapOk && entity.IsValid();
+
+        if (!bootstrapOk)
         {
-            NOC_LOG_ERROR("Editor", "Failed to create Phase 14 validation scene objects");
+            for (const noc::EntityHandle entity : bootstrap)
+            {
+                if (entity.IsValid() && world.IsAlive(entity))
+                    (void)world.DestroyEntity(entity);
+            }
+
+            NOC_LOG_ERROR(
+                "Editor",
+                "%s",
+                "Failed to create Phase 14 bootstrap scene objects");
             return false;
         }
 
@@ -313,10 +323,13 @@ namespace nocturne::editor
         session_ = &session;
         topLevel_ = static_cast<HWND>(window.Handle());
         body_ = shell.ViewportBody();
-        sceneTree_ = shell.SceneTree();
-        if (!topLevel_ || !body_ || !sceneTree_)
+        if (!topLevel_ || !body_)
         {
-            NOC_LOG_ERROR("Editor", "Phase 14 viewport attach missing HWND (top=%p body=%p tree=%p)", topLevel_, body_, sceneTree_);
+            NOC_LOG_ERROR(
+                "Editor",
+                "Viewport attach missing HWND (top=%p body=%p)",
+                topLevel_,
+                body_);
             return false;
         }
 
@@ -366,8 +379,6 @@ namespace nocturne::editor
             return false;
         }
 
-        hierarchySelectedRow_ = 0;
-        InvalidateRect(sceneTree_, nullptr, FALSE);
         NOC_LOG_INFO("Editor", "Phase 14 viewport controller attached; frame-synchronized camera input active");
         return true;
     }
@@ -394,8 +405,6 @@ namespace nocturne::editor
         pendingMouseDy_ = 0;
         dragEntity_ = noc::EntityHandle::Invalid();
         gizmoAxis_ = -1;
-        hierarchySelectedRow_ = 0;
-        hierarchyHoverRow_ = -1;
         session_ = nullptr;
         shell_ = nullptr;
         window_ = nullptr;
@@ -403,7 +412,6 @@ namespace nocturne::editor
         body_ = nullptr;
         overlay_ = nullptr;
         renderHost_ = nullptr;
-        sceneTree_ = nullptr;
         engine_ = nullptr;
     }
 
@@ -592,81 +600,47 @@ namespace nocturne::editor
         return tmax >= 0.0f;
     }
 
-    const noc::TransformComponent* EditorViewportController::ValidationTransform_(int index) const
+    noc::EntityHandle EditorViewportController::PickWorldEntity_(
+        const noc::Vec3& origin,
+        const noc::Vec3& dir) const
     {
-        if (!engine_ || index < 0 || index >= kValidationObjectCount)
-            return nullptr;
+        if (!engine_ || !session_)
+            return noc::EntityHandle::Invalid();
 
-        return engine_->GetWorld().GetTransform(validationObjects_[index].handle);
-    }
-
-    const noc::RenderableComponent* EditorViewportController::ValidationRenderable_(int index) const
-    {
-        if (!engine_ || index < 0 || index >= kValidationObjectCount)
-            return nullptr;
-
-        return engine_->GetWorld().GetRenderable(validationObjects_[index].handle);
-    }
-
-    bool EditorViewportController::RayValidationObject_(int index, const noc::Vec3& origin,
-        const noc::Vec3& dir, float& outT) const
-    {
-        const noc::TransformComponent* transform = ValidationTransform_(index);
-        const noc::RenderableComponent* renderable = ValidationRenderable_(index);
-        if (!transform || !renderable)
-            return false;
-
-        const noc::Vec3& scale = transform->localScale;
-        if (std::fabs(scale.x) <= 1e-6f || std::fabs(scale.y) <= 1e-6f || std::fabs(scale.z) <= 1e-6f)
-            return false;
-
-        const noc::Quat& rotation = transform->localRotation;
-        const noc::Vec3& translation = transform->localTranslation;
-        const noc::Quat invRot{ -rotation.x, -rotation.y, -rotation.z, rotation.w };
-        noc::Vec3 localOrigin = noc::Rotate(invRot, origin - translation);
-        noc::Vec3 localDir = noc::Rotate(invRot, dir);
-        localOrigin.x /= scale.x; localOrigin.y /= scale.y; localOrigin.z /= scale.z;
-        localDir.x /= scale.x; localDir.y /= scale.y; localDir.z /= scale.z;
-        return RayAabb_(localOrigin, localDir, renderable->localBounds, outT);
-    }
-
-    noc::AABB EditorViewportController::ValidationWorldBounds_(int index) const
-    {
-        const noc::RenderableComponent* renderable = ValidationRenderable_(index);
-        return renderable ? renderable->worldBounds : noc::AABB{};
-    }
-
-    int EditorViewportController::PickValidationObject_(const noc::Vec3& origin, const noc::Vec3& dir) const
-    {
-        int nearestIndex = -1;
+        const noc::World& world = engine_->GetWorld();
+        noc::EntityHandle nearest = noc::EntityHandle::Invalid();
         float nearestT = 1.0e30f;
-        for (int i = 0; i < kValidationObjectCount; ++i)
+
+        for (uint32_t i = 0; i < world.EntityCapacity(); ++i)
         {
-            const ValidationObject& object = validationObjects_[i];
-            if (!object.selectable || !object.handle.IsValid()) continue;
+            const noc::EntityHandle entity = world.EntityAtIndex(i);
+            if (!entity.IsValid()
+                || session_->IsToolOwned(entity)
+                || !world.HasTransform(entity))
+            {
+                continue;
+            }
+
+            const noc::RenderableComponent* renderable =
+                world.GetRenderable(entity);
+            if (!renderable || !renderable->enabled)
+                continue;
+
             float t = 0.0f;
-            if (RayValidationObject_(i, origin, dir, t) && t >= 0.0f && t < nearestT)
+            if (RayAabb_(
+                    origin,
+                    dir,
+                    renderable->worldBounds,
+                    t)
+                && t >= 0.0f
+                && t < nearestT)
             {
                 nearestT = t;
-                nearestIndex = i;
+                nearest = entity;
             }
         }
-        return nearestIndex;
-    }
 
-    int EditorViewportController::ValidationIndexForEntity_(
-        noc::EntityHandle entity) const
-    {
-        if (!entity.IsValid())
-            return -1;
-
-        for (int i = 0; i < kValidationObjectCount; ++i)
-        {
-            if (validationObjects_[i].handle == entity)
-                return i;
-        }
-
-        return -1;
+        return nearest;
     }
 
     noc::EntityHandle EditorViewportController::SelectedEntity_() const
@@ -721,25 +695,6 @@ namespace nocturne::editor
 
         if (overlay_)
             InvalidateRect(overlay_, nullptr, FALSE);
-    }
-
-    void EditorViewportController::SetSelectedValidationIndex_(
-        int index,
-        bool syncTree)
-    {
-        if (index < 0
-            || index >= kValidationObjectCount
-            || !validationObjects_[index].selectable)
-        {
-            SetSelectedEntity_(
-                noc::EntityHandle::Invalid(),
-                syncTree);
-            return;
-        }
-
-        SetSelectedEntity_(
-            validationObjects_[index].handle,
-            syncTree);
     }
 
     int EditorViewportController::ActiveTool_() const
@@ -979,8 +934,8 @@ namespace nocturne::editor
                 const int axis = HitGizmoAxis_(mouse);
                 if (axis >= 0) { BeginGizmoDrag_(axis, mouse); break; }
             }
-            SetSelectedValidationIndex_(
-                PickValidationObject_(
+            SetSelectedEntity_(
+                PickWorldEntity_(
                     cameraPos_,
                     MakePickRay_(mouse.x, mouse.y)));
             break;
@@ -1113,131 +1068,6 @@ namespace nocturne::editor
         }
     }
 
-    int EditorViewportController::HierarchyRowFromY_(int y) const
-    {
-        if (y < 0) return -1;
-        const int row = y / kHierarchyRowHeight;
-        const int count = hierarchyObjectsExpanded_ ? 8 : 4;
-        return row >= 0 && row < count ? row : -1;
-    }
-
-    int EditorViewportController::HierarchyObjectIndexFromRow_(int row) const
-    {
-        if (!hierarchyObjectsExpanded_) return -1;
-        return row >= 2 && row < 2 + kValidationObjectCount ? row - 2 : -1;
-    }
-
-    void EditorViewportController::PaintSceneHierarchy_(HWND hwnd, HDC dc, const RECT& rc)
-    {
-        const auto& colors = EditorTheme::Colors();
-        FillColor(dc, rc, colors.panelBg);
-        HFONT font = reinterpret_cast<HFONT>(SendMessageW(hwnd, WM_GETFONT, 0, 0));
-
-        struct Row
-        {
-            const wchar_t* text;
-            int depth;
-            EditorIconId icon;
-            bool expandable;
-            bool expanded;
-        };
-
-        auto runtimeName = [&](noc::EntityHandle entity, const wchar_t* fallback) -> std::wstring
-        {
-            if (!engine_)
-                return fallback;
-
-            const noc::NameComponent* name = engine_->GetWorld().GetName(entity);
-            if (!name || name->value[0] == '\0')
-                return fallback;
-
-            const int required = MultiByteToWideChar(
-                CP_UTF8,
-                MB_ERR_INVALID_CHARS,
-                name->value,
-                -1,
-                nullptr,
-                0);
-
-            if (required <= 1)
-                return fallback;
-
-            std::wstring result(static_cast<size_t>(required), L'\0');
-            if (MultiByteToWideChar(
-                    CP_UTF8,
-                    MB_ERR_INVALID_CHARS,
-                    name->value,
-                    -1,
-                    result.data(),
-                    required) <= 0)
-            {
-                return fallback;
-            }
-
-            result.resize(static_cast<size_t>(required - 1));
-            return result;
-        };
-
-        std::wstring validationNames[kValidationObjectCount] = {
-            runtimeName(validationObjects_[0].handle, L"Cube_A"),
-            runtimeName(validationObjects_[1].handle, L"Cube_B"),
-            runtimeName(validationObjects_[2].handle, L"Cube_C"),
-            runtimeName(validationObjects_[3].handle, L"Ground")
-        };
-        const std::wstring cameraName = runtimeName(cameraObject_, L"Main Camera");
-
-        std::vector<Row> rows;
-        rows.reserve(8);
-        rows.push_back({ L"Scene (Runtime World)", 0, EditorIconId::World, true, true });
-        rows.push_back({ L"Runtime Objects (4)", 1, EditorIconId::Folder, true, hierarchyObjectsExpanded_ });
-        if (hierarchyObjectsExpanded_)
-        {
-            rows.push_back({ validationNames[0].c_str(), 2, EditorIconId::Cube, false, true });
-            rows.push_back({ validationNames[1].c_str(), 2, EditorIconId::Cube, false, true });
-            rows.push_back({ validationNames[2].c_str(), 2, EditorIconId::Cube, false, true });
-            rows.push_back({ validationNames[3].c_str(), 2, EditorIconId::Grid, false, true });
-        }
-        rows.push_back({ cameraName.c_str(), 1, EditorIconId::Camera, false, true });
-        rows.push_back({ L"Environment (Procedural Sky)", 1, EditorIconId::World, false, true });
-
-        int y = 0;
-        for (int rowIndex = 0; rowIndex < static_cast<int>(rows.size()); ++rowIndex, y += kHierarchyRowHeight)
-        {
-            if (y >= rc.bottom) break;
-            const Row& item = rows[rowIndex];
-            RECT rowRc{ 0, y, rc.right - 10, y + kHierarchyRowHeight };
-            if (rowIndex == hierarchySelectedRow_)
-                FillColor(dc, rowRc, BlendColor(colors.panelBg, colors.accent, 35));
-            else if (rowIndex == hierarchyHoverRow_)
-                FillColor(dc, rowRc, colors.panelBgAlt);
-
-            const int arrowX = 9 + item.depth * 16;
-            if (item.expandable)
-            {
-                POINT p[3]{};
-                if (item.expanded)
-                {
-                    p[0] = { arrowX + 2, y + 9 }; p[1] = { arrowX + 10, y + 9 }; p[2] = { arrowX + 6, y + 13 };
-                }
-                else
-                {
-                    p[0] = { arrowX + 4, y + 7 }; p[1] = { arrowX + 4, y + 15 }; p[2] = { arrowX + 9, y + 11 };
-                }
-                HBRUSH brush = CreateSolidBrush(colors.textMuted);
-                HGDIOBJ oldBrush = SelectObject(dc, brush);
-                HGDIOBJ oldPen = SelectObject(dc, GetStockObject(NULL_PEN));
-                Polygon(dc, p, 3);
-                SelectObject(dc, oldPen); SelectObject(dc, oldBrush); DeleteObject(brush);
-            }
-
-            RECT iconRc{ arrowX + 15, y + 5, arrowX + 29, y + 19 };
-            DrawEditorSvgIcon(dc, item.icon, iconRc,
-                rowIndex == hierarchySelectedRow_ ? colors.textPrimary : colors.textMuted);
-            RECT textRc{ arrowX + 34, y, rowRc.right - 4, y + kHierarchyRowHeight };
-            DrawHierarchyText(dc, item.text, textRc, colors.textPrimary, font);
-        }
-    }
-
     LRESULT CALLBACK EditorViewportController::OverlayProc_(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     {
         auto* self = reinterpret_cast<EditorViewportController*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
@@ -1311,82 +1141,4 @@ namespace nocturne::editor
         return DefSubclassProc(hwnd, msg, wParam, lParam);
     }
 
-    LRESULT CALLBACK EditorViewportController::SceneTreeSubclassProc_(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam,
-        UINT_PTR subclassId, DWORD_PTR refData)
-    {
-        (void)subclassId;
-        auto* self = reinterpret_cast<EditorViewportController*>(refData);
-        if (!self)
-            return DefSubclassProc(hwnd, msg, wParam, lParam);
-
-        switch (msg)
-        {
-        case WM_ERASEBKGND:
-            return 1;
-        case WM_PAINT:
-        {
-            PAINTSTRUCT ps{};
-            HDC dc = BeginPaint(hwnd, &ps);
-            RECT rc{}; GetClientRect(hwnd, &rc);
-            self->PaintSceneHierarchy_(hwnd, dc, rc);
-            EndPaint(hwnd, &ps);
-            return 0;
-        }
-        case WM_MOUSEMOVE:
-        {
-            const int row = self->HierarchyRowFromY_(GET_Y_LPARAM(lParam));
-            if (row != self->hierarchyHoverRow_)
-            {
-                self->hierarchyHoverRow_ = row;
-                InvalidateRect(hwnd, nullptr, FALSE);
-            }
-            TRACKMOUSEEVENT t{ sizeof(t), TME_LEAVE, hwnd, 0 };
-            TrackMouseEvent(&t);
-            return 0;
-        }
-        case WM_MOUSELEAVE:
-            self->hierarchyHoverRow_ = -1;
-            InvalidateRect(hwnd, nullptr, FALSE);
-            return 0;
-        case WM_LBUTTONDOWN:
-        {
-            SetFocus(hwnd);
-            const int row = self->HierarchyRowFromY_(GET_Y_LPARAM(lParam));
-            if (row < 0) return 0;
-
-            if (row == 1)
-            {
-                const int x = GET_X_LPARAM(lParam);
-                const int arrowX = 9 + 16;
-                if (x >= arrowX && x <= arrowX + 14)
-                    self->hierarchyObjectsExpanded_ = !self->hierarchyObjectsExpanded_;
-
-                self->SetSelectedEntity_(noc::EntityHandle::Invalid(), false);
-                self->hierarchySelectedRow_ = 1;
-            }
-            else
-            {
-                const int objectIndex = self->HierarchyObjectIndexFromRow_(row);
-                if (objectIndex >= 0)
-                {
-                    self->SetSelectedValidationIndex_(objectIndex, false);
-                    self->hierarchySelectedRow_ = row;
-                }
-                else
-                {
-                    self->SetSelectedEntity_(noc::EntityHandle::Invalid(), false);
-                    self->hierarchySelectedRow_ = row;
-                }
-            }
-            InvalidateRect(hwnd, nullptr, FALSE);
-            if (self->overlay_) InvalidateRect(self->overlay_, nullptr, FALSE);
-            return 0;
-        }
-        case WM_LBUTTONUP:
-        case WM_MOUSEWHEEL:
-            return 0;
-        }
-
-        return DefSubclassProc(hwnd, msg, wParam, lParam);
-    }
 }
