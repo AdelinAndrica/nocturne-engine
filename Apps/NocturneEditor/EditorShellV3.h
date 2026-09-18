@@ -19,6 +19,13 @@ namespace nocturne::editor { class EditorSession; }
 
 namespace nocturne::editor
 {
+    enum class InspectorEditPresentation : uint8_t
+    {
+        Generic = 0,
+        Vector3Axis,
+        EulerDegreesAxis
+    };
+
     // Phase 13 UI Fidelity Pass 3 shell.
     // Design choice (not directly from the book): editor-only custom Win32/GDI controls
     // provide deterministic Nocturne styling without leaking into runtime game UI.
@@ -112,6 +119,9 @@ namespace nocturne::editor
             HWND hwnd = nullptr;
             noc::TypeId componentTypeId{};
             noc::PropertyId propertyId{};
+            InspectorEditPresentation presentation =
+                InspectorEditPresentation::Generic;
+            uint8_t axis = 0;
         };
 
         struct InspectorComponentActionBinding
@@ -151,6 +161,8 @@ namespace nocturne::editor
         [[nodiscard]] bool RebuildInspectorControls_();
         void LayoutInspectorControls_();
         void SyncInspectorControlValues_();
+        [[nodiscard]] bool SyncInspectorBindingValue_(
+            const InspectorEditBinding& binding);
         [[nodiscard]] bool CommitInspectorEdit_(HWND source);
         void CancelInspectorEdit_(HWND source);
 

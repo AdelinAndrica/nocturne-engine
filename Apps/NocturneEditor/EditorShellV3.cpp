@@ -7,6 +7,9 @@
 #include "NocturneEditorResource.h"
 
 #include <algorithm>
+#include <cerrno>
+#include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <memory>
@@ -23,6 +26,8 @@
 #include "Core/Log.h"
 #include "Runtime/Engine.h"
 #include "Runtime/World.h"
+#include "Runtime/Components/TransformComponent.h"
+#include "Runtime/Reflection/BuiltinTypes.h"
 
 #pragma comment(lib, "Comctl32.lib")
 #pragma comment(lib, "Dwmapi.lib")
@@ -47,6 +52,206 @@ namespace nocturne::editor
             noc::EntityHandle child{};
             noc::EntityHandle parent{};
         };
+
+        constexpr noc::TypeId kInspectorTransformTypeId{
+            noc::kTransformComponentTypeId.value
+        };
+        constexpr noc::PropertyId kInspectorTranslationPropertyId =
+            noc::MakePropertyId(
+                "Nocturne.Transform.localTranslation");
+        constexpr noc::PropertyId kInspectorRotationPropertyId =
+            noc::MakePropertyId(
+                "Nocturne.Transform.localRotation");
+        constexpr noc::PropertyId kInspectorScalePropertyId =
+            noc::MakePropertyId(
+                "Nocturne.Transform.localScale");
+
+        InspectorEditPresentation InspectorPresentationFor(
+            noc::TypeId componentTypeId,
+            const InspectorPropertyView& property) noexcept
+        {
+            if (componentTypeId != kInspectorTransformTypeId)
+                return InspectorEditPresentation::Generic;
+
+            if ((property.propertyId == kInspectorTranslationPropertyId
+                    || property.propertyId == kInspectorScalePropertyId)
+                && property.valueTypeId == noc::BuiltinTypeIds::Vec3)
+            {
+                return InspectorEditPresentation::Vector3Axis;
+            }
+
+            if (property.propertyId == kInspectorRotationPropertyId
+                && property.valueTypeId == noc::BuiltinTypeIds::Quat)
+            {
+                return InspectorEditPresentation::EulerDegreesAxis;
+            }
+
+            return InspectorEditPresentation::Generic;
+        }
+
+        uint32_t InspectorEditControlCount(
+            noc::TypeId componentTypeId,
+            const InspectorPropertyView& property) noexcept
+        {
+            return InspectorPresentationFor(
+                       componentTypeId,
+                       property)
+                    == InspectorEditPresentation::Generic
+                ? 1u
+                : 3u;
+        }
+
+        const wchar_t* InspectorPropertyPresentationLabel(
+            noc::TypeId componentTypeId,
+            const InspectorPropertyView& property) noexcept
+        {
+            if (componentTypeId != kInspectorTransformTypeId)
+                return nullptr;
+
+            if (property.propertyId == kInspectorTranslationPropertyId)
+                return L"Position";
+            if (property.propertyId == kInspectorRotationPropertyId)
+                return L"Rotation";
+            if (property.propertyId == kInspectorScalePropertyId)
+                return L"Scale";
+
+            return nullptr;
+        }
+
+        bool ParseFiniteInspectorFloat(
+            const char* text,
+            float& outValue) noexcept
+        {
+            if (!text)
+                return false;
+
+            errno = 0;
+            char* end = nullptr;
+            const float value =
+                std::strtof(text, &end);
+
+            if (end == text
+                || errno == ERANGE
+                || !std::isfinite(value))
+            {
+                return false;
+            }
+
+            while (*end == ' '
+                || *end == '\t'
+                || *end == '\r'
+                || *end == '\n')
+            {
+                ++end;
+            }
+
+            if (*end != '\0')
+                return false;
+
+            outValue = value;
+            return true;
+        }
+
+        noc::Quat InspectorMulQuat(
+            const noc::Quat& a,
+            const noc::Quat& b) noexcept
+        {
+            return {
+                a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+                a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+                a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
+                a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z
+            };
+        }
+
+        noc::Quat InspectorNormalizeQuat(
+            const noc::Quat& value) noexcept
+        {
+            const float lengthSq =
+                value.x * value.x
+                + value.y * value.y
+                + value.z * value.z
+                + value.w * value.w;
+
+            if (!std::isfinite(lengthSq)
+                || lengthSq <= 1.0e-12f)
+            {
+                return noc::Quat::Identity();
+            }
+
+            const float invLength =
+                1.0f / std::sqrt(lengthSq);
+
+            return {
+                value.x * invLength,
+                value.y * invLength,
+                value.z * invLength,
+                value.w * invLength
+            };
+        }
+
+        noc::Vec3 InspectorEulerXYZDegreesFromQuat(
+            const noc::Quat& source) noexcept
+        {
+            constexpr float kRadiansToDegrees =
+                57.29577951308232f;
+
+            const noc::Quat q =
+                InspectorNormalizeQuat(source);
+
+            const float sinX =
+                2.0f * (q.w * q.x + q.y * q.z);
+            const float cosX =
+                1.0f - 2.0f * (q.x * q.x + q.y * q.y);
+
+            const float sinY =
+                (std::clamp)(
+                    2.0f * (q.w * q.y - q.z * q.x),
+                    -1.0f,
+                    1.0f);
+
+            const float sinZ =
+                2.0f * (q.w * q.z + q.x * q.y);
+            const float cosZ =
+                1.0f - 2.0f * (q.y * q.y + q.z * q.z);
+
+            return {
+                std::atan2(sinX, cosX) * kRadiansToDegrees,
+                std::asin(sinY) * kRadiansToDegrees,
+                std::atan2(sinZ, cosZ) * kRadiansToDegrees
+            };
+        }
+
+        noc::Quat InspectorQuatFromEulerXYZDegrees(
+            const noc::Vec3& degrees) noexcept
+        {
+            constexpr float kDegreesToRadians =
+                0.017453292519943295f;
+
+            const float hx =
+                degrees.x * kDegreesToRadians * 0.5f;
+            const float hy =
+                degrees.y * kDegreesToRadians * 0.5f;
+            const float hz =
+                degrees.z * kDegreesToRadians * 0.5f;
+
+            const noc::Quat qx{
+                std::sin(hx), 0.0f, 0.0f, std::cos(hx)
+            };
+            const noc::Quat qy{
+                0.0f, std::sin(hy), 0.0f, std::cos(hy)
+            };
+            const noc::Quat qz{
+                0.0f, 0.0f, std::sin(hz), std::cos(hz)
+            };
+
+            // Design choice (not directly from the book): editor Euler XYZ
+            // means X then Y then Z for column vectors, so q = qZ * qY * qX.
+            return InspectorNormalizeQuat(
+                InspectorMulQuat(
+                    qz,
+                    InspectorMulQuat(qy, qx)));
+        }
 
         enum class Icon
         {
@@ -1717,7 +1922,12 @@ namespace nocturne::editor
                  component.properties)
             {
                 if (property.editable)
-                    ++editableCount;
+                {
+                    editableCount +=
+                        InspectorEditControlCount(
+                            component.typeId,
+                            property);
+                }
             }
         }
 
@@ -1785,94 +1995,111 @@ namespace nocturne::editor
                 if (!property.editable)
                     continue;
 
-                const size_t bindingIndex =
-                    inspectorEdits_.size();
-
-                if (bindingIndex
-                    > static_cast<size_t>(
-                        0xFFFF - IdInspectorEditBase))
-                {
-                    DestroyInspectorControls_();
-                    return false;
-                }
-
-                const int controlId =
-                    IdInspectorEditBase
-                    + static_cast<int>(bindingIndex);
-
-                const std::wstring displayValue =
-                    Utf8ToWide_(
-                        property.displayValue.c_str());
-
-                HWND edit = CreateWindowExW(
-                    0,
-                    L"EDIT",
-                    displayValue.c_str(),
-                    WS_CHILD | WS_TABSTOP
-                        | WS_BORDER | ES_AUTOHSCROLL,
-                    0, 0, 1, 1,
-                    hwnd_,
-                    reinterpret_cast<HMENU>(
-                        static_cast<INT_PTR>(controlId)),
-                    GetModuleHandleW(nullptr),
-                    nullptr);
-
-                if (!edit)
-                {
-                    DestroyInspectorControls_();
-                    return false;
-                }
-
-                SendMessageW(
-                    edit,
-                    WM_SETFONT,
-                    reinterpret_cast<WPARAM>(uiFont_),
-                    TRUE);
-
-                if (!SetWindowSubclass(
-                        edit,
-                        &EditorShellV3::InspectorEditSubclassProc_,
-                        0x1620,
-                        reinterpret_cast<DWORD_PTR>(this)))
-                {
-                    DestroyWindow(edit);
-                    DestroyInspectorControls_();
-                    return false;
-                }
-
-                try
-                {
-                    inspectorEdits_.push_back({
-                        edit,
+                const InspectorEditPresentation presentation =
+                    InspectorPresentationFor(
                         component.typeId,
-                        property.propertyId
-                    });
-                }
-                catch (const std::bad_alloc&)
+                        property);
+
+                const uint32_t controlCount =
+                    InspectorEditControlCount(
+                        component.typeId,
+                        property);
+
+                for (uint32_t axis = 0;
+                     axis < controlCount;
+                     ++axis)
                 {
-                    RemoveWindowSubclass(
+                    const size_t bindingIndex =
+                        inspectorEdits_.size();
+
+                    if (bindingIndex
+                        > static_cast<size_t>(
+                            0xFFFF - IdInspectorEditBase))
+                    {
+                        DestroyInspectorControls_();
+                        return false;
+                    }
+
+                    const int controlId =
+                        IdInspectorEditBase
+                        + static_cast<int>(bindingIndex);
+
+                    const std::wstring displayValue =
+                        presentation
+                                == InspectorEditPresentation::Generic
+                            ? Utf8ToWide_(
+                                property.displayValue.c_str())
+                            : L"";
+
+                    HWND edit = CreateWindowExW(
+                        0,
+                        L"EDIT",
+                        displayValue.c_str(),
+                        WS_CHILD | WS_TABSTOP
+                            | WS_BORDER | ES_AUTOHSCROLL,
+                        0, 0, 1, 1,
+                        hwnd_,
+                        reinterpret_cast<HMENU>(
+                            static_cast<INT_PTR>(controlId)),
+                        GetModuleHandleW(nullptr),
+                        nullptr);
+
+                    if (!edit)
+                    {
+                        DestroyInspectorControls_();
+                        return false;
+                    }
+
+                    SendMessageW(
                         edit,
-                        &EditorShellV3::InspectorEditSubclassProc_,
-                        0x1620);
-                    DestroyWindow(edit);
-                    DestroyInspectorControls_();
-                    return false;
+                        WM_SETFONT,
+                        reinterpret_cast<WPARAM>(uiFont_),
+                        TRUE);
+
+                    if (!SetWindowSubclass(
+                            edit,
+                            &EditorShellV3::InspectorEditSubclassProc_,
+                            0x1620,
+                            reinterpret_cast<DWORD_PTR>(this)))
+                    {
+                        DestroyWindow(edit);
+                        DestroyInspectorControls_();
+                        return false;
+                    }
+
+                    try
+                    {
+                        inspectorEdits_.push_back({
+                            edit,
+                            component.typeId,
+                            property.propertyId,
+                            presentation,
+                            static_cast<uint8_t>(axis)
+                        });
+                    }
+                    catch (const std::bad_alloc&)
+                    {
+                        RemoveWindowSubclass(
+                            edit,
+                            &EditorShellV3::InspectorEditSubclassProc_,
+                            0x1620);
+                        DestroyWindow(edit);
+                        DestroyInspectorControls_();
+                        return false;
+                    }
                 }
             }
         }
 
+        SyncInspectorControlValues_();
         LayoutInspectorControls_();
         return true;
     }
 
     void EditorShellV3::LayoutInspectorControls_()
     {
-        if (!hwnd_
-            || !inspector_.body
-            || inspectorEdits_.empty())
-        {
+        if (!hwnd_ || !inspector_.body)
             return;
-        }
 
         RECT bodyWindow{};
         RECT bodyClient{};
@@ -1961,11 +2188,16 @@ namespace nocturne::editor
             {
                 if (property.editable)
                 {
-                    if (bindingIndex >= inspectorEdits_.size())
-                        return;
+                    const uint32_t controlCount =
+                        InspectorEditControlCount(
+                            component.typeId,
+                            property);
 
-                    HWND edit =
-                        inspectorEdits_[bindingIndex].hwnd;
+                    if (bindingIndex + controlCount
+                        > inspectorEdits_.size())
+                    {
+                        return;
+                    }
 
                     const int x =
                         labelWidth + 4;
@@ -1974,26 +2206,80 @@ namespace nocturne::editor
                             32,
                             bodyWidth - x - 12);
 
-                    if (edit)
+                    const bool visible =
+                        y >= 0
+                        && y + 24 <= bodyHeight - 40;
+
+                    if (controlCount == 1)
                     {
-                        MoveWindow(
-                            edit,
-                            bodyLeft + x,
-                            bodyTop + y + 1,
-                            width,
-                            22,
-                            TRUE);
+                        HWND edit =
+                            inspectorEdits_[bindingIndex].hwnd;
 
-                        const bool visible =
-                            y >= 0
-                            && y + 24 <= bodyHeight - 40;
+                        if (edit)
+                        {
+                            MoveWindow(
+                                edit,
+                                bodyLeft + x,
+                                bodyTop + y + 1,
+                                width,
+                                22,
+                                TRUE);
+                            ShowWindow(
+                                edit,
+                                visible ? SW_SHOW : SW_HIDE);
+                        }
+                    }
+                    else
+                    {
+                        constexpr int kAxisGap = 4;
+                        constexpr int kAxisLabelWidth = 11;
+                        const int totalGap =
+                            kAxisGap * 2;
+                        const int segmentWidth =
+                            (std::max)(
+                                24,
+                                (width - totalGap) / 3);
 
-                        ShowWindow(
-                            edit,
-                            visible ? SW_SHOW : SW_HIDE);
+                        for (uint32_t axis = 0;
+                             axis < 3;
+                             ++axis)
+                        {
+                            const int segmentLeft =
+                                x
+                                + static_cast<int>(axis)
+                                    * (segmentWidth + kAxisGap);
+                            const int editLeft =
+                                segmentLeft + kAxisLabelWidth;
+                            const int segmentRight =
+                                axis == 2
+                                    ? x + width
+                                    : segmentLeft + segmentWidth;
+                            const int editWidth =
+                                (std::max)(
+                                    20,
+                                    segmentRight - editLeft);
+
+                            HWND edit =
+                                inspectorEdits_[
+                                    bindingIndex + axis].hwnd;
+
+                            if (edit)
+                            {
+                                MoveWindow(
+                                    edit,
+                                    bodyLeft + editLeft,
+                                    bodyTop + y + 1,
+                                    editWidth,
+                                    22,
+                                    TRUE);
+                                ShowWindow(
+                                    edit,
+                                    visible ? SW_SHOW : SW_HIDE);
+                            }
+                        }
                     }
 
-                    ++bindingIndex;
+                    bindingIndex += controlCount;
                 }
 
                 y += 27;
@@ -2040,19 +2326,21 @@ namespace nocturne::editor
         return nullptr;
     }
 
-    void EditorShellV3::SyncInspectorControlValues_()
+    bool EditorShellV3::SyncInspectorBindingValue_(
+        const InspectorEditBinding& binding)
     {
-        for (const InspectorEditBinding& binding : inspectorEdits_)
-        {
-            if (!binding.hwnd)
-                continue;
+        if (!binding.hwnd)
+            return false;
 
+        if (binding.presentation
+            == InspectorEditPresentation::Generic)
+        {
             const InspectorPropertyView* property =
                 inspectorModel_.FindProperty(
                     binding.componentTypeId,
                     binding.propertyId);
             if (!property)
-                continue;
+                return false;
 
             const std::wstring value =
                 Utf8ToWide_(
@@ -2061,7 +2349,96 @@ namespace nocturne::editor
             SetWindowTextW(
                 binding.hwnd,
                 value.c_str());
+            return true;
         }
+
+        if (!session_
+            || !inspectorModel_.Entity().IsValid()
+            || binding.axis > 2)
+        {
+            return false;
+        }
+
+        auto context =
+            session_->CommandContext();
+
+        noc::OwnedReflectedValue value;
+        if (!inspectorModel_.ReadValue(
+                context,
+                inspectorModel_.Entity(),
+                binding.componentTypeId,
+                binding.propertyId,
+                value))
+        {
+            return false;
+        }
+
+        float componentValue = 0.0f;
+
+        if (binding.presentation
+            == InspectorEditPresentation::Vector3Axis)
+        {
+            if (value.Type() != noc::BuiltinTypeIds::Vec3
+                || !value.Data())
+            {
+                return false;
+            }
+
+            const noc::Vec3& vector =
+                *static_cast<const noc::Vec3*>(
+                    value.Data());
+
+            componentValue =
+                binding.axis == 0
+                    ? vector.x
+                    : (binding.axis == 1
+                        ? vector.y
+                        : vector.z);
+        }
+        else
+        {
+            if (value.Type() != noc::BuiltinTypeIds::Quat
+                || !value.Data())
+            {
+                return false;
+            }
+
+            const noc::Vec3 euler =
+                InspectorEulerXYZDegreesFromQuat(
+                    *static_cast<const noc::Quat*>(
+                        value.Data()));
+
+            componentValue =
+                binding.axis == 0
+                    ? euler.x
+                    : (binding.axis == 1
+                        ? euler.y
+                        : euler.z);
+        }
+
+        wchar_t buffer[64]{};
+        swprintf_s(
+            buffer,
+            L"%.6g",
+            static_cast<double>(componentValue));
+
+        SetWindowTextW(
+            binding.hwnd,
+            buffer);
+        return true;
+    }
+
+    void EditorShellV3::SyncInspectorControlValues_()
+    {
+        inspectorControlsRefreshing_ = true;
+
+        for (const InspectorEditBinding& binding :
+             inspectorEdits_)
+        {
+            (void)SyncInspectorBindingValue_(binding);
+        }
+
+        inspectorControlsRefreshing_ = false;
     }
 
     bool EditorShellV3::CommitInspectorEdit_(HWND source)
@@ -2121,14 +2498,120 @@ namespace nocturne::editor
         auto context =
             session_->CommandContext();
 
-        const bool committed =
-            inspectorModel_.CommitTextEdit(
-                context,
-                session_->History(),
-                entity,
-                componentTypeId,
-                propertyId,
-                utf8.c_str());
+        bool committed = false;
+
+        if (binding->presentation
+            == InspectorEditPresentation::Generic)
+        {
+            committed =
+                inspectorModel_.CommitTextEdit(
+                    context,
+                    session_->History(),
+                    entity,
+                    componentTypeId,
+                    propertyId,
+                    utf8.c_str());
+        }
+        else
+        {
+            float parsed = 0.0f;
+            if (!ParseFiniteInspectorFloat(
+                    utf8.c_str(),
+                    parsed)
+                || binding->axis > 2)
+            {
+                committed = false;
+            }
+            else
+            {
+                noc::OwnedReflectedValue reflectedValue;
+
+                if (inspectorModel_.ReadValue(
+                        context,
+                        entity,
+                        componentTypeId,
+                        propertyId,
+                        reflectedValue))
+                {
+                    char composite[192]{};
+
+                    if (binding->presentation
+                        == InspectorEditPresentation::Vector3Axis
+                        && reflectedValue.Type()
+                            == noc::BuiltinTypeIds::Vec3
+                        && reflectedValue.Data())
+                    {
+                        noc::Vec3 value =
+                            *static_cast<const noc::Vec3*>(
+                                reflectedValue.Data());
+
+                        if (binding->axis == 0)
+                            value.x = parsed;
+                        else if (binding->axis == 1)
+                            value.y = parsed;
+                        else
+                            value.z = parsed;
+
+                        std::snprintf(
+                            composite,
+                            sizeof(composite),
+                            "%.9g, %.9g, %.9g",
+                            static_cast<double>(value.x),
+                            static_cast<double>(value.y),
+                            static_cast<double>(value.z));
+
+                        committed =
+                            inspectorModel_.CommitTextEdit(
+                                context,
+                                session_->History(),
+                                entity,
+                                componentTypeId,
+                                propertyId,
+                                composite);
+                    }
+                    else if (binding->presentation
+                        == InspectorEditPresentation::EulerDegreesAxis
+                        && reflectedValue.Type()
+                            == noc::BuiltinTypeIds::Quat
+                        && reflectedValue.Data())
+                    {
+                        noc::Vec3 euler =
+                            InspectorEulerXYZDegreesFromQuat(
+                                *static_cast<const noc::Quat*>(
+                                    reflectedValue.Data()));
+
+                        if (binding->axis == 0)
+                            euler.x = parsed;
+                        else if (binding->axis == 1)
+                            euler.y = parsed;
+                        else
+                            euler.z = parsed;
+
+                        const noc::Quat value =
+                            InspectorQuatFromEulerXYZDegrees(
+                                euler);
+
+                        std::snprintf(
+                            composite,
+                            sizeof(composite),
+                            "%.9g, %.9g, %.9g, %.9g",
+                            static_cast<double>(value.x),
+                            static_cast<double>(value.y),
+                            static_cast<double>(value.z),
+                            static_cast<double>(value.w));
+
+                        committed =
+                            inspectorModel_.CommitTextEdit(
+                                context,
+                                session_->History(),
+                                entity,
+                                componentTypeId,
+                                propertyId,
+                                composite);
+                    }
+                }
+            }
+        }
 
         if (!committed)
         {
@@ -2149,8 +2632,6 @@ namespace nocturne::editor
             return false;
         }
 
-        // Name changes are reflected in the hierarchy immediately. Rebuilding
-        // the tree is generic and does not inspect component type.
         PopulateScene_();
         SyncInspectorControlValues_();
 
@@ -2171,20 +2652,9 @@ namespace nocturne::editor
         if (!binding)
             return;
 
-        const InspectorPropertyView* property =
-            inspectorModel_.FindProperty(
-                binding->componentTypeId,
-                binding->propertyId);
-        if (!property)
-            return;
+        (void)SyncInspectorBindingValue_(
+            *binding);
 
-        const std::wstring value =
-            Utf8ToWide_(
-                property->displayValue.c_str());
-
-        SetWindowTextW(
-            source,
-            value.c_str());
         SendMessageW(
             source,
             EM_SETSEL,
@@ -3310,9 +3780,17 @@ namespace nocturne::editor
                         if (y >= rc.bottom - 44)
                             break;
 
+                        const wchar_t* presentationLabel =
+                            InspectorPropertyPresentationLabel(
+                                component.typeId,
+                                property);
+
                         const std::wstring propertyName =
-                            Utf8ToWide_(
-                                property.displayName.c_str());
+                            presentationLabel
+                                ? std::wstring(presentationLabel)
+                                : Utf8ToWide_(
+                                    property.displayName.c_str());
+
                         const std::wstring propertyValue =
                             Utf8ToWide_(
                                 property.displayValue.c_str());
@@ -3339,27 +3817,98 @@ namespace nocturne::editor
                             DT_LEFT | DT_VCENTER
                                 | DT_SINGLELINE | DT_END_ELLIPSIS);
 
-                        RoundBox(
-                            dis->hDC,
-                            valueRc,
-                            c.inputBg,
+                        const uint32_t controlCount =
                             property.editable
-                                ? c.border
-                                : Blend(c.border, c.panelBg, 55),
-                            3);
+                                ? InspectorEditControlCount(
+                                    component.typeId,
+                                    property)
+                                : 1u;
 
-                        valueRc.left += 7;
-                        valueRc.right -= 5;
-                        if (!property.editable)
+                        if (controlCount == 3)
                         {
-                            DrawTextUi(
+                            constexpr int kAxisGap = 4;
+                            constexpr int kAxisLabelWidth = 11;
+                            const int width =
+                                static_cast<int>(
+                                    valueRc.right - valueRc.left);
+                            const int segmentWidth =
+                                (std::max)(
+                                    24,
+                                    (width - kAxisGap * 2) / 3);
+                            constexpr const wchar_t* kAxisNames[] = {
+                                L"X", L"Y", L"Z"
+                            };
+
+                            for (uint32_t axis = 0;
+                                 axis < 3;
+                                 ++axis)
+                            {
+                                const int segmentLeft =
+                                    valueRc.left
+                                    + static_cast<int>(axis)
+                                        * (segmentWidth + kAxisGap);
+                                const int segmentRight =
+                                    axis == 2
+                                        ? valueRc.right
+                                        : segmentLeft + segmentWidth;
+
+                                RECT axisRc{
+                                    segmentLeft,
+                                    y,
+                                    segmentLeft + kAxisLabelWidth,
+                                    y + 24
+                                };
+                                DrawTextUi(
+                                    dis->hDC,
+                                    kAxisNames[axis],
+                                    axisRc,
+                                    c.textMuted,
+                                    smallFont_,
+                                    DT_CENTER | DT_VCENTER
+                                        | DT_SINGLELINE);
+
+                                RECT fieldRc{
+                                    segmentLeft + kAxisLabelWidth,
+                                    y + 1,
+                                    segmentRight,
+                                    y + 23
+                                };
+                                RoundBox(
+                                    dis->hDC,
+                                    fieldRc,
+                                    c.inputBg,
+                                    c.border,
+                                    3);
+                            }
+                        }
+                        else
+                        {
+                            RoundBox(
                                 dis->hDC,
-                                propertyValue.c_str(),
                                 valueRc,
-                                c.textMuted,
-                                uiFont_,
-                                DT_LEFT | DT_VCENTER
-                                    | DT_SINGLELINE | DT_END_ELLIPSIS);
+                                c.inputBg,
+                                property.editable
+                                    ? c.border
+                                    : Blend(
+                                        c.border,
+                                        c.panelBg,
+                                        55),
+                                3);
+
+                            valueRc.left += 7;
+                            valueRc.right -= 5;
+                            if (!property.editable)
+                            {
+                                DrawTextUi(
+                                    dis->hDC,
+                                    propertyValue.c_str(),
+                                    valueRc,
+                                    c.textMuted,
+                                    uiFont_,
+                                    DT_LEFT | DT_VCENTER
+                                        | DT_SINGLELINE
+                                        | DT_END_ELLIPSIS);
+                            }
                         }
 
                         y += 27;
