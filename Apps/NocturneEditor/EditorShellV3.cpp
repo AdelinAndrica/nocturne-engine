@@ -7,6 +7,7 @@
 #include "NocturneEditorResource.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <filesystem>
 #include <memory>
 #include <new>
@@ -587,24 +588,35 @@ namespace nocturne::editor
             case WM_LBUTTONUP:
                 if (state)
                 {
-                    if (GetCapture() == hwnd)
-                        ReleaseCapture();
-
-                    if (state->dragging
+                    const bool shouldDrop =
+                        state->dragging
                         && state->dragSource >= 0
                         && state->dropTarget >= 0
                         && state->dragSource
                             < static_cast<int>(state->items.size())
                         && state->dropTarget
-                            < static_cast<int>(state->items.size()))
-                    {
-                        TreeReparentRequest request{
-                            state->items[
-                                state->dragSource].entity,
-                            state->items[
-                                state->dropTarget].entity
-                        };
+                            < static_cast<int>(state->items.size());
 
+                    TreeReparentRequest request{};
+                    if (shouldDrop)
+                    {
+                        request.child =
+                            state->items[
+                                state->dragSource].entity;
+                        request.parent =
+                            state->items[
+                                state->dropTarget].entity;
+                    }
+
+                    state->dragSource = -1;
+                    state->dropTarget = -1;
+                    state->dragging = false;
+
+                    if (GetCapture() == hwnd)
+                        ReleaseCapture();
+
+                    if (shouldDrop)
+                    {
                         SendMessageW(
                             GetParent(hwnd),
                             WM_NOC_V3_TREE_REPARENT,
@@ -614,9 +626,6 @@ namespace nocturne::editor
                                 &request));
                     }
 
-                    state->dragSource = -1;
-                    state->dropTarget = -1;
-                    state->dragging = false;
                     InvalidateRect(
                         hwnd,
                         nullptr,
