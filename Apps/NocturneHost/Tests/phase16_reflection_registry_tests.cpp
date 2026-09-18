@@ -599,7 +599,7 @@ bool RunPhase16ReflectionRegistryTests()
         noc::RegisterBuiltinReflectionTypes(builtinRegistry),
         "Builtin reflection registration failed");
     ok &= CheckReflectionRegistry(
-        builtinRegistry.TypeCount() == 17,
+        builtinRegistry.TypeCount() == 20,
         "Unexpected builtin reflected type count");
 
     char mutableEnumValueName[] = "Read";
