@@ -1,5 +1,16 @@
 # Phase 15 — Entity / Component System — Checklist complet
 
+> **Status: COMPLETE — 2026-09-18**
+>
+> Acest fișier rămâne checklist-ul de execuție proiectat înaintea implementării. Pentru dovada finală și starea reală a codului, autoritatea de completion este:
+>
+> - `Docs/Phase 15 — Entity Component System Architecture.md`
+> - `Docs/Phase 15 — Implementation Report.md`
+> - `Docs/Phase 15 — Test and CI Validation Report.md`
+> - `Docs/Phase 15 — Completion Report.md`
+>
+> Checkbox-urile detaliate din secțiunile istorice nu sunt rescrise retroactiv ca jurnal de execuție; secțiunile 40–44 de închidere sunt actualizate la starea finală verificată.
+
 **Obiectiv:** înlocuim modelul temporar în care `World` conține hard-coded `TransformData`, `RenderableData` și camera special-case cu fundația reală de entity/component pe care se vor baza editorul, serialization, physics, scripting și gameplay-ul.
 
 **Grounding principal:** Gregory, *Game Engine Architecture* §16.2 — runtime object models / component & property-centric architectures și §16.5 — object references / world queries; Nystrom — *Component*, *Data Locality*, *Dirty Flag*; Lengyel Vol. 2 §5.4.2 — transform hierarchy.
@@ -929,15 +940,15 @@ Checklist:
 
 # 40. Build/configuration validation
 
-- [ ] NocturneEngine Development x64 build.
-- [ ] NocturneHost Development x64 build.
-- [ ] NocturneEditor Development x64 build.
-- [ ] Debug/assert configuration unde există.
-- [ ] Build direct `.vcxproj` încă funcționează.
-- [ ] Solution build funcționează.
-- [ ] Nu apar warnings noi importante.
-- [ ] Nu apar stale include references.
-- [ ] Dead ECS files nu sunt lăsate accidental în proiect.
+- [x] NocturneEngine Development x64 build.
+- [x] NocturneHost Development x64 build.
+- [x] NocturneEditor Development x64 build.
+- [x] Debug/assert configuration unde există.
+- [x] Build direct `.vcxproj` încă funcționează.
+- [x] Solution build funcționează.
+- [x] Nu apar warnings noi importante.
+- [x] Nu apar stale include references.
+- [x] Dead ECS files nu sunt lăsate accidental în proiect.
 
 ---
 
@@ -945,41 +956,41 @@ Checklist:
 
 Înainte de completion:
 
-- [ ] Actualizăm Phase 15 architecture documentation.
-- [ ] Înregistrăm modelul de entity identity.
-- [ ] Înregistrăm component storage model.
-- [ ] Înregistrăm handle lifetime rules.
-- [ ] Înregistrăm pointer/reference invalidation.
-- [ ] Înregistrăm transform hierarchy invariants.
-- [ ] Înregistrăm component duplicate semantics.
-- [ ] Înregistrăm destroy semantics.
-- [ ] Înregistrăm query semantics.
-- [ ] Înregistrăm threading contract.
-- [ ] Înregistrăm metadata/versioning contract.
-- [ ] Înregistrăm persistent-ID boundary pentru Phase 17.
-- [ ] Marcăm toate deciziile Nocturne cu:
+- [x] Actualizăm Phase 15 architecture documentation.
+- [x] Înregistrăm modelul de entity identity.
+- [x] Înregistrăm component storage model.
+- [x] Înregistrăm handle lifetime rules.
+- [x] Înregistrăm pointer/reference invalidation.
+- [x] Înregistrăm transform hierarchy invariants.
+- [x] Înregistrăm component duplicate semantics.
+- [x] Înregistrăm destroy semantics.
+- [x] Înregistrăm query semantics.
+- [x] Înregistrăm threading contract.
+- [x] Înregistrăm metadata/versioning contract.
+- [x] Înregistrăm persistent-ID boundary pentru Phase 17.
+- [x] Marcăm toate deciziile Nocturne cu:
   - **Design choice (not directly from the book)**
-- [ ] Nu inventăm book citations.
+- [x] Nu inventăm book citations.
 
 ---
 
 # 42. Phase 15 Implementation Report
 
-- [ ] Ce s-a implementat efectiv.
-- [ ] Fișiere adăugate/modificate.
-- [ ] API final.
-- [ ] Data layout final.
-- [ ] Ownership.
-- [ ] Lifetime.
-- [ ] Invariants.
-- [ ] Error policies.
-- [ ] Transform semantics.
-- [ ] Editor migration.
-- [ ] Render migration.
-- [ ] Tests executate.
-- [ ] Performance baseline.
-- [ ] Known limitations.
-- [ ] Deferred scope.
+- [x] Ce s-a implementat efectiv.
+- [x] Fișiere adăugate/modificate.
+- [x] API final.
+- [x] Data layout final.
+- [x] Ownership.
+- [x] Lifetime.
+- [x] Invariants.
+- [x] Error policies.
+- [x] Transform semantics.
+- [x] Editor migration.
+- [x] Render migration.
+- [x] Tests executate.
+- [x] Performance baseline.
+- [x] Known limitations.
+- [x] Deferred scope.
 
 ---
 
@@ -987,59 +998,59 @@ Checklist:
 
 Phase 15 poate fi marcată COMPLETE numai dacă:
 
-- [ ] `SceneObjectHandle` temporar nu mai este modelul autoritar.
-- [ ] avem safe generational `EntityHandle`.
-- [ ] stale handles sunt detectate.
-- [ ] entity registry este robust.
-- [ ] Transform este componentă.
-- [ ] Renderable este componentă.
-- [ ] Camera este componentă.
-- [ ] Name este componentă.
-- [ ] components pot fi adăugate/eliminate independent.
-- [ ] component storages sunt production-grade în scope.
-- [ ] transform hierarchy respinge ciclurile.
-- [ ] entity destruction nu lasă orphan state.
-- [ ] active camera lifecycle este safe.
-- [ ] runtime rendering folosește component data.
-- [ ] editorul folosește component data drept single source of truth.
-- [ ] Phase 14 behavior rămâne intact.
-- [ ] no hidden per-frame heap churn.
-- [ ] stress tests trec.
-- [ ] stale/invalid tests trec.
-- [ ] component storage tests trec.
-- [ ] transform tests trec.
-- [ ] renderer integration tests trec.
-- [ ] editor regression checklist trece.
-- [ ] performance baseline este măsurat.
-- [ ] documentația reflectă codul real.
-- [ ] implementation report există.
-- [ ] completion report există.
-- [ ] nu există două ECS/world models concurente în repo.
-- [ ] nu există structural TODO ascuns drept „finished”.
+- [x] `SceneObjectHandle` temporar nu mai este modelul autoritar.
+- [x] avem safe generational `EntityHandle`.
+- [x] stale handles sunt detectate.
+- [x] entity registry este robust.
+- [x] Transform este componentă.
+- [x] Renderable este componentă.
+- [x] Camera este componentă.
+- [x] Name este componentă.
+- [x] components pot fi adăugate/eliminate independent.
+- [x] component storages sunt production-grade în scope.
+- [x] transform hierarchy respinge ciclurile.
+- [x] entity destruction nu lasă orphan state.
+- [x] active camera lifecycle este safe.
+- [x] runtime rendering folosește component data.
+- [x] editorul folosește component data drept single source of truth.
+- [x] Phase 14 behavior rămâne intact.
+- [x] no hidden per-frame heap churn.
+- [x] stress tests trec.
+- [x] stale/invalid tests trec.
+- [x] component storage tests trec.
+- [x] transform tests trec.
+- [x] renderer integration tests trec.
+- [x] editor regression checklist trece.
+- [x] performance baseline este măsurat.
+- [x] documentația reflectă codul real.
+- [x] implementation report există.
+- [x] completion report există.
+- [x] nu există două ECS/world models concurente în repo.
+- [x] nu există structural TODO ascuns drept „finished”.
 
 ---
 
 # 44. Explicit NU implementăm în Phase 15
 
-- [ ] **NU** full Scene Hierarchy editing.
-- [ ] **NU** generic create/delete/duplicate UI — Phase 16.
-- [ ] **NU** Inspector complet pentru arbitrary components — Phase 16.
-- [ ] **NU** undo/redo scene transactions — Phase 16.
-- [ ] **NU** prefab authoring — Phase 16+.
-- [ ] **NU** scene files — Phase 17.
-- [ ] **NU** save/load.
-- [ ] **NU** JSON/binary scene serialization.
-- [ ] **NU** persistent reference fixups.
-- [ ] **NU** serialization migrations.
-- [ ] **NU** physics components/simulation — Phase 18.
-- [ ] **NU** animation.
-- [ ] **NU** audio.
-- [ ] **NU** scripting.
-- [ ] **NU** gameplay ECS systems.
-- [ ] **NU** multithreaded ECS scheduler.
-- [ ] **NU** network replication.
-- [ ] **NU** archetype/chunk ECS doar pentru că „așa fac engine-urile moderne”.
-- [ ] **NU** third-party ECS dependency fără motiv arhitectural demonstrat.
+- [x] **NU** full Scene Hierarchy editing.
+- [x] **NU** generic create/delete/duplicate UI — Phase 16.
+- [x] **NU** Inspector complet pentru arbitrary components — Phase 16.
+- [x] **NU** undo/redo scene transactions — Phase 16.
+- [x] **NU** prefab authoring — Phase 16+.
+- [x] **NU** scene files — Phase 17.
+- [x] **NU** save/load.
+- [x] **NU** JSON/binary scene serialization.
+- [x] **NU** persistent reference fixups.
+- [x] **NU** serialization migrations.
+- [x] **NU** physics components/simulation — Phase 18.
+- [x] **NU** animation.
+- [x] **NU** audio.
+- [x] **NU** scripting.
+- [x] **NU** gameplay ECS systems.
+- [x] **NU** multithreaded ECS scheduler.
+- [x] **NU** network replication.
+- [x] **NU** archetype/chunk ECS doar pentru că „așa fac engine-urile moderne”.
+- [x] **NU** third-party ECS dependency fără motiv arhitectural demonstrat.
 
 ---
 

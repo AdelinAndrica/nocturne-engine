@@ -1,448 +1,498 @@
 # Nocturne Engine — Phase 15 Entity Component System Completion Report
 
-> **Status:** AUTOMATED GATES PASS — FINAL MANUAL PHASE 14 VIEWPORT REGRESSION PENDING  
+> **Status: PHASE 15 COMPLETE**
+>
+> **Completion date:** 2026-09-18  
 > **Phase:** 15 — Entity / Component System  
-> **Validated code revision:** `b3048d5b76c4f213414b6557d1fd2c0f68c567c8`  
-> **CI run:** `35290999381` — SUCCESS  
+> **Final validated code revision:** `5b890be76f4b4444c29f7515a86791bad4b3b2c1`  
+> **Final comprehensive CI run:** `35292726512` — SUCCESS  
+> **Manual Phase 14 viewport regression:** PASS  
 > **Architecture:** `Docs/Phase 15 — Entity Component System Architecture.md`  
 > **Implementation report:** `Docs/Phase 15 — Implementation Report.md`  
+> **Test/CI report:** `Docs/Phase 15 — Test and CI Validation Report.md`  
 > **Engineering standard:** `Docs/Production Engineering Standard.md`
 
-## 1. Completion summary
+## 1. Final verdict
 
-Phase 15 has completed its runtime implementation and all automated validation gates.
+Phase 15 is **COMPLETE**.
 
-The previous hard-coded World object model has been replaced by:
+The temporary pre-Phase-15 World object model has been replaced by a production-grade entity/component foundation within the scope of this phase.
 
-- generational runtime entity identity;
-- entity registry;
-- dense per-type component storage;
-- component metadata;
-- Transform / Renderable / Camera / Name foundation components;
-- World ownership/orchestration;
-- component-based render extraction;
-- editor/runtime single source of truth.
+The final system provides:
 
-The branch no longer contains the abandoned incompatible Transform/Visibility/RenderPackets runtime model.
+- generational transient runtime entity identity;
+- robust entity registry lifecycle;
+- dense/sparse component storage;
+- stable component metadata IDs and versions;
+- Transform, Renderable, Camera and Name components;
+- cycle-safe transform hierarchy;
+- component-driven render extraction;
+- component-driven active camera;
+- editor/runtime single source of truth;
+- negative-path and stale-handle coverage;
+- 10k-class stress/performance baselines;
+- Debug and Development x64 build validation;
+- direct project and solution build validation;
+- manual regression of the Phase 14 editor viewport.
 
-One final validation item remains before changing this report status to **COMPLETE**:
-
-> manually exercise the Phase 14 interactive editor viewport on a real Windows desktop/GPU path.
-
-GitHub Actions can compile the editor but cannot credibly verify mouse interaction, visual selection/gizmo behavior, viewport resize behavior, or recurring frame stutter.
+No remaining known issue requires replacing the Phase 15 foundation before Phase 16.
 
 ---
 
-## 2. Source grounding
+## 2. Primary source grounding
 
-Primary references used for the architecture:
+The Phase 15 architecture remains grounded primarily in:
 
 - Jason Gregory — *Game Engine Architecture, 3rd Edition*
-  - Section 16.2.1.6 — Pure Component Models;
-  - Section 16.2.2 — Property-Centric Architectures;
-  - Section 16.5 — Object References and World Queries.
+  - §16.2.1.6 — Pure Component Models;
+  - §16.2.2 — Property-Centric Architectures;
+  - §16.5 — Object References and World Queries.
 - Bob Nystrom — *Game Programming Patterns*
   - Component;
   - Data Locality;
   - Dirty Flag.
 - Eric Lengyel — *Foundations of Game Engine Development, Volume 2: Rendering*
-  - Section 5.4.2 — Transform Hierarchy.
+  - §5.4.2 — Transform Hierarchy.
 - Frank D. Luna — *Introduction to 3D Game Programming with DirectX 12*
   - Camera chapter for camera basis/lens concepts.
 
-No architecture decision in the implementation reports depends on an invented page reference.
+No invented book citations or page numbers are used.
 
-Decisions specific to Nocturne that are not directly mandated by the books are labeled **Design choice (not directly from the book)** in the architecture/code.
-
----
-
-## 3. Automated CI result
-
-GitHub Actions run:
-
-`35290999381`
-
-Validated code commit:
-
-`b3048d5b76c4f213414b6557d1fd2c0f68c567c8`
-
-Result:
-
-**SUCCESS**
-
-Steps:
-
-- [x] Checkout
-- [x] Configure MSBuild
-- [x] Build NocturneHost — Debug x64
-- [x] Run full `--phase15-tests`
-- [x] Build NocturneEditor regression target — Debug x64
-- [x] Job completed successfully
-
-Compiler diagnostics extracted from the successful job:
-
-- C/C++ warnings matching `warning Cxxxx`: **0**
-- C/C++ errors matching `error Cxxxx`: **0**
-
-The earlier editor `C4834` warnings caused by ignored `[[nodiscard]]` World mutations were fixed in commit:
-
-`c701e1a87ef192633e6fad057c8f7fef57647b57`
+Nocturne-specific implementation policy remains explicitly labeled **Design choice (not directly from the book)** in the architecture/code where applicable.
 
 ---
 
-## 4. Test coverage passed
-
-The aggregate Phase 15 suite covers:
+## 3. Final runtime architecture
 
 ### Entity identity
 
-- [x] default invalid handle
-- [x] sequential initial slots
-- [x] capacity growth
-- [x] stale handle rejection
-- [x] generation reuse
-- [x] double destroy
-- [x] invalid destroy
-- [x] out-of-range inspection
-- [x] terminal generation retirement policy
-- [x] 10k stress
+- [x] one canonical runtime identity type: `EntityHandle`
+- [x] index + generation
+- [x] invalid sentinel
+- [x] stale-handle rejection
+- [x] slot reuse cannot resurrect an old handle
+- [x] generation terminal/retirement policy
+- [x] runtime handle is explicitly not persistent scene identity
+
+Persistent entity identity remains Phase 17 scope.
+
+### EntityRegistry
+
+- [x] owns generations/liveness/free-list/next-unused/alive count
+- [x] deterministic `EntityAtIndex()`
+- [x] safe invalid/out-of-range behavior
+- [x] double-destroy rejection
+- [x] 10k stress coverage
 
 ### Component storage
 
-- [x] add / has / get / try-get
-- [x] duplicate add rejection
-- [x] absent remove rejection
-- [x] swap-remove
-- [x] sparse lookup repair
-- [x] storage growth
-- [x] non-trivial component lifetime
-- [x] over-aligned component
-- [x] different-generation lookup rejection
-- [x] leak-free shutdown
+- [x] dense components
+- [x] dense owners
+- [x] sparse entity→dense lookup
+- [x] one component of each type per entity
+- [x] duplicate add rejected
+- [x] absent remove rejected safely
+- [x] swap-remove repairs reverse lookup
+- [x] non-trivial lifetime respected
+- [x] over-aligned component support
+- [x] structural mutation invalidation documented
+- [x] component add/remove/lookup/iteration performance measured
 
 ### Component metadata
 
-- [x] explicit stable type IDs
-- [x] version / size / alignment
-- [x] canonical-name ownership
-- [x] duplicate ID rejection
-- [x] duplicate canonical-name rejection
-- [x] invalid metadata rejection
-- [x] deterministic enumeration independent of registration order
+- [x] explicit stable numeric type IDs
+- [x] canonical names
+- [x] versions
+- [x] size/alignment
+- [x] flags
+- [x] duplicate ID/name rejection
+- [x] deterministic enumeration
 
-### Transform hierarchy
+Foundation component IDs remain:
 
-- [x] local TRS
-- [x] world transform propagation
-- [x] multiple siblings
-- [x] dirty propagation
-- [x] on-demand update
-- [x] reparent
-- [x] detach
-- [x] self-parent rejection
-- [x] indirect cycle rejection
-- [x] parent removal
-- [x] child promotion to root
-- [x] local-pose preservation policy
-- [x] stale handle rejection
-- [x] 1,024-level correctness hierarchy
-- [x] stackless traversal
-
-### Renderable
-
-- [x] mesh handle
-- [x] local bounds
-- [x] world bounds
-- [x] dirty cache
-- [x] translation
-- [x] non-uniform scale
-- [x] enable / disable
-- [x] growth / swap-remove
-- [x] stale handle rejection
-- [x] dense enumeration
-
-### Camera
-
-- [x] default lens
-- [x] perspective validation
-- [x] active camera lifecycle
-- [x] missing transform handling
-- [x] parented camera
-- [x] view/projection rebuild
-- [x] invalid lens rejection
-- [x] degenerate basis rejection
-- [x] disable/remove active camera
-- [x] stale handle rejection
-
-### Name
-
-- [x] empty name
-- [x] copy/ownership
-- [x] rename
-- [x] duplicate names
-- [x] exact maximum size
-- [x] over-limit rejection without truncation
-- [x] stale handle rejection
-- [x] growth / swap-remove
-
-### World integration
-
-- [x] component metadata startup registration
-- [x] generic entity with no implicit components
-- [x] compatibility object with Transform
-- [x] add/remove/has/get component API
-- [x] hierarchy through World
-- [x] render extraction from ECS state
-- [x] CameraComponent materialization through Phase 14 compatibility path
-- [x] destruction cascade
-- [x] active camera cleanup
-- [x] stale component access rejection
-- [x] generation reuse
-- [x] deterministic entity inspection
-- [x] leak-free shutdown
+- Transform — 1
+- Renderable — 2
+- Camera — 3
+- Name — 4
 
 ---
 
-## 5. Measured performance baseline
+## 4. Transform completion gate
 
-Environment:
+- [x] local translation/rotation/scale authoritative
+- [x] cached world transform derived
+- [x] dirty state
+- [x] parent/child/sibling hierarchy
+- [x] cycle-free tree invariant
+- [x] self-parent rejected
+- [x] indirect cycle rejected
+- [x] stale parent/child operations rejected
+- [x] deterministic top-down update
+- [x] stackless hierarchy traversal
+- [x] dirty descendant propagation
+- [x] parent destruction/removal semantics tested
+- [x] children promoted to roots while preserving local TRS
+- [x] deep and wide hierarchy stress coverage
 
-- GitHub-hosted Windows runner
-- Debug x64 build
-- CI run `35290999381`
-
-These values are **baseline observations, not shipping performance budgets**.
-
-Debug CI numbers are useful for regression comparison on similar runners, but must not be treated as optimized game-runtime targets.
-
-| Workload | Items | Time | Persistent allocator calls during measured section | Persistent bytes during measured section |
-|---|---:|---:|---:|---:|
-| Entity create | 10,000 | 583 µs | 24 | 293,760 |
-| Entity IsAlive | 10,000 | 130 µs | 0 | 0 |
-| Entity destroy | 5,000 | 113 µs | 0 | 0 |
-| Entity free-list reuse | 5,000 | 58 µs | 0 | 0 |
-| Transform mutation | 10,000 | 774 µs | 0 | 0 |
-| Transform update — independent roots, all dirty | 10,000 | 9,100 µs | 0 | 0 |
-| Transform update — independent roots, 1% dirty | 10,000 | 847 µs | 0 | 0 |
-| Transform update — wide hierarchy | 10,000 | 19,971 µs | 0 | 0 |
-| Transform update — deep hierarchy | 2,048 | 2,693 µs | 0 | 0 |
-| Render extraction | 10,000 | 15,646 µs | 0 | 0 |
-
-Render extraction frame-arena use:
-
-- used: **720,000 bytes**
-- capacity: **724,096 bytes**
-
-Important validated property:
-
-- [x] render extraction performed **zero persistent allocator calls**
-- [x] render extraction allocated **zero persistent bytes**
-
-The performance test intentionally has no arbitrary wall-clock pass/fail threshold.
+**Design choice (not directly from the book):** child promotion preserves local TRS; world transform may change.
 
 ---
 
-## 6. Ownership/lifetime gate
+## 5. Renderable completion gate
 
-- [x] Engine owns World.
-- [x] World owns EntityRegistry.
-- [x] World owns ComponentRegistry.
-- [x] World owns foundation component systems.
-- [x] Component systems own component storage.
-- [x] Component storage owns component lifetime.
-- [x] EntityHandle does not own an entity.
-- [x] component pointers are borrowed and structurally invalidatable.
-- [x] renderer does not own/read mutable ECS stores.
-- [x] editor does not own authoritative runtime transform/render/name state.
+- [x] mesh ResourceHandle
+- [x] local bounds authoritative
+- [x] world bounds derived/cache
+- [x] enabled state
+- [x] world-bounds invalidation
+- [x] non-uniform-scale bounds coverage
+- [x] remove/destroy removes entity from extraction
+- [x] deterministic component/world query behavior
 
----
-
-## 7. Invariants / invalid-state gate
-
-- [x] handle generation must match live slot
-- [x] destroyed entity cannot expose foundation components
-- [x] transform hierarchy rejects cycles
-- [x] duplicate component add rejected
-- [x] absent component remove safe
-- [x] invalid/stale entity mutation rejected
-- [x] active camera cannot remain stale after component/entity removal
-- [x] component storage preserves non-trivial lifetime
-- [x] alignment is preserved
-- [x] persistent entity identity is not conflated with runtime handle identity
+Renderer ownership remains separate from ECS storage.
 
 ---
 
-## 8. Single source of truth gate
+## 6. Camera completion gate
 
-The Phase 14 editor previously mirrored transform state inside `ValidationObject`.
+- [x] CameraComponent owns lens state
+- [x] TransformComponent owns spatial state
+- [x] view/projection/view-projection are derived caches
+- [x] active camera referenced by EntityHandle
+- [x] invalid lens parameters rejected
+- [x] disabled camera cannot remain active
+- [x] removing active camera clears active state
+- [x] destroying active entity clears active state
+- [x] parented camera behavior tested
+- [x] degenerate camera basis rejected
 
-That mirror has been removed.
-
-Current authoritative data:
-
-- transform → `TransformComponent`
-- render bounds/mesh → `RenderableComponent`
-- display name → `NameComponent`
-- camera lens → `CameraComponent`
-
-Editor-only state is limited to presentation/interaction data such as selectability, selection index and ephemeral gizmo drag-start values.
-
-- [x] no duplicate authoritative editor transform state remains
+The old special-case World camera authority is gone.
 
 ---
 
-## 9. Dead competing model cleanup
+## 7. Name completion gate
 
-Removed:
+- [x] runtime/editor display name is a component
+- [x] name is not entity identity
+- [x] duplicate names allowed
+- [x] empty names allowed
+- [x] byte limit explicit
+- [x] over-limit input rejected without silent truncation
+- [x] growth/swap-remove/stale-handle behavior tested
 
-- [x] `Engine/Runtime/Transform.h`
-- [x] `Engine/Runtime/RenderPackets.h`
-- [x] `Engine/Runtime/VisibilitySystem.h`
-- [x] `Engine/Runtime/VisibilitySystem.cpp`
-
-These files belonged to an incompatible abandoned model and were not active project sources.
-
-There is now one runtime entity/component world authority.
+**Design choice (not directly from the book):** Phase 15 uses an inline 64-byte UTF-8 storage buffer.
 
 ---
 
-## 10. Public API gate
+## 8. World and render extraction completion gate
 
-`World` exposes foundation operations required by the next phases:
+`World` now owns/orchestrates:
 
-Entities:
+- EntityRegistry
+- ComponentRegistry
+- TransformSystem
+- RenderableSystem
+- CameraSystem
+- NameSystem
 
-- [x] create
-- [x] destroy
-- [x] alive
-- [x] count
-- [x] deterministic index inspection
+Public foundation operations include:
 
-Components:
-
+- [x] entity create/destroy/alive/count/index inspection
 - [x] Transform add/remove/has/get
 - [x] Renderable add/remove/has/get
 - [x] Camera add/remove/has/get
 - [x] Name add/remove/has/get
+- [x] hierarchy mutation
+- [x] camera activation/lens helpers
+- [x] component metadata lookup
 
-Additional narrow mutation APIs exist for current engine/editor integration.
+Render extraction:
 
-Public runtime headers retain the project rule of no STL API types.
-
----
-
-## 11. Phase 14 compatibility preserved structurally
-
-Compatibility helpers remain:
-
-- `SceneObjectHandle` — alias to `EntityHandle`
-- `CreateObject()`
-- `DestroyObject()`
-- `SetLocalTRS()`
-- `SetRenderable()`
-- `SetCameraParams()`
-- `SetCameraFromObject()`
-
-They now operate on the same ECS runtime.
-
-There is no parallel compatibility world.
-
-CI additionally compiles `NocturneEditor` after all Phase 15 tests.
+- [x] reads ECS state
+- [x] does not expose mutable ECS storage to renderer
+- [x] uses deterministic entity-index order
+- [x] updates transforms/bounds before culling
+- [x] writes renderer POD instances into LinearArena
+- [x] performs zero persistent allocator calls/bytes in the measured 10k extraction baseline
 
 ---
 
-## 12. Final manual Phase 14 regression gate
+## 9. Destruction/lifecycle gate
 
-This is the only remaining completion item.
+`World::DestroyEntity()` removes foundation components while the entity is still alive, then invalidates the registry identity.
 
-Run `NocturneEditor` on the normal Windows desktop/GPU development path and verify:
+Validated result:
 
-- [ ] editor launches using `EditorShellV3`
-- [ ] DX12 child-HWND viewport renders
-- [ ] Cube_A / Cube_B / Cube_C / Ground are visible as before
-- [ ] procedural grid and sky are unchanged
-- [ ] camera mouse navigation works
-- [ ] camera keyboard navigation works
-- [ ] viewport click picking selects the correct object
-- [ ] Scene Hierarchy selection and viewport selection remain synchronized
-- [ ] hierarchy displays runtime NameComponent names
-- [ ] Move gizmo works
-- [ ] Rotate gizmo works
-- [ ] Scale gizmo works
-- [ ] depth-tested selection bounds render correctly
-- [ ] viewport resize remains correct
-- [ ] active camera continues rendering after resize
-- [ ] no recurring frame stutter returns
-- [ ] no MeshPass shader recompilation-every-frame regression
-- [ ] no crash/assert/log spam during the above interactions
-
-Once these items pass, update this document status from:
-
-**AUTOMATED GATES PASS — FINAL MANUAL PHASE 14 VIEWPORT REGRESSION PENDING**
-
-to:
-
-**PHASE 15 COMPLETE**
+- [x] Camera removed/active state cleared
+- [x] Renderable removed
+- [x] Name removed
+- [x] Transform hierarchy cleaned
+- [x] registry generation advanced
+- [x] old handle becomes stale
+- [x] reused slot cannot validate old handle
+- [x] no foundation component remains accessible through stale handle
 
 ---
 
-## 13. Temporary scaffolding remaining
+## 10. Editor single-source-of-truth gate
 
-Allowed Phase 15 validation scaffolding:
+The old `ValidationObject.t/r/s/localBounds` authoritative mirrors are gone.
 
-- four deterministic validation renderables;
-- editor camera;
-- procedural sky/grid/debug selection path.
+Runtime authority:
 
-These are not the Phase 16 scene-authoring system.
+- transform → TransformComponent
+- mesh/bounds → RenderableComponent
+- name → NameComponent
+- camera lens → CameraComponent
 
-Phase 16 will replace the fixed validation-scene interaction bridge with real editor scene editing.
+Editor-owned state is limited to presentation/interaction state and ephemeral gizmo drag-start values.
 
----
+Validated:
 
-## 14. Deliberately deferred scope
-
-- Phase 16 — scene editing, Inspector/component authoring, undo/redo/prefab-adjacent editor workflows as scoped there
-- Phase 17 — persistent identity, serialization, save/load, fixups/version compatibility
-- Phase 18 — physics/collision
-- Phase 19 — animation
-- Phase 20 — audio
-- Phase 24 — scripting/gameplay runtime
-- Phase 25 — AI/navigation
-- Phase 27 — Play-In-Editor
-- later optimization only when measured workload justifies it
-
-No archetype/chunk rewrite or generic ECS scheduler is required before Phase 16/17 can build on the Phase 15 foundation.
+- [x] picking reads runtime components
+- [x] gizmo drawing reads runtime transform
+- [x] gizmo edits write through World
+- [x] debug selection reads runtime state
+- [x] Scene Hierarchy labels read NameComponent
+- [x] editor remains a client of the same World
 
 ---
 
-## 15. Production Engineering Standard completion gate
+## 11. Manual Phase 14 regression — PASS
+
+The user manually rebuilt and exercised the Windows editor/runtime path and reported the Phase 14 behavior functioning.
+
+Validated manually:
+
+- [x] EditorShellV3 launches
+- [x] DX12 child-HWND viewport renders
+- [x] Cube_A / Cube_B / Cube_C / Ground visible
+- [x] procedural grid and sky intact
+- [x] mouse camera navigation
+- [x] keyboard camera navigation
+- [x] viewport picking
+- [x] hierarchy ↔ viewport selection synchronization
+- [x] runtime NameComponent labels
+- [x] Move gizmo
+- [x] Rotate gizmo
+- [x] Scale gizmo
+- [x] selection bounds
+- [x] viewport resize
+- [x] active camera remains functional after resize
+- [x] no recurring stutter regression observed
+- [x] no MeshPass recompile-every-frame regression observed
+- [x] no crash/assert/log-spam regression reported
+
+### Accepted limitation: transform coordinate space
+
+The transform gizmo currently operates in **Local Axis** space.
+
+This limitation was explicitly accepted for Phase 15 completion.
+
+It does not invalidate the ECS/runtime work or the Phase 14 viewport regression.
+
+**Design choice (not directly from the book):** Local/Global coordinate-space authoring UX is assigned to Phase 16 — Editor Scene Editing and is recorded in the Phase 16 handoff.
+
+---
+
+## 12. Automated tests — PASS
+
+The aggregate flag:
+
+`NocturneHost.exe --phase15-tests`
+
+runs:
+
+- EntityRegistry tests
+- ComponentStorage tests
+- ComponentRegistry tests
+- Transform tests
+- Renderable tests
+- Camera tests
+- Name tests
+- World integration tests
+- stress/performance tests
+
+Focused switches remain available for each test family.
+
+Coverage includes:
+
+- positive lifecycle paths
+- invalid inputs
+- stale handles
+- duplicate registration/add
+- absent remove
+- storage growth
+- alignment/non-trivial lifetime
+- hierarchy cycles
+- deep/wide transforms
+- camera lifecycle
+- world destruction cascade
+- render extraction
+- leaks
+- stress/performance
+
+Detailed evidence is in `Docs/Phase 15 — Test and CI Validation Report.md`.
+
+---
+
+## 13. Build/CI gate — PASS
+
+Final CI validates:
+
+- [x] NocturneHost Debug x64
+- [x] full `--phase15-tests`
+- [x] NocturneEditor Debug x64
+- [x] NocturneEngine Development x64 direct project build
+- [x] NocturneHost Development x64 direct project build
+- [x] NocturneEditor Development x64 direct project build
+- [x] `Nocturne.slnx` Debug x64 solution build
+- [x] direct project repository-root discovery
+- [x] project-reference graph without duplicate engine build authority
+
+Build-system fixes made during finalization:
+
+- `254f83b8137ce50dbbd10d5e6e9d2c33dd6571b6` — Host direct-project root independence
+- `a1e47771b6e7b890cf2158a9ccf7df1886fc7da5` — expanded Development/solution CI
+- `5b890be76f4b4444c29f7515a86791bad4b3b2c1` — deduplicated engine project references
+
+The expanded CI deliberately caught a solution-build compiler-PDB conflict; the conflict was fixed rather than waived.
+
+---
+
+## 14. Performance gate — PASS
+
+Measured workload classes include:
+
+- entity create/destroy/reuse
+- EntityRegistry IsAlive
+- component add
+- component Has/Get
+- dense component iteration
+- component remove/swap-remove
+- transform mutation
+- all-dirty roots
+- mostly-clean roots
+- 10k-wide hierarchy
+- 2,048-deep hierarchy
+- 10k render extraction
+- allocator call/byte deltas
+- frame-arena usage
+
+Timings are observations, not hardware-dependent CI budgets.
+
+Correctness, leaks and forbidden persistent allocations remain pass/fail conditions.
+
+Exact final values are recorded in the Test and CI Validation Report.
+
+---
+
+## 15. Dead/competing runtime model cleanup — COMPLETE
+
+Removed:
+
+- `Engine/Runtime/Transform.h`
+- `Engine/Runtime/RenderPackets.h`
+- `Engine/Runtime/VisibilitySystem.h`
+- `Engine/Runtime/VisibilitySystem.cpp`
+
+`SceneObjectHandle` is only a compatibility alias to `EntityHandle`.
+
+There is no second entity/world model.
+
+---
+
+## 16. Build hygiene discovered during local validation
+
+A local direct Host rebuild exposed a hidden dependency on `$(SolutionDir)`.
+
+This was fixed instead of requiring developers to pass special command-line properties forever.
+
+The root-independent build model now derives repository root from project location where appropriate.
+
+The generated local `DerivedDataCache/` directory is ignored by the final Phase 15 branch hygiene update.
+
+---
+
+## 17. Production Engineering Standard gate
 
 - [x] architecture documented
 - [x] book grounding recorded
-- [x] design choices labeled
+- [x] Nocturne design choices labeled
 - [x] ownership/lifetime explicit
 - [x] invariants documented
 - [x] invalid/stale/error cases handled
-- [x] no known hidden structural TODO in Phase 15 scope
-- [x] duplicate authoritative editor/runtime state removed
-- [x] public APIs reviewed for Phase 16/17 use
-- [x] hot-path allocation/performance inspected
+- [x] no hidden structural TODO represented as finished
+- [x] one authoritative runtime/editor state
+- [x] APIs reviewed for Phase 16/17 compatibility
+- [x] hot-path allocation/performance measured
 - [x] representative unit/integration/stress tests
-- [x] editor compile regression passed
+- [x] Phase 14 interactive regression passed
 - [x] diagnostics available
-- [x] documentation matches implemented architecture
-- [x] implementation report written
-- [x] completion report written
-- [x] deliberately deferred work assigned to later roadmap phases
-- [ ] final interactive Phase 14 viewport regression
+- [x] direct project and solution builds validated
+- [x] documentation matches final code
+- [x] implementation report finalized
+- [x] test/CI report finalized
+- [x] completion report finalized
+- [x] deliberately deferred work assigned to later phases
 
-Phase 15 must not be marked complete until the final unchecked item is validated.
+All applicable Phase 15 completion gates are satisfied.
 
 ---
 
-## 16. Next chat handoff
+## 18. Temporary scaffolding remaining
 
-After the manual regression passes, the next chat should begin with:
+Allowed validation/editor scaffolding remains:
 
-> **Phase 15 manual Phase 14 viewport regression passed. Mark Phase 15 COMPLETE, finalize its completion report, then begin Phase 16 — Editor Scene Editing. Study all existing phase .md files first, with special attention to the Phase 15 Architecture, Implementation Report, Completion Report, Production Engineering Standard, and the Phase 14 editor completion/handoff documents.**
+- four deterministic validation renderables
+- editor validation camera
+- procedural grid/sky
+- debug selection path
+
+This is explicitly not the Phase 16 scene-authoring system.
+
+Phase 16 owns replacement of the fixed validation authoring bridge with real editor scene editing.
+
+---
+
+## 19. Deliberately deferred scope
+
+Phase 16:
+
+- real scene create/delete/duplicate/reparent
+- Inspector/component authoring
+- editing transactions
+- undo/redo for owned operations
+- Local/Global transform coordinate-space UX
+
+Phase 17:
+
+- persistent entity identity
+- scene serialization
+- save/load
+- reference fixups
+- format/version migration policy
+
+Later phases retain physics, animation, audio, scripting/gameplay, AI/navigation, PIE and shipping concerns according to the canonical roadmap.
+
+No deferred item requires a rewrite of Phase 15 before Phase 16 begins.
+
+---
+
+## 20. Final handoff
+
+Phase 15 is closed.
+
+The next phase authority is:
+
+`Docs/Phase 16 — Editor Scene Editing Handoff.md`
+
+At the beginning of the next phase, study all previous Markdown phase files and especially:
+
+- Production Engineering Standard
+- Phase 15 Architecture
+- Phase 15 Implementation Report
+- Phase 15 Test and CI Validation Report
+- Phase 15 Completion Report
+- Phase 14 editor architecture/completion documentation
+- canonical roadmap

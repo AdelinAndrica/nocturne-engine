@@ -1,5 +1,17 @@
 # Handoff — Phase 15: Entity / Component System
 
+> **ARCHIVED — PHASE 15 COMPLETE (2026-09-18)**
+>
+> Acesta este handoff-ul istoric cu care a început Phase 15. Starea finală este documentată în:
+>
+> - `Docs/Phase 15 — Entity Component System Architecture.md`
+> - `Docs/Phase 15 — Implementation Report.md`
+> - `Docs/Phase 15 — Test and CI Validation Report.md`
+> - `Docs/Phase 15 — Completion Report.md`
+> - `Docs/Phase 16 — Editor Scene Editing Handoff.md`
+>
+> Nu folosi acest handoff inițial ca descriere a codului final fără documentele de completion de mai sus.
+
 **Phase 14 este COMPLETĂ și merged în `master`.**
 
 Începem **Phase 15 — Entity / Component System**.

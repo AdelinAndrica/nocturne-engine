@@ -457,17 +457,16 @@ Professional-grade does not mean phase-scope expansion. Future features remain i
 
 ### Completed foundation
 
-Phases 1–14 constitute the current implemented foundation. Their individual phase/completion documents remain the authority for exactly what was delivered.
+Phases 1–15 constitute the current implemented foundation. Their individual phase/completion documents remain the authority for exactly what was delivered.
+
+Phase 15 completed the production runtime entity/component foundation: generational runtime identity, component lifecycle/storage, transform/render/camera/name components, metadata/versioning seams, deterministic world queries, render extraction, editor/runtime single source of truth, stress/performance baselines, and CI/build regression coverage.
 
 ### Active
 
-15. **Phase 15 — Entity / Component System**  
-    Production-grade runtime object model: safe entity identity and generational handles, component lifecycle/storage, transform/render/camera/name migration, component metadata/versioning, deterministic queries and editor/render integration. The result must be serialization-ready without implementing Phase 17 file I/O.
-
-### Future roadmap — production-grade scope
-
 16. **Phase 16 — Editor Scene Editing**  
     Real scene-authoring workflows over the Phase 15 object model: create/delete/duplicate/reparent entities, component add/remove/edit, schema-driven inspectors, robust selection synchronization, transactional editing semantics, undo/redo integration for owned operations, prefab prototype and editor diagnostics. No scene-file persistence beyond interfaces required by the next phase.
+
+### Future roadmap — production-grade scope
 
 17. **Phase 17 — Serialization & Save / Load**  
     Versioned persistence for scenes, prefabs and savegame-relevant state: stable entity/component identity, reference fixups, deterministic output where required, compatibility/version checks, malformed-data diagnostics, transactional/atomic save behavior where applicable, round-trip tests and migration/rejection policy.

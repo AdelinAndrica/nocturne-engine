@@ -1,6 +1,6 @@
 # Nocturne Engine — Phase 15 Entity Component System Implementation Report
 
-> **Status:** IMPLEMENTATION COMPLETE; FINAL COMPLETION GATE VALIDATION RECORDED SEPARATELY  
+> **Status:** PHASE 15 IMPLEMENTATION COMPLETE  
 > **Phase:** 15 — Entity / Component System  
 > **Architecture contract:** `Docs/Phase 15 — Entity Component System Architecture.md`  
 > **Engineering standard:** `Docs/Production Engineering Standard.md`
@@ -495,6 +495,14 @@ The Phase 15 aggregate test now includes representative measured workloads.
 - destroy 5k;
 - free-list reuse 5k.
 
+### Component storage/query hot paths
+
+- add 10k NameComponents;
+- Has/Get lookup over 10k components;
+- dense iteration over 10k components;
+- remove 5k components through swap-remove;
+- allocator call/byte deltas recorded around add/remove.
+
 ### Transform
 
 - mutate 10k;
@@ -526,11 +534,15 @@ It:
 2. configures MSBuild;
 3. builds `NocturneHost` Debug x64;
 4. runs `NocturneHost.exe --phase15-tests`;
-5. builds `NocturneEditor` Debug x64 as a Phase 14 regression compile target.
+5. builds `NocturneEditor` Debug x64 as a Phase 14 regression compile target;
+6. builds `NocturneEngine`, `NocturneHost` and `NocturneEditor` directly as Development x64 projects;
+7. builds `Nocturne.slnx` as a Debug x64 solution regression.
 
 The Phase 15 aggregate test executes all Phase 15 runtime unit/integration/stress suites before Engine initialization, so tests do not depend on a GPU, DX12 device, native window or content mount.
 
-Final branch validation status is recorded in the Phase 15 Completion Report.
+The direct-project and solution steps also validate that repository-root discovery and project references do not rely on Visual Studio setting `$(SolutionDir)` implicitly.
+
+Final branch validation status and measured values are recorded in `Docs/Phase 15 — Test and CI Validation Report.md` and the Completion Report.
 
 ---
 
@@ -583,3 +595,131 @@ Deliberately deferred:
 - archetype/chunk storage until a measured workload justifies it.
 
 No deferred item is required to replace the Phase 15 foundation before those phases can build on it.
+
+
+---
+
+## 20. Final build-system hardening
+
+Phase 15 completion exposed and fixed two build-system weaknesses that were masked by the original CI command line.
+
+### Direct project root independence
+
+Commit:
+
+`254f83b8137ce50dbbd10d5e6e9d2c33dd6571b6`
+
+Message:
+
+`build: make NocturneHost project root-independent`
+
+A local direct `NocturneHost.vcxproj /t:Rebuild` initially failed because Host include/output paths depended on `$(SolutionDir)`, which is not guaranteed when MSBuild is invoked directly on a project.
+
+The project now derives `RepoRoot` from `$(MSBuildProjectDirectory)`, matching the robust Editor pattern.
+
+The same completion pass subsequently made `NocturneEngine.vcxproj` root-independent for Debug/Development direct builds.
+
+### Development and solution CI
+
+Commit:
+
+`a1e47771b6e7b890cf2158a9ccf7df1886fc7da5`
+
+Message:
+
+`ci: validate Phase 15 development and solution builds`
+
+The CI matrix was expanded to include:
+
+- NocturneEngine Development x64;
+- NocturneHost Development x64;
+- NocturneEditor Development x64;
+- full `Nocturne.slnx` Debug x64 build.
+
+The first expanded solution run intentionally exposed a duplicate `NocturneEngine` project-instance/PDB conflict rather than being ignored.
+
+### Project-reference deduplication
+
+Commit:
+
+`5b890be76f4b4444c29f7515a86791bad4b3b2c1`
+
+Message:
+
+`build: deduplicate engine project references`
+
+Host and Editor no longer inject a distinct `SolutionDir` project-reference property into `NocturneEngine`. Since all three projects can now derive repository root themselves, this removes competing MSBuild project instances that targeted the same compiler PDB/output paths.
+
+---
+
+## 21. Final performance coverage addition
+
+Commit:
+
+`07608b3d40fd89554efdbc4a90c26915d48027c4`
+
+Message:
+
+`phase15: measure component storage hot paths`
+
+The stress/performance suite was extended to measure:
+
+- component add;
+- component Has/Get;
+- dense component iteration;
+- component remove/swap-remove;
+- allocation deltas around those operations.
+
+This closes the performance checklist gap between generic component-storage correctness tests and measured component hot-path behavior.
+
+Exact final CI measurements are recorded in the Test and CI Validation Report.
+
+---
+
+## 22. Manual Phase 14 regression
+
+The final Windows desktop/GPU regression was performed manually after rebuilding and running the Phase 15 branch.
+
+Validated behavior:
+
+- EditorShellV3 launch;
+- DX12 child-HWND viewport;
+- validation geometry/grid/sky;
+- camera navigation;
+- picking;
+- hierarchy/viewport selection synchronization;
+- runtime NameComponent display names;
+- Move/Rotate/Scale gizmos;
+- selection bounds;
+- viewport resize;
+- camera after resize;
+- no recurring frame-stutter regression;
+- no observed shader-recompile-every-frame regression.
+
+The user reported the full regression as functioning.
+
+### Accepted editor limitation
+
+The transform gizmo currently operates in **Local Axis** space.
+
+This does not invalidate the Phase 15 entity/component runtime contract or the Phase 14 regression accepted for this phase.
+
+**Design choice (not directly from the book):** Local/Global transform-coordinate-space authoring UX is deferred to Phase 16 — Editor Scene Editing and is explicitly carried in the Phase 16 handoff.
+
+---
+
+## 23. Final implementation state
+
+The final validated code revision for Phase 15 is recorded in the Completion Report.
+
+At Phase 15 handoff:
+
+- the runtime entity/component foundation is the sole world authority;
+- the editor reads/writes runtime component state rather than mirrored transform state;
+- renderer consumption remains extracted data;
+- negative lifecycle paths are tested;
+- component/entity/transform/render hot paths have measured baselines;
+- Debug/Development direct project builds and solution build are part of CI;
+- future persistent identity remains deliberately deferred to Phase 17.
+
+No remaining known issue requires replacing the Phase 15 foundation before Phase 16.

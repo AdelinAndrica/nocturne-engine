@@ -29,3 +29,6 @@ cmake_install.cmake
 # vcpkg local copies/logs
 vcpkg_installed/
 vcpkg.applocal.log
+
+# Runtime/editor generated caches
+DerivedDataCache/

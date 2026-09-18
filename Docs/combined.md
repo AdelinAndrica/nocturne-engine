@@ -12,6 +12,14 @@ This document consolidates the entire Markdown pack into a single coherent spec 
 > - `Docs/Production Engineering Standard.md` — mandatory production-grade completion standard from Phase 15 onward;
 > - the current phase handoff / implementation / completion reports.
 >
+> Phase 15 is COMPLETE. Its final documentation pack is:
+>
+> - `Docs/Phase 15 — Entity Component System Architecture.md`
+> - `Docs/Phase 15 — Implementation Report.md`
+> - `Docs/Phase 15 — Test and CI Validation Report.md`
+> - `Docs/Phase 15 — Completion Report.md`
+> - `Docs/Phase 16 — Editor Scene Editing Handoff.md`
+>
 > Any shorter future-phase descriptions embedded later in this generated snapshot are superseded by those documents.
 
 ## Table of Contents
