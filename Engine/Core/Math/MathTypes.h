@@ -198,14 +198,14 @@ namespace noc
         return Mul(Translation(t), Mul(RotationFromQuat(r), Scale(s)));
     }
 
-    inline bool IsFinite(const Vec3& v)
+    inline bool IsFiniteMath(const Vec3& v)
     {
         return std::isfinite(v.x)
             && std::isfinite(v.y)
             && std::isfinite(v.z);
     }
 
-    inline bool IsFinite(const Quat& q)
+    inline bool IsFiniteMath(const Quat& q)
     {
         return std::isfinite(q.x)
             && std::isfinite(q.y)
@@ -213,7 +213,7 @@ namespace noc
             && std::isfinite(q.w);
     }
 
-    inline bool IsFinite(const Mat4& m)
+    inline bool IsFiniteMath(const Mat4& m)
     {
         for (float value : m.m)
         {
@@ -230,7 +230,7 @@ namespace noc
         Mat4& outInverse,
         float epsilon = 1.0e-6f)
     {
-        if (!IsFinite(input)
+        if (!IsFiniteMath(input)
             || std::fabs(M(input, 3, 0)) > epsilon
             || std::fabs(M(input, 3, 1)) > epsilon
             || std::fabs(M(input, 3, 2)) > epsilon
@@ -303,7 +303,7 @@ namespace noc
         M(result, 1, 3) = inverseTranslation.y;
         M(result, 2, 3) = inverseTranslation.z;
 
-        if (!IsFinite(result))
+        if (!IsFiniteMath(result)
             return false;
 
         outInverse = result;
@@ -389,7 +389,7 @@ namespace noc
         float epsilon = 1.0e-5f,
         float shearEpsilon = 1.0e-4f)
     {
-        if (!IsFinite(input)
+        if (!IsFiniteMath(input)
             || std::fabs(M(input, 3, 0)) > epsilon
             || std::fabs(M(input, 3, 1)) > epsilon
             || std::fabs(M(input, 3, 2)) > epsilon
@@ -474,9 +474,9 @@ namespace noc
             QuatFromRotationMatrix(rotationMatrix);
         const Vec3 scale{ sx, sy, sz };
 
-        if (!IsFinite(translation)
-            || !IsFinite(rotation)
-            || !IsFinite(scale))
+        if (!IsFiniteMath(translation)
+            || !IsFiniteMath(rotation)
+            || !IsFiniteMath(scale))
         {
             return false;
         }
