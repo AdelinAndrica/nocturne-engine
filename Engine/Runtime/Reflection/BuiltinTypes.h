@@ -47,6 +47,18 @@ namespace noc
             { 0x1000000000000203ull };
     }
 
+    namespace BuiltinFunctionIds
+    {
+        // Design choice (not directly from the book): Phase 16 exposes a small
+        // side-effect-free real engine math function set first. Script exposure
+        // policy remains deferred; these functions are reflected, not yet
+        // declared ScriptVisible.
+        inline constexpr FunctionId Vec3Length =
+            MakeFunctionId("Nocturne.Vec3.Length");
+        inline constexpr FunctionId Vec3Dot =
+            MakeFunctionId("Nocturne.Vec3.Dot");
+    }
+
     namespace builtin_reflection_detail
     {
         struct MeshResourceMarker
@@ -105,6 +117,56 @@ namespace noc
             return registry.RegisterType(metadata);
         }
 
+        [[nodiscard]] inline bool InvokeVec3Length(
+            FunctionInvocationContext&,
+            const ReflectedConstValueView* arguments,
+            uint32_t argumentCount,
+            ReflectedValueView returnValue)
+        {
+            if (!arguments
+                || argumentCount != 1
+                || arguments[0].typeId != BuiltinTypeIds::Vec3
+                || !arguments[0].data
+                || returnValue.typeId != BuiltinTypeIds::Float32
+                || !returnValue.data)
+            {
+                return false;
+            }
+
+            *static_cast<float*>(returnValue.data) =
+                Length(
+                    *static_cast<const Vec3*>(
+                        arguments[0].data));
+            return true;
+        }
+
+        [[nodiscard]] inline bool InvokeVec3Dot(
+            FunctionInvocationContext&,
+            const ReflectedConstValueView* arguments,
+            uint32_t argumentCount,
+            ReflectedValueView returnValue)
+        {
+            if (!arguments
+                || argumentCount != 2
+                || arguments[0].typeId != BuiltinTypeIds::Vec3
+                || arguments[1].typeId != BuiltinTypeIds::Vec3
+                || !arguments[0].data
+                || !arguments[1].data
+                || returnValue.typeId != BuiltinTypeIds::Float32
+                || !returnValue.data)
+            {
+                return false;
+            }
+
+            *static_cast<float*>(returnValue.data) =
+                Dot(
+                    *static_cast<const Vec3*>(
+                        arguments[0].data),
+                    *static_cast<const Vec3*>(
+                        arguments[1].data));
+            return true;
+        }
+
         [[nodiscard]] inline bool RegisterVec3(ReflectionRegistry& registry)
         {
             const PropertyMetadata properties[] = {
@@ -130,8 +192,40 @@ namespace noc
                 TypeFlags::EditorVisible
                     | TypeFlags::Serializable
                     | TypeFlags::ScriptVisible);
+            const FunctionParameterMetadata lengthParameters[] = {
+                { "value", BuiltinTypeIds::Vec3 }
+            };
+            const FunctionParameterMetadata dotParameters[] = {
+                { "a", BuiltinTypeIds::Vec3 },
+                { "b", BuiltinTypeIds::Vec3 }
+            };
+            const FunctionMetadata functions[] = {
+                {
+                    BuiltinFunctionIds::Vec3Length,
+                    "Length",
+                    BuiltinTypeIds::Vec3,
+                    BuiltinTypeIds::Float32,
+                    FunctionFlags::Static,
+                    lengthParameters,
+                    1,
+                    &InvokeVec3Length
+                },
+                {
+                    BuiltinFunctionIds::Vec3Dot,
+                    "Dot",
+                    BuiltinTypeIds::Vec3,
+                    BuiltinTypeIds::Float32,
+                    FunctionFlags::Static,
+                    dotParameters,
+                    2,
+                    &InvokeVec3Dot
+                }
+            };
+
             metadata.properties = properties;
             metadata.propertyCount = 3;
+            metadata.functions = functions;
+            metadata.functionCount = 2;
             return registry.RegisterType(metadata);
         }
 

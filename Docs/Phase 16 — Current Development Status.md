@@ -56,7 +56,7 @@ Do not rebuild the Phase 16 core. Continue from the current implementation and c
 | Reflected component operations | Implemented | generic Has/Add/Remove/Get and reflected component enumeration per entity |
 | Generic reflected values | Implemented | OwnedReflectedValue with allocator-aware lifetime/alignment/copy semantics |
 | OCP proof | Implemented | synthetic reflected component works without modifying central Inspector/property-command switches |
-| Reflection perf baseline | Partial / useful | 100/1000 synthetic types, 10k property lookups, 100k property reads, 100k TypeId lookups, no allocator calls on measured frozen hot paths |
+| Reflection perf baseline | Implemented / expanded | 100/1000 synthetic types; TypeId/name/property/function lookup; property read/enumeration; raw+generic function invoke; reflected component enumeration; frozen hot lookup paths checked for allocator calls |
 | EditorSession | Implemented | owns selection, tool camera classification, active tool, Local/World orientation, command history and dirty state |
 | Selection | Implemented | EntityHandle is the authoritative identity; no row/index identity |
 | Tool editor camera | Implemented | protected from authored hierarchy/delete/duplicate/reset workflows |
@@ -328,8 +328,8 @@ Keyboard shortcuts, Actor menu actions, hierarchy drag/drop and hierarchy contex
 | Dedicated hierarchy test matrix | PARTIAL |
 | Dedicated Inspector robustness matrix | PARTIAL |
 | Dedicated gizmo matrix | PARTIAL |
-| Real-engine function reflection proof | PARTIAL — generic function reflection works, real runtime proof remains |
-| Reflection perf contract expansion | PARTIAL — name/function/component-enumeration paths still need measured observations |
+| Real-engine function reflection proof | VERIFIED — real Vec3.Length / Vec3.Dot functions are registered in builtin runtime schema and invoked generically |
+| Reflection perf contract expansion | VERIFIED — TypeId/name/property/function lookup, raw+generic invoke, property enumeration and reflected component enumeration measured |
 | Explicit prefab prototype seam | PARTIAL — transient snapshot/instantiate mechanism exists; explicit prototype contract remains |
 | Manual Phase 13/14/15 UI regression | OPEN |
 | 15+ minute edit-session soak | OPEN |
@@ -484,13 +484,26 @@ Coverage includes:
 
 Win32 hit-testing and OS delivery of mouse/capture/focus messages remain part of manual UI regression, but production termination routing now resolves those events through the tested policy seam.
 
-### 11.5 Prefab prototype seam
+### 11.5 Reflection function/performance gate — VERIFIED
+
+**Design choice (not directly from the book):** the first real reflected function set is attached to the engine's \`Vec3\` schema as static math operations matching the existing free functions:
+
+- \`Nocturne.Vec3.Length(value: Vec3) -> Float32\`;
+- \`Nocturne.Vec3.Dot(a: Vec3, b: Vec3) -> Float32\`.
+
+They are deliberately side-effect-free and are not marked ScriptVisible; Phase 24 retains authority over script exposure policy.
+
+Automated proof covers stable FunctionId lookup, canonical-name lookup, return/parameter metadata, Static flags, generic invocation, argument-count mismatch, TypeId mismatch and allocator cleanup.
+
+The reflection performance baseline now measures TypeId lookup, canonical-name lookup, property lookup/read/enumeration, function lookup, raw function invocation, generic validated function invocation and reflected component enumeration. Frozen lookup/enumeration/raw-invoke paths are asserted not to call the reflection allocator. Generic invocation reports its OwnedReflectedValue allocation cost separately.
+
+### 11.6 Prefab prototype seam
 
 ReflectedEntitySubtreeSnapshot already supplies much of the transient capture/instantiate mechanism.
 
 Phase 16 should make the prototype seam explicit without introducing prefab persistence, prefab files, persistent IDs or serialized references. Durable representation belongs to the appropriate later persistence/prefab phase.
 
-### 11.6 Manual regression and soak
+### 11.7 Manual regression and soak
 
 Before completion, validate the preserved editor baseline plus new authoring operations:
 

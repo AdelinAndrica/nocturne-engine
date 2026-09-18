@@ -15,6 +15,7 @@
 #include "Core/Memory/Allocator.h"
 #include "Core/Memory/DebugAlloc.h"
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -1580,6 +1581,153 @@ bool RunPhase16ReflectionRegistryTests()
         ok &= CheckReflectionRegistry(
             allocator.OutstandingBytes() == 0,
             "Semantic property access leaked allocator memory");
+    }
+
+    {
+        noc::ReflectionRegistry builtinRegistry;
+
+        ok &= CheckReflectionRegistry(
+            builtinRegistry.Init(allocator, 32)
+                && noc::RegisterBuiltinReflectionTypes(
+                    builtinRegistry)
+                && builtinRegistry.Freeze(),
+            "Real engine function reflection registry setup failed");
+
+        const noc::FunctionMetadata* lengthFunction =
+            builtinRegistry.FindFunction(
+                noc::BuiltinTypeIds::Vec3,
+                noc::BuiltinFunctionIds::Vec3Length);
+        const noc::FunctionMetadata* dotFunction =
+            builtinRegistry.FindFunctionByName(
+                noc::BuiltinTypeIds::Vec3,
+                "Dot");
+
+        ok &= CheckReflectionRegistry(
+            lengthFunction
+                && dotFunction
+                && noc::HasFlag(
+                    lengthFunction->flags,
+                    noc::FunctionFlags::Static)
+                && noc::HasFlag(
+                    dotFunction->flags,
+                    noc::FunctionFlags::Static)
+                && lengthFunction->returnTypeId
+                    == noc::BuiltinTypeIds::Float32
+                && lengthFunction->parameterCount == 1
+                && dotFunction->parameterCount == 2,
+            "Real engine Vec3 function metadata/lookup failed");
+
+        const noc::Vec3 lengthInput{
+            3.0f, 4.0f, 0.0f
+        };
+        const noc::ReflectedConstValueView lengthArgs[] = {
+            {
+                noc::BuiltinTypeIds::Vec3,
+                &lengthInput
+            }
+        };
+        noc::FunctionInvocationContext functionContext{};
+        noc::OwnedReflectedValue lengthResult;
+
+        ok &= CheckReflectionRegistry(
+            lengthFunction
+                && noc::InvokeReflectedFunction(
+                    builtinRegistry,
+                    *lengthFunction,
+                    functionContext,
+                    lengthArgs,
+                    1,
+                    &allocator,
+                    &lengthResult)
+                    == noc::FunctionInvokeStatus::Success
+                && lengthResult.Type()
+                    == noc::BuiltinTypeIds::Float32
+                && lengthResult.Data()
+                && std::fabs(
+                    *static_cast<const float*>(
+                        lengthResult.Data())
+                        - 5.0f) < 1.0e-6f,
+            "Real engine Vec3.Length reflected invocation failed");
+
+        const noc::Vec3 dotA{
+            1.0f, 2.0f, 3.0f
+        };
+        const noc::Vec3 dotB{
+            4.0f, 5.0f, 6.0f
+        };
+        const noc::ReflectedConstValueView dotArgs[] = {
+            {
+                noc::BuiltinTypeIds::Vec3,
+                &dotA
+            },
+            {
+                noc::BuiltinTypeIds::Vec3,
+                &dotB
+            }
+        };
+        noc::OwnedReflectedValue dotResult;
+
+        ok &= CheckReflectionRegistry(
+            dotFunction
+                && noc::InvokeReflectedFunction(
+                    builtinRegistry,
+                    *dotFunction,
+                    functionContext,
+                    dotArgs,
+                    2,
+                    &allocator,
+                    &dotResult)
+                    == noc::FunctionInvokeStatus::Success
+                && dotResult.Type()
+                    == noc::BuiltinTypeIds::Float32
+                && dotResult.Data()
+                && std::fabs(
+                    *static_cast<const float*>(
+                        dotResult.Data())
+                        - 32.0f) < 1.0e-6f,
+            "Real engine Vec3.Dot reflected invocation failed");
+
+        ok &= CheckReflectionRegistry(
+            lengthFunction
+                && noc::InvokeReflectedFunction(
+                    builtinRegistry,
+                    *lengthFunction,
+                    functionContext,
+                    nullptr,
+                    0,
+                    &allocator,
+                    nullptr)
+                    == noc::FunctionInvokeStatus::ArgumentCountMismatch,
+            "Real engine function invocation did not reject argument-count mismatch");
+
+        const float wrongArgument = 1.0f;
+        const noc::ReflectedConstValueView wrongArgs[] = {
+            {
+                noc::BuiltinTypeIds::Float32,
+                &wrongArgument
+            }
+        };
+
+        ok &= CheckReflectionRegistry(
+            lengthFunction
+                && noc::InvokeReflectedFunction(
+                    builtinRegistry,
+                    *lengthFunction,
+                    functionContext,
+                    wrongArgs,
+                    1,
+                    &allocator,
+                    nullptr)
+                    == noc::FunctionInvokeStatus::ArgumentTypeMismatch,
+            "Real engine function invocation did not reject argument TypeId mismatch");
+
+        lengthResult.Clear();
+        dotResult.Clear();
+        builtinRegistry.Shutdown();
+
+        ok &= CheckReflectionRegistry(
+            allocator.OutstandingBytes() == 0,
+            "Real engine function reflection proof leaked allocator memory");
     }
 
     {

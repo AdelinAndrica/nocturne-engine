@@ -136,7 +136,7 @@ Type metadata:
 - [ ] canonical name.
 - [ ] version.
 - [ ] size/alignment.
-- [ ] flags.
+- [x] flags.
 - [ ] deterministic enumeration.
 - [ ] registry-owned metadata/string lifetime.
 - [ ] no temporary descriptor pointers.
@@ -214,7 +214,7 @@ References:
 
 Components:
 - [ ] reflected component operations Has/Add/Remove/Get.
-- [ ] generic reflected component enumeration per entity.
+- [x] generic reflected component enumeration per entity.
 - [ ] Name reflected.
 - [ ] Transform reflected.
 - [ ] Renderable reflected.
@@ -223,17 +223,17 @@ Components:
 - [ ] derived fields marked transient/read-only.
 
 Functions:
-- [ ] FunctionMetadata.
-- [ ] stable function identity.
-- [ ] return TypeId.
-- [ ] parameters.
+- [x] FunctionMetadata.
+- [x] stable function identity.
+- [x] return TypeId.
+- [x] parameters.
 - [ ] flags.
-- [ ] invocation adapter.
-- [ ] type/count validation.
-- [ ] const/static/member semantics.
-- [ ] real engine function reflection proof.
-- [ ] mismatch/failure tests.
-- [ ] Phase 24 script exposure policy deferred, mechanism implemented.
+- [x] invocation adapter.
+- [x] type/count validation.
+- [x] const/static/member semantics.
+- [x] real engine function reflection proof.
+- [x] mismatch/failure tests.
+- [x] Phase 24 script exposure policy deferred, mechanism implemented.
 
 Generic values:
 - [ ] const reflected value view.
@@ -257,16 +257,16 @@ Registry:
 - [ ] shutdown/leak tests.
 
 Performance:
-- [ ] lookup by TypeId measured.
-- [ ] lookup by canonical name measured.
-- [ ] property lookup measured.
-- [ ] function lookup/invoke measured.
-- [ ] property enumeration measured.
-- [ ] reflected component enumeration measured.
-- [ ] no allocations on frozen hot lookups.
-- [ ] synthetic 1k reflected types.
-- [ ] 10k/100k lookup workloads unde util.
-- [ ] timings observations, correctness hard gate.
+- [x] lookup by TypeId measured.
+- [x] lookup by canonical name measured.
+- [x] property lookup measured.
+- [x] function lookup/invoke measured.
+- [x] property enumeration measured.
+- [x] reflected component enumeration measured.
+- [x] no allocations on frozen hot lookups.
+- [x] synthetic 1k reflected types.
+- [x] 10k/100k lookup workloads unde util.
+- [x] timings observations, correctness hard gate.
 
 OCP acceptance:
 - [ ] synthetic new reflected component.
