@@ -25,6 +25,7 @@ bool RunPhase15StressPerfTests();
 bool RunPhase16ReflectionFoundationTests();
 bool RunPhase16ReflectionRegistryTests();
 bool RunPhase16ReflectionOcpTests();
+bool RunPhase16ReflectionPerfTests();
 
 // Phase 12 tooling
 #include "Phase12CookPack.h"
@@ -57,6 +58,7 @@ int main(int argc, char** argv)
         bool ok = RunPhase16ReflectionFoundationTests();
         ok &= RunPhase16ReflectionRegistryTests();
         ok &= RunPhase16ReflectionOcpTests();
+        ok &= RunPhase16ReflectionPerfTests();
         return ok ? 0 : 1;
     }
 
