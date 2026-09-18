@@ -100,6 +100,14 @@ Current `ComponentRegistry`:
 
 This is a migration seam, not the final Phase 16 authority.
 
+### 3.2.1 Math-type discrepancy found by the audit
+
+The Phase 16 reflection contract names `Vec2`, `Vec3`, `Vec4`, `Quat`, `Mat4` and `AABB` as Nocturne math types to integrate.
+
+The current codebase actually defines `Vec3`, `Quat`, `Mat4` and `AABB`. `Vec2` and `Vec4` are referenced by Phase 16 documentation but are not implemented runtime types yet.
+
+They must therefore be introduced as a bounded math/reflection dependency before claiming complete math-type reflection coverage. The architecture does not pretend those types already exist.
+
 ### 3.3 World semantic APIs
 
 Current `World` already provides useful semantic mutation seams:
@@ -729,7 +737,7 @@ Windows CI retains Debug/Development Engine/Host/Editor and solution regression.
 
 ## 24. Implementation order
 
-1. Repository/code audit — **complete for Phase 16 start**.
+1. Phase 16 targeted repository/code audit — **complete**. The separate checklist item requiring an integral review of every historical phase Markdown file is not claimed complete here.
 2. Architecture contract — **this document**.
 3. Stable reflection IDs, kinds, flags and metadata primitives.
 4. Lifecycle operations.
