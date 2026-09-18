@@ -173,6 +173,7 @@ namespace nocturne::editor
         void HandleCommand_(int id);
         void ShowPopup_(int menuId, HWND anchor);
         void UpdateStatus_();
+        [[nodiscard]] bool RequestEditorExit_();
 
         [[nodiscard]] bool ExecuteCreateEntity_();
         [[nodiscard]] bool ExecuteDeleteSelection_();

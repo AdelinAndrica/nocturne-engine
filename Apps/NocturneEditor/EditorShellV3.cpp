@@ -1816,6 +1816,37 @@ namespace nocturne::editor
         RECT rc{}; GetClientRect(consoleEdit_, &rc); const int lines = static_cast<int>(SendMessageW(consoleEdit_, EM_GETLINECOUNT, 0, 0)); const int first = static_cast<int>(SendMessageW(consoleEdit_, EM_GETFIRSTVISIBLELINE, 0, 0)); const int page = (std::max)(1, static_cast<int>(rc.bottom) / 15); SetScroll(consoleScroll_, lines, page, first);
     }
 
+    bool EditorShellV3::RequestEditorExit_()
+    {
+        if (!window_)
+            return false;
+
+        if (session_ && session_->SceneDirty())
+        {
+            // Design choice (not directly from the book): Phase 16 has no
+            // persistence yet, so exit confirmation is intentionally
+            // discard-or-cancel. Save remains Phase 17.
+            const int choice =
+                MessageBoxW(
+                    hwnd_,
+                    L"The current in-memory scene has unsaved authoring changes.\n\nDiscard them and exit Nocturne Editor?",
+                    L"Exit Nocturne Editor",
+                    MB_OKCANCEL
+                        | MB_ICONWARNING
+                        | MB_DEFBUTTON2);
+
+            if (choice != IDOK)
+            {
+                AppendConsole_(
+                    L"Exit cancelled; current scene retained.");
+                return false;
+            }
+        }
+
+        window_->RequestQuit();
+        return true;
+    }
+
     bool EditorShellV3::ExecuteCreateEntity_()
     {
         if (!session_)
@@ -5320,6 +5351,11 @@ namespace nocturne::editor
             }
             break;
         }
+        case WM_CLOSE:
+            (void)RequestEditorExit_();
+            result = 0;
+            return true;
+
         case WM_COMMAND:
         {
             const int id = LOWORD(wParam);
@@ -5401,7 +5437,12 @@ namespace nocturne::editor
                 return true;
             }
             if (id >= IdMenuFile && id <= IdMenuHelp) { ShowPopup_(id, source); result = 0; return true; }
-            if (id == IDCANCEL) { if (window_) window_->RequestQuit(); result = 0; return true; }
+            if (id == IDCANCEL)
+            {
+                (void)RequestEditorExit_();
+                result = 0;
+                return true;
+            }
             if ((id >= IdToolbarNew && id <= IdToolbarBuild)
                 || (id >= IdActorCreate && id <= IdActorRename)
                 || id == IdPlay || id == IdBuild
