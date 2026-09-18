@@ -115,6 +115,7 @@
     <ClInclude Include="..\..\..\Engine\Runtime\EngineConfig.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Frustum.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\MainLoop.h" />
+    <ClInclude Include="..\..\..\Engine\Runtime\Reflection\BuiltinTypes.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Reflection\ReflectionIds.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Reflection\ReflectionMetadata.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Reflection\ReflectionRegistry.h" />
