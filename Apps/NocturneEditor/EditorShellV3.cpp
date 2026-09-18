@@ -1323,6 +1323,14 @@ namespace nocturne::editor
     {
         DestroyInspectorControls_();
 
+        if (inspector_.body)
+        {
+            RemoveWindowSubclass(
+                inspector_.body,
+                &EditorShellV3::InspectorBodySubclassProc_,
+                0x1630);
+        }
+
         if (renameEdit_)
         {
             RemoveWindowSubclass(
@@ -1393,6 +1401,18 @@ namespace nocturne::editor
         ButtonActive(viewportOrientation_, true);
         inspector_.header = MakeHeader(hwnd_, L"Inspector / Properties", Icon::Inspector, uiBold_);
         inspector_.body = makeBody(IdInspector);
+        if (inspector_.body
+            && !SetWindowSubclass(
+                inspector_.body,
+                &EditorShellV3::InspectorBodySubclassProc_,
+                0x1630,
+                reinterpret_cast<DWORD_PTR>(this)))
+        {
+            NOC_LOG_WARN(
+                "Editor",
+                "%s",
+                "Inspector body subclass registration failed; wheel scrolling unavailable");
+        }
         inspectorAddComponent_ = MakeButton(
             hwnd_,
             IdInspectorAddComponent,
@@ -1564,6 +1584,9 @@ namespace nocturne::editor
 
     void EditorShellV3::RefreshInspector()
     {
+        const noc::EntityHandle previousEntity =
+            inspectorModel_.Entity();
+
         DestroyInspectorControls_();
         inspectorModel_.Clear();
 
@@ -1572,6 +1595,9 @@ namespace nocturne::editor
 
         const noc::EntityHandle selected =
             session_->SelectedEntity();
+
+        if (selected != previousEntity)
+            inspectorScrollY_ = 0;
 
         if (selected.IsValid())
         {
@@ -1587,6 +1613,8 @@ namespace nocturne::editor
                     L"Inspector refresh failed.");
             }
         }
+
+        ClampInspectorScroll_();
 
         if (!RebuildInspectorControls_())
         {
@@ -2223,7 +2251,7 @@ namespace nocturne::editor
         size_t removeIndex = 0;
         size_t resourceIndex = 0;
         size_t boolIndex = 0;
-        int y = 43;
+        int y = 43 - inspectorScrollY_;
 
         for (const InspectorComponentView& component :
              inspectorModel_.Components())
@@ -2249,7 +2277,8 @@ namespace nocturne::editor
 
                         ShowWindow(
                             button,
-                            y + 26 <= bodyHeight - 40
+                            y >= 40
+                                && y + 26 <= bodyHeight - 40
                                 ? SW_SHOW
                                 : SW_HIDE);
                     }
@@ -2281,7 +2310,7 @@ namespace nocturne::editor
                             32,
                             bodyWidth - x - 12);
                     const bool visible =
-                        y >= 0
+                        y >= 40
                         && y + 24 <= bodyHeight - 40;
 
                     if (picker)
@@ -2318,7 +2347,7 @@ namespace nocturne::editor
                             32,
                             bodyWidth - x - 12);
                     const bool visible =
-                        y >= 0
+                        y >= 40
                         && y + 24 <= bodyHeight - 40;
 
                     if (toggle)
@@ -2358,7 +2387,7 @@ namespace nocturne::editor
                             bodyWidth - x - 12);
 
                     const bool visible =
-                        y >= 0
+                        y >= 40
                         && y + 24 <= bodyHeight - 40;
 
                     if (controlCount == 1)
@@ -2438,6 +2467,50 @@ namespace nocturne::editor
 
             y += 7;
         }
+    }
+
+    int EditorShellV3::InspectorContentHeight_() const noexcept
+    {
+        if (!inspectorModel_.Entity().IsValid())
+            return 0;
+
+        int y = 43;
+
+        for (const InspectorComponentView& component :
+             inspectorModel_.Components())
+        {
+            y += 31;
+            y += static_cast<int>(
+                component.properties.size()) * 27;
+            y += 7;
+        }
+
+        return y + 6;
+    }
+
+    void EditorShellV3::ClampInspectorScroll_() noexcept
+    {
+        if (!inspector_.body)
+        {
+            inspectorScrollY_ = 0;
+            return;
+        }
+
+        RECT rc{};
+        GetClientRect(inspector_.body, &rc);
+
+        const int viewportBottom =
+            (std::max)(43, static_cast<int>(rc.bottom) - 40);
+        const int maxScroll =
+            (std::max)(
+                0,
+                InspectorContentHeight_() - viewportBottom);
+
+        inspectorScrollY_ =
+            (std::clamp)(
+                inspectorScrollY_,
+                0,
+                maxScroll);
     }
 
     EditorShellV3::InspectorEditBinding*
@@ -3383,6 +3456,61 @@ namespace nocturne::editor
             EM_SETSEL,
             0,
             -1);
+    }
+
+    LRESULT CALLBACK EditorShellV3::InspectorBodySubclassProc_(
+        HWND hwnd,
+        UINT message,
+        WPARAM wParam,
+        LPARAM lParam,
+        UINT_PTR subclassId,
+        DWORD_PTR refData)
+    {
+        (void)subclassId;
+
+        auto* self =
+            reinterpret_cast<EditorShellV3*>(refData);
+        if (!self)
+            return DefSubclassProc(
+                hwnd,
+                message,
+                wParam,
+                lParam);
+
+        switch (message)
+        {
+        case WM_MOUSEWHEEL:
+        {
+            const int notches =
+                GET_WHEEL_DELTA_WPARAM(wParam)
+                / WHEEL_DELTA;
+
+            self->inspectorScrollY_ -=
+                notches * 81;
+            self->ClampInspectorScroll_();
+            self->LayoutInspectorControls_();
+            InvalidateRect(
+                hwnd,
+                nullptr,
+                FALSE);
+            return 0;
+        }
+
+        case WM_SIZE:
+            self->ClampInspectorScroll_();
+            self->LayoutInspectorControls_();
+            InvalidateRect(
+                hwnd,
+                nullptr,
+                FALSE);
+            break;
+        }
+
+        return DefSubclassProc(
+            hwnd,
+            message,
+            wParam,
+            lParam);
     }
 
     LRESULT CALLBACK EditorShellV3::InspectorEditSubclassProc_(
@@ -4473,11 +4601,23 @@ namespace nocturne::editor
                     DT_LEFT | DT_VCENTER
                         | DT_SINGLELINE | DT_END_ELLIPSIS);
 
-                int y = rc.top + 43;
+                int y =
+                    rc.top + 43 - inspectorScrollY_;
                 const int inspectorWidth =
                     static_cast<int>(rc.right - rc.left);
                 const int labelWidth =
                     (std::max)(95, inspectorWidth * 42 / 100);
+
+                const int listDcState =
+                    SaveDC(dis->hDC);
+                IntersectClipRect(
+                    dis->hDC,
+                    rc.left,
+                    rc.top + 40,
+                    rc.right,
+                    (std::max)(
+                        rc.top + 41,
+                        rc.bottom - 40));
 
                 for (const InspectorComponentView& component :
                      inspectorModel_.Components())
@@ -4672,6 +4812,29 @@ namespace nocturne::editor
 
                     y += 7;
                 }
+
+                RestoreDC(
+                    dis->hDC,
+                    listDcState);
+
+                RECT scrollTrack{
+                    rc.right - 10,
+                    rc.top + 42,
+                    rc.right,
+                    (std::max)(
+                        rc.top + 43,
+                        rc.bottom - 42)
+                };
+                DrawSlimThumb(
+                    dis->hDC,
+                    InspectorContentHeight_(),
+                    (std::max)(
+                        1,
+                        static_cast<int>(
+                            scrollTrack.bottom
+                            - scrollTrack.top)),
+                    inspectorScrollY_,
+                    scrollTrack);
 
                 result = TRUE;
                 return true;

@@ -178,6 +178,8 @@ namespace nocturne::editor
         void DestroyInspectorControls_() noexcept;
         [[nodiscard]] bool RebuildInspectorControls_();
         void LayoutInspectorControls_();
+        [[nodiscard]] int InspectorContentHeight_() const noexcept;
+        void ClampInspectorScroll_() noexcept;
         void SyncInspectorControlValues_();
         [[nodiscard]] bool SyncInspectorBindingValue_(
             const InspectorEditBinding& binding);
@@ -207,6 +209,14 @@ namespace nocturne::editor
             const InspectorBoolBinding& binding);
         void ToggleInspectorBool_(
             InspectorBoolBinding& binding);
+
+        static LRESULT CALLBACK InspectorBodySubclassProc_(
+            HWND hwnd,
+            UINT message,
+            WPARAM wParam,
+            LPARAM lParam,
+            UINT_PTR subclassId,
+            DWORD_PTR refData);
 
         static LRESULT CALLBACK InspectorEditSubclassProc_(
             HWND hwnd,
@@ -285,6 +295,7 @@ namespace nocturne::editor
             inspectorBoolButtons_;
         HWND inspectorAddComponent_ = nullptr;
         bool inspectorControlsRefreshing_ = false;
+        int inspectorScrollY_ = 0;
 
         int activeToolId_ = IdToolbarSelect;
         std::wstring contentRoot_ = L"Data";
