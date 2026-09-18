@@ -53,12 +53,10 @@ namespace noc
             return 0;
 
         uint64_t hash = 14695981039346656037ull;
-        for (const unsigned char* p =
-                 reinterpret_cast<const unsigned char*>(text);
-             *p != 0;
-             ++p)
+        for (const char* p = text; *p != '\0'; ++p)
         {
-            hash ^= static_cast<uint64_t>(*p);
+            hash ^= static_cast<uint64_t>(
+                static_cast<unsigned char>(*p));
             hash *= 1099511628211ull;
         }
 
