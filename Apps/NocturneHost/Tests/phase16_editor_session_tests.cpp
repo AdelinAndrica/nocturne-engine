@@ -8,6 +8,7 @@
 #include "Core/Memory/DebugAlloc.h"
 #include "Runtime/Components/TransformComponent.h"
 #include "Runtime/Reflection/BuiltinTypes.h"
+#include "Runtime/Reflection/ComponentReflection.h"
 #include "Runtime/Reflection/FoundationComponents.h"
 #include "Runtime/Reflection/ReflectionRegistry.h"
 #include "Runtime/World.h"
@@ -148,6 +149,57 @@ namespace
             : nullptr;
     }
 
+    bool ReadEnumDrawerMode(
+        const noc::PropertyAccessContext& context,
+        void* destination)
+    {
+        const auto* runtime =
+            static_cast<
+                const noc::ComponentPropertyRuntimeContext*>(
+                    context.userContext);
+
+        if (!runtime
+            || !runtime->world
+            || !destination
+            || !HasEnumDrawerTestComponent(
+                *runtime->world,
+                runtime->entity))
+        {
+            return false;
+        }
+
+        *static_cast<EnumDrawerTestMode*>(
+            destination) =
+                gEnumDrawerStore.component.mode;
+        return true;
+    }
+
+    bool WriteEnumDrawerMode(
+        noc::PropertyAccessContext& context,
+        const void* source)
+    {
+        auto* runtime =
+            static_cast<
+                noc::ComponentPropertyRuntimeContext*>(
+                    context.userContext);
+
+        if (!runtime
+            || !runtime->world
+            || !source
+            || !HasEnumDrawerTestComponent(
+                *runtime->world,
+                runtime->entity))
+        {
+            return false;
+        }
+
+        gEnumDrawerStore.component.mode =
+            *static_cast<
+                const EnumDrawerTestMode*>(
+                    source);
+        return true;
+    }
+
     bool RegisterEnumDrawerTestReflection(
         noc::ReflectionRegistry& registry)
     {
@@ -195,16 +247,16 @@ namespace
             return false;
 
         const noc::PropertyMetadata properties[] = {
-            noc::MakeMemberPropertyMetadata<
-                EnumDrawerTestComponent,
-                EnumDrawerTestMode,
-                &EnumDrawerTestComponent::mode>(
-                    noc::MakePropertyId(
-                        "Nocturne.Tests.EnumDrawerComponent.mode"),
-                    "mode",
-                    kEnumDrawerComponentTypeId,
-                    kEnumDrawerModeTypeId,
-                    kAuthorable)
+            {
+                noc::MakePropertyId(
+                    "Nocturne.Tests.EnumDrawerComponent.mode"),
+                "mode",
+                kEnumDrawerComponentTypeId,
+                kEnumDrawerModeTypeId,
+                kAuthorable,
+                &ReadEnumDrawerMode,
+                &WriteEnumDrawerMode
+            }
         };
 
         const noc::ComponentMetadata componentOps{
