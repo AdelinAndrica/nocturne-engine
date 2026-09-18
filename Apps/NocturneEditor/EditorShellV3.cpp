@@ -182,6 +182,27 @@ namespace nocturne::editor
                 && property.valueKind == noc::TypeKind::Bool;
         }
 
+        bool IsEnumPickerProperty(
+            const noc::ReflectionRegistry* registry,
+            const InspectorPropertyView& property) noexcept
+        {
+            if (!registry
+                || !property.editable
+                || property.valueKind != noc::TypeKind::Enum)
+            {
+                return false;
+            }
+
+            const noc::TypeMetadata* valueType =
+                registry->FindType(property.valueTypeId);
+
+            return valueType
+                && valueType->enumMetadata
+                && !valueType->enumMetadata->isFlags
+                && valueType->enumMetadata->values
+                && valueType->enumMetadata->valueCount > 0;
+        }
+
         enum class Icon
         {
             None, Document, Folder, Save, Undo, Redo, Cursor, Move, Rotate, Scale,
@@ -1866,10 +1887,19 @@ namespace nocturne::editor
             binding.hwnd = nullptr;
         }
 
+        for (InspectorEnumBinding& binding :
+             inspectorEnumButtons_)
+        {
+            if (binding.hwnd)
+                DestroyWindow(binding.hwnd);
+            binding.hwnd = nullptr;
+        }
+
         inspectorEdits_.clear();
         inspectorRemoveButtons_.clear();
         inspectorResourceButtons_.clear();
         inspectorBoolButtons_.clear();
+        inspectorEnumButtons_.clear();
         inspectorControlsRefreshing_ = false;
     }
 
@@ -1888,6 +1918,10 @@ namespace nocturne::editor
         size_t removableCount = 0;
         size_t resourceCount = 0;
         size_t boolCount = 0;
+        size_t enumCount = 0;
+
+        const noc::ReflectionRegistry* reflection =
+            engine_ ? &engine_->Reflection() : nullptr;
 
         for (const InspectorComponentView& component :
              inspectorModel_.Components())
@@ -1906,6 +1940,12 @@ namespace nocturne::editor
                 {
                     ++boolCount;
                 }
+                else if (IsEnumPickerProperty(
+                    reflection,
+                    property))
+                {
+                    ++enumCount;
+                }
                 else if (property.editable)
                 {
                     editableCount +=
@@ -1922,6 +1962,7 @@ namespace nocturne::editor
             inspectorRemoveButtons_.reserve(removableCount);
             inspectorResourceButtons_.reserve(resourceCount);
             inspectorBoolButtons_.reserve(boolCount);
+            inspectorEnumButtons_.reserve(enumCount);
         }
         catch (const std::bad_alloc&)
         {
@@ -2095,6 +2136,59 @@ namespace nocturne::editor
                     continue;
                 }
 
+                if (IsEnumPickerProperty(
+                        reflection,
+                        property))
+                {
+                    const size_t enumIndex =
+                        inspectorEnumButtons_.size();
+
+                    if (enumIndex
+                        > static_cast<size_t>(
+                            0xFFFF - IdInspectorEnumBase))
+                    {
+                        DestroyInspectorControls_();
+                        return false;
+                    }
+
+                    HWND picker = MakeButton(
+                        hwnd_,
+                        IdInspectorEnumBase
+                            + static_cast<int>(enumIndex),
+                        L"",
+                        Icon::None,
+                        ButtonKind::Neutral,
+                        uiFont_);
+
+                    if (!picker)
+                    {
+                        DestroyInspectorControls_();
+                        return false;
+                    }
+
+                    ShowWindow(picker, SW_HIDE);
+
+                    try
+                    {
+                        inspectorEnumButtons_.push_back({
+                            picker,
+                            component.typeId,
+                            property.propertyId,
+                            property.valueTypeId
+                        });
+                    }
+                    catch (const std::bad_alloc&)
+                    {
+                        DestroyWindow(picker);
+                        DestroyInspectorControls_();
+                        return false;
+                    }
+
+                    (void)SyncInspectorEnumValue_(
+                        inspectorEnumButtons_.back());
+                    continue;
+                }
+
                 if (!property.editable)
                     continue;
 
@@ -2251,6 +2345,7 @@ namespace nocturne::editor
         size_t removeIndex = 0;
         size_t resourceIndex = 0;
         size_t boolIndex = 0;
+        size_t enumIndex = 0;
         int y = 43 - inspectorScrollY_;
 
         for (const InspectorComponentView& component :
@@ -2365,6 +2460,45 @@ namespace nocturne::editor
                     }
 
                     ++boolIndex;
+                }
+                else if (IsEnumPickerProperty(
+                    reflection,
+                    property))
+                {
+                    if (enumIndex
+                        >= inspectorEnumButtons_.size())
+                    {
+                        return;
+                    }
+
+                    HWND picker =
+                        inspectorEnumButtons_[enumIndex].hwnd;
+
+                    const int x =
+                        labelWidth + 4;
+                    const int width =
+                        (std::max)(
+                            32,
+                            bodyWidth - x - 12);
+                    const bool visible =
+                        y >= 40
+                        && y + 24 <= bodyHeight - 40;
+
+                    if (picker)
+                    {
+                        MoveWindow(
+                            picker,
+                            bodyLeft + x,
+                            bodyTop + y + 1,
+                            width,
+                            22,
+                            TRUE);
+                        ShowWindow(
+                            picker,
+                            visible ? SW_SHOW : SW_HIDE);
+                    }
+
+                    ++enumIndex;
                 }
                 else if (property.editable)
                 {
@@ -3043,6 +3177,182 @@ namespace nocturne::editor
         UpdateStatus_();
     }
 
+    EditorShellV3::InspectorEnumBinding*
+    EditorShellV3::FindInspectorEnumButton_(
+        HWND source) noexcept
+    {
+        for (InspectorEnumBinding& binding :
+             inspectorEnumButtons_)
+        {
+            if (binding.hwnd == source)
+                return &binding;
+        }
+
+        return nullptr;
+    }
+
+    bool EditorShellV3::SyncInspectorEnumValue_(
+        const InspectorEnumBinding& binding)
+    {
+        if (!binding.hwnd)
+            return false;
+
+        const InspectorPropertyView* property =
+            inspectorModel_.FindProperty(
+                binding.componentTypeId,
+                binding.propertyId);
+        if (!property)
+            return false;
+
+        const std::wstring value =
+            Utf8ToWide_(
+                property->displayValue.c_str());
+
+        SetWindowTextW(
+            binding.hwnd,
+            value.c_str());
+        return true;
+    }
+
+    void EditorShellV3::ShowInspectorEnumPopup_(
+        InspectorEnumBinding& binding)
+    {
+        if (!engine_
+            || !session_
+            || !binding.hwnd
+            || !inspectorModel_.Entity().IsValid())
+        {
+            return;
+        }
+
+        const noc::TypeMetadata* valueType =
+            engine_->Reflection().FindType(
+                binding.valueTypeId);
+
+        if (!valueType
+            || valueType->kind != noc::TypeKind::Enum
+            || !valueType->enumMetadata
+            || valueType->enumMetadata->isFlags
+            || !valueType->enumMetadata->values
+            || valueType->enumMetadata->valueCount == 0)
+        {
+            AppendConsole_(
+                L"Enum Inspector picker is unavailable for this reflected enum.");
+            return;
+        }
+
+        const InspectorPropertyView* property =
+            inspectorModel_.FindProperty(
+                binding.componentTypeId,
+                binding.propertyId);
+        if (!property)
+            return;
+
+        HMENU menu = CreatePopupMenu();
+        if (!menu)
+            return;
+
+        const noc::EnumMetadata& enumMetadata =
+            *valueType->enumMetadata;
+
+        const uint32_t visibleCount =
+            (std::min)(
+                enumMetadata.valueCount,
+                static_cast<uint32_t>(0xFFFE));
+
+        for (uint32_t i = 0;
+             i < visibleCount;
+             ++i)
+        {
+            const noc::EnumValueMetadata& value =
+                enumMetadata.values[i];
+
+            const std::wstring label =
+                Utf8ToWide_(value.canonicalName);
+
+            UINT flags = MF_STRING;
+            if (property->displayValue
+                == value.canonicalName)
+            {
+                flags |= MF_CHECKED;
+            }
+
+            AppendMenuW(
+                menu,
+                flags,
+                static_cast<UINT_PTR>(i + 1),
+                label.c_str());
+        }
+
+        RECT buttonRect{};
+        GetWindowRect(
+            binding.hwnd,
+            &buttonRect);
+
+        const int command =
+            TrackPopupMenuEx(
+                menu,
+                TPM_RETURNCMD
+                    | TPM_LEFTALIGN
+                    | TPM_TOPALIGN,
+                buttonRect.left,
+                buttonRect.bottom + 2,
+                hwnd_,
+                nullptr);
+
+        DestroyMenu(menu);
+
+        if (command <= 0)
+            return;
+
+        const uint32_t valueIndex =
+            static_cast<uint32_t>(command - 1);
+        if (valueIndex >= visibleCount)
+            return;
+
+        const char* canonicalName =
+            enumMetadata.values[
+                valueIndex].canonicalName;
+        if (!canonicalName)
+            return;
+
+        const noc::EntityHandle entity =
+            inspectorModel_.Entity();
+        auto context =
+            session_->CommandContext();
+
+        if (!inspectorModel_.CommitTextEdit(
+                context,
+                session_->History(),
+                entity,
+                binding.componentTypeId,
+                binding.propertyId,
+                canonicalName))
+        {
+            AppendConsole_(
+                L"Enum Inspector selection was rejected by the reflected semantic setter.");
+            return;
+        }
+
+        session_->SetSceneDirty();
+
+        if (!inspectorModel_.Refresh(
+                context,
+                entity))
+        {
+            AppendConsole_(
+                L"Inspector refresh after enum edit failed.");
+            return;
+        }
+
+        SyncInspectorControlValues_();
+
+        if (inspector_.body)
+            InvalidateRect(inspector_.body, nullptr, FALSE);
+
+        UpdateStatus_();
+    }
+
     bool EditorShellV3::SyncInspectorBindingValue_(
         const InspectorEditBinding& binding)
     {
@@ -3200,6 +3510,12 @@ namespace nocturne::editor
              inspectorBoolButtons_)
         {
             (void)SyncInspectorBoolValue_(binding);
+        }
+
+        for (const InspectorEnumBinding& binding :
+             inspectorEnumButtons_)
+        {
+            (void)SyncInspectorEnumValue_(binding);
         }
 
         inspectorControlsRefreshing_ = false;
@@ -4400,6 +4716,17 @@ namespace nocturne::editor
 
             if (source)
             {
+                InspectorEnumBinding* enumBinding =
+                    FindInspectorEnumButton_(source);
+
+                if (enumBinding)
+                {
+                    ShowInspectorEnumPopup_(
+                        *enumBinding);
+                    result = 0;
+                    return true;
+                }
+
                 InspectorBoolBinding* boolBinding =
                     FindInspectorBoolButton_(source);
 
@@ -4749,6 +5076,12 @@ namespace nocturne::editor
                         const bool boolToggle =
                             IsBoolToggleProperty(
                                 property);
+                        const bool enumPicker =
+                            IsEnumPickerProperty(
+                                engine_
+                                    ? &engine_->Reflection()
+                                    : nullptr,
+                                property);
 
                         const uint32_t controlCount =
                             property.editable
@@ -4757,7 +5090,9 @@ namespace nocturne::editor
                                     property)
                                 : 1u;
 
-                        if (resourcePicker || boolToggle)
+                        if (resourcePicker
+                            || boolToggle
+                            || enumPicker)
                         {
                             // The child button owns the value field chrome.
                         }
