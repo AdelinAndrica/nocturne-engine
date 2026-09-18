@@ -4181,7 +4181,48 @@ namespace nocturne::editor
     {
         switch (id)
         {
-        case IdToolbarNew: AppendConsole_(L"New Scene requested. Scene authoring is scheduled for Phase 16."); break;
+        case IdToolbarNew:
+            if (session_)
+            {
+                if (session_->SceneDirty())
+                {
+                    // Design choice (not directly from the book): because
+                    // persistence is Phase 17, New Scene can only offer
+                    // discard-or-cancel. It never pretends to save to disk.
+                    const int choice =
+                        MessageBoxW(
+                            hwnd_,
+                            L"The current in-memory scene has unsaved authoring changes.\n\nDiscard them and create a new empty scene?",
+                            L"New Scene",
+                            MB_OKCANCEL
+                                | MB_ICONWARNING
+                                | MB_DEFBUTTON2);
+
+                    if (choice != IDOK)
+                    {
+                        AppendConsole_(
+                            L"New Scene cancelled; current scene retained.");
+                        break;
+                    }
+                }
+
+                CancelRename_();
+
+                if (!session_->ResetAuthoredScene())
+                {
+                    AppendConsole_(
+                        L"New Scene failed while clearing authored entities.");
+                    break;
+                }
+
+                inspectorScrollY_ = 0;
+                PopulateScene_();
+                RefreshInspector();
+                UpdateStatus_();
+                AppendConsole_(
+                    L"New in-memory scene created. Tool camera retained; persistence remains Phase 17.");
+            }
+            break;
         case IdToolbarOpen: AppendConsole_(L"Open Scene requested. Scene serialization is scheduled for Phase 17."); break;
         case IdToolbarSave: AppendConsole_(L"Save requested. Serialization remains Phase 17 scope."); break;
         case IdToolbarUndo:

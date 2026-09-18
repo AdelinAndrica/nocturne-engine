@@ -1127,6 +1127,67 @@ bool RunPhase16EditorSessionTests()
             && !session.History().CanRedo(),
         "History clear failed");
 
+    {
+        const noc::EntityHandle resetParent =
+            world.CreateEntity();
+        const noc::EntityHandle resetChild =
+            world.CreateEntity();
+
+        ok &= CheckEditorSession(
+            resetParent.IsValid()
+                && resetChild.IsValid()
+                && world.AddName(
+                    resetParent,
+                    "Reset Parent")
+                && world.AddTransform(resetParent)
+                && world.AddName(
+                    resetChild,
+                    "Reset Child")
+                && world.AddTransform(resetChild)
+                && world.SetParent(
+                    resetChild,
+                    resetParent)
+                && session.SetSelection(resetChild),
+            "New Scene reset setup failed");
+
+        auto resetHistoryCommand =
+            MakeTranslationCommand(
+                context,
+                resetChild,
+                noc::Vec3{
+                    8.0f,
+                    1.0f,
+                    -3.0f });
+
+        ok &= CheckEditorSession(
+            resetHistoryCommand
+                && session.History().Execute(
+                    context,
+                    std::move(resetHistoryCommand)),
+            "New Scene history setup failed");
+
+        session.SetSceneDirty();
+
+        ok &= CheckEditorSession(
+            session.SceneDirty()
+                && session.History().CanUndo()
+                && session.ResetAuthoredScene(),
+            "New Scene reset execution failed");
+
+        ok &= CheckEditorSession(
+            !world.IsAlive(resetParent)
+                && !world.IsAlive(resetChild)
+                && world.IsAlive(camera)
+                && session.ToolCamera() == camera
+                && session.IsToolOwned(camera)
+                && !session.SelectedEntity().IsValid()
+                && session.History().CommandCount() == 0
+                && !session.History().CanUndo()
+                && !session.History().CanRedo()
+                && !session.SceneDirty(),
+            "New Scene reset did not establish a clean tool-camera-only baseline");
+    }
+
     ok &= CheckEditorSession(
         world.DestroyEntity(camera),
         "Tool-camera cleanup failed");

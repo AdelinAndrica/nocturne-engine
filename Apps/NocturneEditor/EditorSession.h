@@ -69,6 +69,11 @@ namespace nocturne::editor
         void SetSceneDirty(bool dirty = true) noexcept;
         [[nodiscard]] bool SceneDirty() const noexcept;
 
+        // In-memory editor scene reset. Destroys authored entities only; the
+        // tool camera remains owned by the same World. This establishes a new
+        // transient baseline, so selection/history/dirty state are cleared.
+        [[nodiscard]] bool ResetAuthoredScene() noexcept;
+
         [[nodiscard]] EditorCommandHistory& History() noexcept;
         [[nodiscard]] const EditorCommandHistory& History() const noexcept;
 

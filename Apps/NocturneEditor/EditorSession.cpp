@@ -194,6 +194,39 @@ namespace nocturne::editor
         return sceneDirty_;
     }
 
+    bool EditorSession::ResetAuthoredScene() noexcept
+    {
+        if (!IsInitialized())
+            return false;
+
+        selected_ = noc::EntityHandle::Invalid();
+
+        const uint32_t capacity =
+            world_->EntityCapacity();
+
+        for (uint32_t index = 0;
+             index < capacity;
+             ++index)
+        {
+            const noc::EntityHandle entity =
+                world_->EntityAtIndex(index);
+
+            if (!entity.IsValid()
+                || IsToolOwned(entity))
+            {
+                continue;
+            }
+
+            if (!world_->DestroyEntity(entity))
+                return false;
+        }
+
+        history_.Clear();
+        sceneDirty_ = false;
+        Touch_();
+        return true;
+    }
+
     EditorCommandHistory& EditorSession::History() noexcept
     {
         return history_;
