@@ -7,6 +7,7 @@
 #include "Runtime/Components/NameComponent.h"
 #include "Runtime/Components/RenderableComponent.h"
 #include "Runtime/Components/TransformComponent.h"
+#include "Runtime/Reflection/BuiltinTypes.h"
 #include "Runtime/Reflection/FoundationComponents.h"
 #include "Runtime/Reflection/ReflectionRegistry.h"
 
@@ -43,7 +44,8 @@ bool RunPhase15ComponentRegistryTests()
         reflection.Init(allocator, 4),
         "ReflectionRegistry::Init failed");
     ok &= CheckComponentRegistry(
-        noc::RegisterFoundationComponentReflectionTypes(reflection),
+        noc::RegisterBuiltinReflectionTypes(reflection)
+            && noc::RegisterFoundationComponentReflectionTypes(reflection),
         "Foundation component reflection registration failed");
     ok &= CheckComponentRegistry(
         reflection.Freeze(),

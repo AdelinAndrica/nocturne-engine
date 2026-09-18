@@ -96,7 +96,15 @@ namespace noc
             ResourceHandle mesh,
             const AABB& localBounds);
 
-        [[nodiscard]] bool SetRenderableEnabled(EntityHandle entity, bool enabled);
+        [[nodiscard]] bool SetRenderableMesh(
+            EntityHandle entity,
+            ResourceHandle mesh);
+        [[nodiscard]] bool SetRenderableLocalBounds(
+            EntityHandle entity,
+            const AABB& localBounds);
+        [[nodiscard]] bool SetRenderableEnabled(
+            EntityHandle entity,
+            bool enabled);
 
         // --- Camera component ---
         [[nodiscard]] bool AddCamera(EntityHandle entity);
@@ -111,6 +119,16 @@ namespace noc
             float aspect,
             float nearZ,
             float farZ);
+
+        [[nodiscard]] bool SetCameraPerspective(
+            EntityHandle entity,
+            float fovYRadians,
+            float aspect,
+            float nearZ,
+            float farZ);
+        [[nodiscard]] bool SetCameraEnabled(
+            EntityHandle entity,
+            bool enabled);
 
         [[nodiscard]] bool SetCameraFromObject(SceneObjectHandle entity);
         [[nodiscard]] EntityHandle ActiveCamera() const;

@@ -1,7 +1,9 @@
 #pragma once
 
 #include "Core/Math/MathTypes.h"
+#include "Resources/ResourceHandle.h"
 #include "Runtime/Bounds.h"
+#include "Runtime/Entity.h"
 #include "Runtime/Reflection/ReflectionRegistry.h"
 
 #include <cstdint>
@@ -30,6 +32,11 @@ namespace noc
         inline constexpr TypeId Quat    { 0x1000000000000104ull };
         inline constexpr TypeId Mat4    { 0x1000000000000105ull };
         inline constexpr TypeId AABB    { 0x1000000000000106ull };
+
+        inline constexpr TypeId EntityHandle
+            { 0x1000000000000201ull };
+        inline constexpr TypeId ResourceHandle
+            { 0x1000000000000202ull };
     }
 
     namespace builtin_reflection_detail
@@ -262,11 +269,28 @@ namespace noc
                     "Nocturne.Mat4",
                     TypeKind::Opaque,
                     1,
-                    TypeFlags::Serializable)))
+                    TypeFlags::Serializable))
+            || !RegisterAabb(registry)
+            || !registry.RegisterType(
+                MakeTypeMetadata<EntityHandle>(
+                    BuiltinTypeIds::EntityHandle,
+                    "Nocturne.EntityHandle",
+                    TypeKind::EntityReference,
+                    1,
+                    TypeFlags::ScriptVisible
+                        | TypeFlags::Transient))
+            || !registry.RegisterType(
+                MakeTypeMetadata<ResourceHandle>(
+                    BuiltinTypeIds::ResourceHandle,
+                    "Nocturne.ResourceHandle",
+                    TypeKind::ResourceReference,
+                    1,
+                    TypeFlags::Serializable
+                        | TypeFlags::ScriptVisible)))
         {
             return false;
         }
 
-        return RegisterAabb(registry);
+        return true;
     }
 }

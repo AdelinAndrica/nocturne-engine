@@ -41,6 +41,21 @@ namespace noc
                 && farZ > nearZ;
         }
 
+        [[nodiscard]] bool IsFinite(const Vec3& value)
+        {
+            return std::isfinite(value.x)
+                && std::isfinite(value.y)
+                && std::isfinite(value.z);
+        }
+
+        [[nodiscard]] bool IsFinite(const Quat& value)
+        {
+            return std::isfinite(value.x)
+                && std::isfinite(value.y)
+                && std::isfinite(value.z)
+                && std::isfinite(value.w);
+        }
+
         [[nodiscard]] bool AabbBeyondDistance(
             const AABB& bounds,
             const Vec3& eye,
@@ -384,8 +399,13 @@ namespace noc
         const Quat& rotation,
         const Vec3& scale)
     {
-        if (!impl_)
+        if (!impl_
+            || !IsFinite(translation)
+            || !IsFinite(rotation)
+            || !IsFinite(scale))
+        {
             return false;
+        }
 
         return impl_->transforms.SetLocalTRS(
             entity,
@@ -477,13 +497,32 @@ namespace noc
         if (!impl_->renderables.Has(entity))
             return AddRenderable(entity, mesh, localBounds);
 
-        return impl_->renderables.SetMesh(entity, mesh)
+        return SetRenderableMesh(entity, mesh)
+            && SetRenderableLocalBounds(entity, localBounds);
+    }
+
+    bool World::SetRenderableMesh(
+        EntityHandle entity,
+        ResourceHandle mesh)
+    {
+        return impl_
+            && impl_->entities.IsAlive(entity)
+            && impl_->renderables.SetMesh(entity, mesh);
+    }
+
+    bool World::SetRenderableLocalBounds(
+        EntityHandle entity,
+        const AABB& localBounds)
+    {
+        return impl_
+            && impl_->entities.IsAlive(entity)
             && impl_->renderables.SetLocalBounds(entity, localBounds);
     }
 
     bool World::SetRenderableEnabled(EntityHandle entity, bool enabled)
     {
         return impl_
+            && impl_->entities.IsAlive(entity)
             && impl_->renderables.SetEnabled(entity, enabled);
     }
 
@@ -541,12 +580,38 @@ namespace noc
         if (!active.IsValid())
             return true;
 
-        return impl_->cameras.SetPerspective(
+        return SetCameraPerspective(
             active,
             fovYRadians,
             aspect,
             nearZ,
             farZ);
+    }
+
+    bool World::SetCameraPerspective(
+        EntityHandle entity,
+        float fovYRadians,
+        float aspect,
+        float nearZ,
+        float farZ)
+    {
+        return impl_
+            && impl_->entities.IsAlive(entity)
+            && impl_->cameras.SetPerspective(
+                entity,
+                fovYRadians,
+                aspect,
+                nearZ,
+                farZ);
+    }
+
+    bool World::SetCameraEnabled(
+        EntityHandle entity,
+        bool enabled)
+    {
+        return impl_
+            && impl_->entities.IsAlive(entity)
+            && impl_->cameras.SetEnabled(entity, enabled);
     }
 
     bool World::SetCameraFromObject(SceneObjectHandle entity)
@@ -564,7 +629,7 @@ namespace noc
                 return false;
         }
 
-        if (!impl_->cameras.SetPerspective(
+        if (!SetCameraPerspective(
                 entity,
                 impl_->defaultFovY,
                 impl_->defaultAspect,

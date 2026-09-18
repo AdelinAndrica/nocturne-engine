@@ -7,6 +7,21 @@ namespace noc
 {
     class World;
 
+    struct ComponentPropertyRuntimeContext
+    {
+        World* world = nullptr;
+        EntityHandle entity{};
+    };
+
+    [[nodiscard]] inline PropertyAccessContext
+    MakeComponentPropertyAccessContext(
+        ComponentPropertyRuntimeContext& runtime) noexcept
+    {
+        PropertyAccessContext context{};
+        context.userContext = &runtime;
+        return context;
+    }
+
     // Design choice (not directly from the book): generic component
     // membership enumeration scans frozen reflected component schemas and
     // invokes their Has adapters. No archetype/bitmask ECS migration is

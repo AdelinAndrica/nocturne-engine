@@ -17,6 +17,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 
 namespace
 {
@@ -854,8 +855,9 @@ bool RunPhase16ReflectionRegistryTests()
             componentRegistry.Init(allocator, 4),
             "Component reflection registry init failed");
         ok &= CheckReflectionRegistry(
-            noc::RegisterFoundationComponentReflectionTypes(
-                componentRegistry),
+            noc::RegisterBuiltinReflectionTypes(componentRegistry)
+                && noc::RegisterFoundationComponentReflectionTypes(
+                    componentRegistry),
             "Foundation component reflection registration failed");
         ok &= CheckReflectionRegistry(
             componentRegistry.Freeze(),
@@ -945,6 +947,124 @@ bool RunPhase16ReflectionRegistryTests()
                 componentWorld,
                 componentEntity) != nullptr,
             "Generic reflected component const access failed");
+
+        const noc::PropertyMetadata* translationProperty =
+            componentRegistry.FindPropertyByName(
+                noc::TypeId{
+                    noc::kTransformComponentTypeId.value },
+                "localTranslation");
+
+        noc::ComponentPropertyRuntimeContext propertyRuntime{
+            &componentWorld,
+            componentEntity
+        };
+        noc::PropertyAccessContext propertyContext =
+            noc::MakeComponentPropertyAccessContext(propertyRuntime);
+
+        const noc::Vec3 reflectedTranslation{
+            4.0f, 5.0f, 6.0f
+        };
+
+        ok &= CheckReflectionRegistry(
+            translationProperty
+                && noc::WritePropertyValue(
+                    *translationProperty,
+                    propertyContext,
+                    noc::ReflectedConstValueView{
+                        noc::BuiltinTypeIds::Vec3,
+                        &reflectedTranslation })
+                    == noc::PropertyAccessStatus::Success
+                && componentWorld.GetTransform(componentEntity)
+                && componentWorld.GetTransform(componentEntity)
+                    ->localTranslation.x == 4.0f,
+            "Semantic Transform property write failed");
+
+        const noc::TypeMetadata* renderableType =
+            componentRegistry.FindType(
+                noc::TypeId{
+                    noc::kRenderableComponentTypeId.value });
+        ok &= CheckReflectionRegistry(
+            renderableType
+                && renderableType->componentMetadata->add(
+                    componentWorld,
+                    componentEntity),
+            "Generic reflected Renderable add failed");
+
+        const noc::PropertyMetadata* meshProperty =
+            componentRegistry.FindPropertyByName(
+                renderableType->typeId,
+                "mesh");
+        const noc::ResourceHandle reflectedMesh{ 77u, 9u };
+        ok &= CheckReflectionRegistry(
+            meshProperty
+                && noc::WritePropertyValue(
+                    *meshProperty,
+                    propertyContext,
+                    noc::ReflectedConstValueView{
+                        noc::BuiltinTypeIds::ResourceHandle,
+                        &reflectedMesh })
+                    == noc::PropertyAccessStatus::Success
+                && componentWorld.GetRenderable(componentEntity)
+                && componentWorld.GetRenderable(componentEntity)->mesh
+                    == reflectedMesh,
+            "Semantic Renderable mesh write failed");
+
+        const noc::TypeMetadata* cameraType =
+            componentRegistry.FindType(
+                noc::TypeId{
+                    noc::kCameraComponentTypeId.value });
+        ok &= CheckReflectionRegistry(
+            cameraType
+                && cameraType->componentMetadata->add(
+                    componentWorld,
+                    componentEntity),
+            "Generic reflected Camera add failed");
+
+        const noc::PropertyMetadata* nearProperty =
+            componentRegistry.FindPropertyByName(
+                cameraType->typeId,
+                "nearZ");
+        float invalidNear = 1000.0f;
+        ok &= CheckReflectionRegistry(
+            nearProperty
+                && noc::WritePropertyValue(
+                    *nearProperty,
+                    propertyContext,
+                    noc::ReflectedConstValueView{
+                        noc::BuiltinTypeIds::Float32,
+                        &invalidNear })
+                    == noc::PropertyAccessStatus::ValidationFailed,
+            "Camera near-plane cross-field validation failed");
+
+        float validNear = 0.25f;
+        ok &= CheckReflectionRegistry(
+            noc::WritePropertyValue(
+                *nearProperty,
+                propertyContext,
+                noc::ReflectedConstValueView{
+                    noc::BuiltinTypeIds::Float32,
+                    &validNear })
+                == noc::PropertyAccessStatus::Success
+                && componentWorld.GetCamera(componentEntity)
+                && componentWorld.GetCamera(componentEntity)->nearZ
+                    == validNear,
+            "Semantic Camera near-plane write failed");
+
+        const float nanValue =
+            std::numeric_limits<float>::quiet_NaN();
+        const noc::Vec3 invalidTranslation{
+            nanValue, 0.0f, 0.0f
+        };
+        ok &= CheckReflectionRegistry(
+            noc::WritePropertyValue(
+                *translationProperty,
+                propertyContext,
+                noc::ReflectedConstValueView{
+                    noc::BuiltinTypeIds::Vec3,
+                    &invalidTranslation })
+                == noc::PropertyAccessStatus::WriteFailed,
+            "World semantic TRS seam accepted NaN");
+
 
         ok &= CheckReflectionRegistry(
             nameType->componentMetadata->remove(
