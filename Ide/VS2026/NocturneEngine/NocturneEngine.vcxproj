@@ -117,6 +117,7 @@
     <ClInclude Include="..\..\..\Engine\Runtime\MainLoop.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Reflection\ReflectionIds.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Reflection\ReflectionMetadata.h" />
+    <ClInclude Include="..\..\..\Engine\Runtime\Reflection\ReflectionRegistry.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\SceneObject.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\World.h" />
   </ItemGroup>
@@ -163,6 +164,7 @@
     <ClCompile Include="..\..\..\Engine\Resources\VirtualFileSystem.cpp" />
     <ClCompile Include="..\..\..\Engine\Resources\VPath.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\ComponentRegistry.cpp" />
+    <ClCompile Include="..\..\..\Engine\Runtime\Reflection\ReflectionRegistry.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\EntityRegistry.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\CameraSystem.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\NameSystem.cpp" />

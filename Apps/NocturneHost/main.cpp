@@ -23,6 +23,7 @@ bool RunPhase15StressPerfTests();
 
 // Phase 16 runtime reflection tests
 bool RunPhase16ReflectionFoundationTests();
+bool RunPhase16ReflectionRegistryTests();
 
 // Phase 12 tooling
 #include "Phase12CookPack.h"
@@ -51,9 +52,18 @@ int main(int argc, char** argv)
 
     // Phase 16 reflection tests are pure runtime tests and intentionally run
     // before Engine::Init(), so CI does not require DX12 or a native window.
-    if (HasArg(args, "--phase16-tests")
-        || HasArg(args, "--phase16-reflection-foundation-tests")) {
+    if (HasArg(args, "--phase16-tests")) {
+        bool ok = RunPhase16ReflectionFoundationTests();
+        ok &= RunPhase16ReflectionRegistryTests();
+        return ok ? 0 : 1;
+    }
+
+    if (HasArg(args, "--phase16-reflection-foundation-tests")) {
         return RunPhase16ReflectionFoundationTests() ? 0 : 1;
+    }
+
+    if (HasArg(args, "--phase16-reflection-registry-tests")) {
+        return RunPhase16ReflectionRegistryTests() ? 0 : 1;
     }
 
     // Phase 15 foundation tests are pure runtime tests. Keep them before

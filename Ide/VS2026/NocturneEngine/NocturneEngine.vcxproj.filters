@@ -350,6 +350,9 @@
     <ClCompile Include="..\..\..\Engine\Runtime\ComponentRegistry.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\Engine\Runtime\Reflection\ReflectionRegistry.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\Engine\Runtime\CameraSystem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
