@@ -208,8 +208,22 @@ namespace nocturne::editor
             object.s = s;
             object.selectable = selectable;
             object.localBounds = { noc::Vec3(-1.0f, -1.0f, -1.0f), noc::Vec3(1.0f, 1.0f, 1.0f) };
-            world.SetLocalTRS(object.handle, object.t, object.r, object.s);
-            world.SetRenderable(object.handle, logicalMesh, object.localBounds);
+            if (!world.SetLocalTRS(object.handle, object.t, object.r, object.s))
+            {
+                NOC_LOG_ERROR("Editor", "Failed to initialize validation object transform (index=%d)", index);
+                world.DestroyObject(object.handle);
+                object.handle = noc::SceneObjectHandle::Invalid();
+                return false;
+            }
+
+            if (!world.SetRenderable(object.handle, logicalMesh, object.localBounds))
+            {
+                NOC_LOG_ERROR("Editor", "Failed to initialize validation object renderable (index=%d)", index);
+                world.DestroyObject(object.handle);
+                object.handle = noc::SceneObjectHandle::Invalid();
+                return false;
+            }
+
             return true;
         };
 
@@ -233,9 +247,17 @@ namespace nocturne::editor
         }
 
         cameraRot_ = YawPitch(cameraYaw_, cameraPitch_);
-        world.SetLocalTRS(cameraObject_, cameraPos_, cameraRot_, noc::Vec3::One());
-        world.SetCameraParams(fovY_, 16.0f / 9.0f, 0.05f, 500.0f);
-        world.SetCameraFromObject(cameraObject_);
+
+        if (!world.SetLocalTRS(cameraObject_, cameraPos_, cameraRot_, noc::Vec3::One())
+            || !world.SetCameraParams(fovY_, 16.0f / 9.0f, 0.05f, 500.0f)
+            || !world.SetCameraFromObject(cameraObject_))
+        {
+            NOC_LOG_ERROR("Editor", "%s", "Failed to initialize Phase 14 editor camera components");
+            world.DestroyObject(cameraObject_);
+            cameraObject_ = noc::SceneObjectHandle::Invalid();
+            return false;
+        }
+
         world.Update();
 
         scenePrepared_ = true;
@@ -400,7 +422,20 @@ namespace nocturne::editor
         }
 
         if (width > 0 && height > 0)
-            engine_->GetWorld().SetCameraParams(fovY_, float(width) / float(height), 0.05f, 500.0f);
+        {
+            if (!engine_->GetWorld().SetCameraParams(
+                    fovY_,
+                    float(width) / float(height),
+                    0.05f,
+                    500.0f))
+            {
+                NOC_LOG_WARN(
+                    "Editor",
+                    "Viewport camera aspect update rejected (%dx%d)",
+                    width,
+                    height);
+            }
+        }
         InvalidateRect(overlay_, nullptr, FALSE);
     }
 
@@ -408,7 +443,14 @@ namespace nocturne::editor
     {
         if (!engine_ || !cameraObject_.IsValid()) return;
         cameraRot_ = YawPitch(cameraYaw_, cameraPitch_);
-        engine_->GetWorld().SetLocalTRS(cameraObject_, cameraPos_, cameraRot_, noc::Vec3::One());
+        if (!engine_->GetWorld().SetLocalTRS(
+                cameraObject_,
+                cameraPos_,
+                cameraRot_,
+                noc::Vec3::One()))
+        {
+            NOC_LOG_WARN("Editor", "%s", "Editor camera transform update rejected");
+        }
     }
 
     void EditorViewportController::UpdateCamera_()
@@ -454,7 +496,15 @@ namespace nocturne::editor
         if (!changed)
             return;
 
-        engine_->GetWorld().SetLocalTRS(cameraObject_, cameraPos_, cameraRot_, noc::Vec3::One());
+        if (!engine_->GetWorld().SetLocalTRS(
+                cameraObject_,
+                cameraPos_,
+                cameraRot_,
+                noc::Vec3::One()))
+        {
+            NOC_LOG_WARN("Editor", "%s", "Interactive editor camera transform update rejected");
+            return;
+        }
 
         // Only the GDI gizmo depends on camera projection. Selection bounds and
         // grid are already part of the DX12 frame, so avoid invalidating the
@@ -763,7 +813,19 @@ namespace nocturne::editor
             }
         }
 
-        engine_->GetWorld().SetLocalTRS(object.handle, object.t, object.r, object.s);
+        if (!engine_->GetWorld().SetLocalTRS(
+                object.handle,
+                object.t,
+                object.r,
+                object.s))
+        {
+            NOC_LOG_WARN(
+                "Editor",
+                "Gizmo transform update rejected (object=%d)",
+                dragObjectIndex_);
+            return;
+        }
+
         engine_->GetWorld().Update();
         RefreshDebugSelection_();
         InvalidateRect(overlay_, nullptr, FALSE);
