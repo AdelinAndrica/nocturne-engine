@@ -16,6 +16,26 @@ namespace nocturne::editor
         bool hasAuthoredChildren = false;
     };
 
+    struct EditorHierarchyExpansionEntry
+    {
+        noc::EntityHandle entity{};
+        bool expanded = true;
+    };
+
+    [[nodiscard]] inline bool EditorHierarchyWasExpanded(
+        const std::vector<EditorHierarchyExpansionEntry>& entries,
+        noc::EntityHandle entity,
+        bool fallback = true) noexcept
+    {
+        for (const EditorHierarchyExpansionEntry& entry : entries)
+        {
+            if (entry.entity == entity)
+                return entry.expanded;
+        }
+
+        return fallback;
+    }
+
     // Design choice (not directly from the book): the editor hierarchy is a
     // transient projection of the authoritative World. Keeping traversal
     // separate from Win32 presentation gives production code and stress tests

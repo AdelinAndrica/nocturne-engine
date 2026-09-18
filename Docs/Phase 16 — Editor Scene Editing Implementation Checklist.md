@@ -1005,46 +1005,46 @@ Măsurăm, nu ghicim:
 
 # 40. Integration tests — scene operations
 
-- [ ] create.
-- [ ] create under parent.
-- [ ] rename.
+- [x] create.
+- [x] create under parent.
+- [x] rename.
 - [ ] duplicate leaf.
-- [ ] duplicate subtree.
+- [x] duplicate subtree.
 - [ ] delete leaf.
-- [ ] delete subtree.
-- [ ] undo delete.
-- [ ] redo delete.
-- [ ] reparent.
-- [ ] unparent.
-- [ ] cycle reject.
-- [ ] preserve-world reparent.
-- [ ] add component.
-- [ ] remove component.
-- [ ] undo component add/remove.
+- [x] delete subtree.
+- [x] undo delete.
+- [x] redo delete.
+- [x] reparent.
+- [x] unparent.
+- [x] cycle reject.
+- [x] preserve-world reparent.
+- [x] add component.
+- [x] remove component.
+- [x] undo component add/remove.
 - [ ] inspector transform edit.
 - [ ] inspector camera validation.
 - [ ] asset assignment.
-- [ ] selection invalidation.
-- [ ] tool camera protection.
+- [x] selection invalidation.
+- [x] tool camera protection.
 
 ---
 
 # 41. Hierarchy tests
 
-- [ ] empty world.
-- [ ] one root.
-- [ ] many roots.
-- [ ] deep hierarchy.
-- [ ] wide hierarchy.
-- [ ] expand/collapse model.
-- [ ] duplicate names.
-- [ ] rename refresh.
-- [ ] reparent refresh.
-- [ ] delete refresh.
-- [ ] undo restore refresh.
-- [ ] stale row.
-- [ ] 10k entity stress.
-- [ ] deterministic row generation.
+- [x] empty world.
+- [x] one root.
+- [x] many roots.
+- [x] deep hierarchy.
+- [x] wide hierarchy.
+- [x] expand/collapse model.
+- [x] duplicate names.
+- [x] rename refresh.
+- [x] reparent refresh.
+- [x] delete refresh.
+- [x] undo restore refresh.
+- [x] stale row.
+- [x] 10k entity stress.
+- [x] deterministic row generation.
 
 ---
 

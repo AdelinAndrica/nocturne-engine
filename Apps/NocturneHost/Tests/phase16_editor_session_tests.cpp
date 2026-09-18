@@ -1,4 +1,5 @@
 #include "../../NocturneEditor/EditorCommands.h"
+#include "../../NocturneEditor/EditorHierarchyModel.h"
 #include "../../NocturneEditor/EditorInspectorModel.h"
 #include "../../NocturneEditor/EditorSession.h"
 #include "../../NocturneEditor/EditorTransformMath.h"
@@ -548,6 +549,318 @@ bool RunPhase16EditorSessionTests()
 
     nocturne::editor::EditorCommandContext context =
         session.CommandContext();
+
+    {
+        noc::World hierarchyWorld;
+        nocturne::editor::EditorHierarchyModel hierarchyModel;
+
+        ok &= CheckEditorSession(
+            hierarchyWorld.Init(
+                allocator,
+                reflection)
+                && hierarchyModel.Rebuild(
+                    hierarchyWorld)
+                && hierarchyModel.RowCount() == 0,
+            "Hierarchy empty-world projection failed");
+
+        const noc::EntityHandle rootA =
+            hierarchyWorld.CreateEntity();
+
+        ok &= CheckEditorSession(
+            rootA.IsValid()
+                && hierarchyWorld.AddTransform(rootA)
+                && hierarchyWorld.AddName(
+                    rootA,
+                    "Duplicate Name")
+                && hierarchyModel.Rebuild(
+                    hierarchyWorld)
+                && hierarchyModel.RowCount() == 1
+                && hierarchyModel.Rows()[0].entity
+                    == rootA
+                && hierarchyModel.Rows()[0].depth == 1
+                && !hierarchyModel.Rows()[0]
+                    .hasAuthoredChildren,
+            "Hierarchy one-root projection failed");
+
+        const noc::EntityHandle rootB =
+            hierarchyWorld.CreateEntity();
+        const noc::EntityHandle rootC =
+            hierarchyWorld.CreateEntity();
+
+        ok &= CheckEditorSession(
+            rootB.IsValid()
+                && rootC.IsValid()
+                && hierarchyWorld.AddTransform(rootB)
+                && hierarchyWorld.AddTransform(rootC)
+                && hierarchyWorld.AddName(
+                    rootB,
+                    "Duplicate Name")
+                && hierarchyWorld.AddName(
+                    rootC,
+                    "Third Root")
+                && hierarchyModel.Rebuild(
+                    hierarchyWorld)
+                && hierarchyModel.RowCount() == 3,
+            "Hierarchy many-root projection failed");
+
+        bool sawRootA = false;
+        bool sawRootB = false;
+        bool sawRootC = false;
+        bool allRootDepths = true;
+
+        for (const auto& row :
+             hierarchyModel.Rows())
+        {
+            sawRootA |= row.entity == rootA;
+            sawRootB |= row.entity == rootB;
+            sawRootC |= row.entity == rootC;
+            allRootDepths &= row.depth == 1;
+        }
+
+        ok &= CheckEditorSession(
+            sawRootA
+                && sawRootB
+                && sawRootC
+                && allRootDepths
+                && std::strcmp(
+                    hierarchyWorld.GetName(rootA)->value,
+                    hierarchyWorld.GetName(rootB)->value)
+                    == 0,
+            "Hierarchy duplicate-name identity aliased rows");
+
+        const std::vector<
+            nocturne::editor::EditorHierarchyExpansionEntry>
+            expansionState{
+                { rootA, false },
+                { rootB, true }
+            };
+
+        ok &= CheckEditorSession(
+            !nocturne::editor::EditorHierarchyWasExpanded(
+                expansionState,
+                rootA,
+                true)
+                && nocturne::editor::EditorHierarchyWasExpanded(
+                    expansionState,
+                    rootB,
+                    false)
+                && !nocturne::editor::EditorHierarchyWasExpanded(
+                    expansionState,
+                    rootC,
+                    false),
+            "Hierarchy expand/collapse identity state lookup failed");
+
+        const noc::EntityHandle child =
+            hierarchyWorld.CreateEntity();
+        const noc::EntityHandle grandChild =
+            hierarchyWorld.CreateEntity();
+
+        ok &= CheckEditorSession(
+            child.IsValid()
+                && grandChild.IsValid()
+                && hierarchyWorld.AddTransform(child)
+                && hierarchyWorld.AddTransform(grandChild)
+                && hierarchyWorld.AddName(
+                    child,
+                    "Lifecycle Child")
+                && hierarchyWorld.AddName(
+                    grandChild,
+                    "Lifecycle GrandChild")
+                && hierarchyWorld.SetParent(
+                    child,
+                    rootA)
+                && hierarchyWorld.SetParent(
+                    grandChild,
+                    child)
+                && hierarchyModel.Rebuild(
+                    hierarchyWorld),
+            "Hierarchy parented lifecycle setup failed");
+
+        auto findHierarchyRow =
+            [&](noc::EntityHandle entity)
+                -> const nocturne::editor::EditorHierarchyRow*
+            {
+                for (const auto& row :
+                     hierarchyModel.Rows())
+                {
+                    if (row.entity == entity)
+                        return &row;
+                }
+
+                return nullptr;
+            };
+
+        const auto* rootARow =
+            findHierarchyRow(rootA);
+        const auto* childRow =
+            findHierarchyRow(child);
+        const auto* grandChildRow =
+            findHierarchyRow(grandChild);
+
+        ok &= CheckEditorSession(
+            rootARow
+                && rootARow->depth == 1
+                && rootARow->hasAuthoredChildren
+                && childRow
+                && childRow->depth == 2
+                && childRow->hasAuthoredChildren
+                && grandChildRow
+                && grandChildRow->depth == 3
+                && !grandChildRow->hasAuthoredChildren,
+            "Hierarchy deep parent projection mismatch");
+
+        ok &= CheckEditorSession(
+            hierarchyWorld.SetName(
+                rootA,
+                "Renamed Root")
+                && hierarchyModel.Rebuild(
+                    hierarchyWorld)
+                && findHierarchyRow(rootA)
+                && std::strcmp(
+                    hierarchyWorld.GetName(rootA)->value,
+                    "Renamed Root") == 0,
+            "Hierarchy rename refresh lost entity identity");
+
+        nocturne::editor::EditorCommandContext
+            hierarchyContext{
+                hierarchyWorld,
+                reflection,
+                allocator,
+                noc::EntityHandle::Invalid()
+            };
+        nocturne::editor::EditorCommandHistory
+            hierarchyHistory;
+        hierarchyHistory.Configure(
+            32,
+            4u * 1024u * 1024u);
+
+        auto reparent =
+            std::make_unique<
+                nocturne::editor::ReparentEntityCommand>();
+
+        ok &= CheckEditorSession(
+            reparent->Init(
+                hierarchyContext,
+                child,
+                rootB)
+                && hierarchyHistory.Execute(
+                    hierarchyContext,
+                    std::move(reparent))
+                && hierarchyModel.Rebuild(
+                    hierarchyWorld)
+                && hierarchyWorld.ParentOf(child)
+                    == rootB,
+            "Hierarchy reparent refresh failed");
+
+        const auto* rootAAfterReparent =
+            findHierarchyRow(rootA);
+        const auto* rootBAfterReparent =
+            findHierarchyRow(rootB);
+        const auto* childAfterReparent =
+            findHierarchyRow(child);
+
+        ok &= CheckEditorSession(
+            rootAAfterReparent
+                && !rootAAfterReparent
+                    ->hasAuthoredChildren
+                && rootBAfterReparent
+                && rootBAfterReparent
+                    ->hasAuthoredChildren
+                && childAfterReparent
+                && childAfterReparent->depth == 2,
+            "Hierarchy reparent topology projection mismatch");
+
+        auto cycle =
+            std::make_unique<
+                nocturne::editor::ReparentEntityCommand>();
+
+        ok &= CheckEditorSession(
+            !cycle->Init(
+                hierarchyContext,
+                rootB,
+                grandChild)
+                && hierarchyWorld.ParentOf(rootB)
+                    == noc::EntityHandle::Invalid(),
+            "Hierarchy cycle reparent was not rejected");
+
+        noc::EntityHandle staleRow{};
+        for (const auto& row :
+             hierarchyModel.Rows())
+        {
+            if (row.entity == rootC)
+            {
+                staleRow = row.entity;
+                break;
+            }
+        }
+
+        ok &= CheckEditorSession(
+            staleRow == rootC
+                && hierarchyWorld.DestroyEntity(rootC)
+                && !hierarchyWorld.IsAlive(staleRow)
+                && hierarchyModel.Rebuild(
+                    hierarchyWorld)
+                && !findHierarchyRow(staleRow),
+            "Hierarchy stale row survived authoritative rebuild");
+
+        hierarchyHistory.Clear();
+
+        auto deleteCommand =
+            std::make_unique<
+                nocturne::editor::DeleteEntityCommand>();
+        auto* deleteRaw =
+            deleteCommand.get();
+
+        ok &= CheckEditorSession(
+            deleteCommand->Init(
+                hierarchyContext,
+                child)
+                && hierarchyHistory.Execute(
+                    hierarchyContext,
+                    std::move(deleteCommand))
+                && hierarchyModel.Rebuild(
+                    hierarchyWorld)
+                && !findHierarchyRow(child)
+                && !findHierarchyRow(grandChild),
+            "Hierarchy delete refresh retained deleted subtree rows");
+
+        ok &= CheckEditorSession(
+            hierarchyHistory.Undo(
+                hierarchyContext),
+            "Hierarchy delete undo failed");
+
+        const noc::EntityHandle restoredChild =
+            deleteRaw->CurrentRoot();
+        const noc::EntityHandle restoredGrandChild =
+            hierarchyWorld.FirstChildOf(
+                restoredChild);
+
+        ok &= CheckEditorSession(
+            restoredChild.IsValid()
+                && restoredGrandChild.IsValid()
+                && restoredChild != child
+                && restoredGrandChild != grandChild
+                && hierarchyModel.Rebuild(
+                    hierarchyWorld)
+                && findHierarchyRow(restoredChild)
+                && findHierarchyRow(restoredGrandChild)
+                && hierarchyWorld.ParentOf(
+                    restoredChild) == rootB,
+            "Hierarchy undo restore refresh failed");
+
+        ok &= CheckEditorSession(
+            hierarchyHistory.Redo(
+                hierarchyContext)
+                && hierarchyModel.Rebuild(
+                    hierarchyWorld)
+                && !findHierarchyRow(restoredChild)
+                && !findHierarchyRow(restoredGrandChild),
+            "Hierarchy delete redo refresh failed");
+
+        hierarchyHistory.Clear();
+        hierarchyModel.Clear();
+        hierarchyWorld.Shutdown();
+    }
 
     {
         int sequenceValue = 0;

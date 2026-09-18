@@ -1214,15 +1214,9 @@ namespace nocturne::editor
             InvalidateRect(h, nullptr, FALSE);
         }
 
-        struct TreeExpansionEntry
-        {
-            noc::EntityHandle entity{};
-            bool expanded = true;
-        };
-
         void TreeCaptureExpansion(
             HWND h,
-            std::vector<TreeExpansionEntry>& outEntries,
+            std::vector<EditorHierarchyExpansionEntry>& outEntries,
             bool& outRootExpanded)
         {
             outEntries.clear();
@@ -1258,20 +1252,6 @@ namespace nocturne::editor
                 outEntries.clear();
                 outRootExpanded = true;
             }
-        }
-
-        bool TreeWasExpanded(
-            const std::vector<TreeExpansionEntry>& entries,
-            noc::EntityHandle entity,
-            bool fallback = true)
-        {
-            for (const TreeExpansionEntry& entry : entries)
-            {
-                if (entry.entity == entity)
-                    return entry.expanded;
-            }
-
-            return fallback;
         }
 
         [[nodiscard]] noc::EntityHandle TreeSelectedEntity(HWND h)
@@ -1567,7 +1547,7 @@ namespace nocturne::editor
 
     void EditorShellV3::PopulateScene_()
     {
-        std::vector<TreeExpansionEntry> expansionState;
+        std::vector<EditorHierarchyExpansionEntry> expansionState;
         bool rootExpanded = true;
         TreeCaptureExpansion(
             sceneTree_,
@@ -1641,7 +1621,7 @@ namespace nocturne::editor
                 row.depth,
                 iconFor(row.entity),
                 row.hasAuthoredChildren,
-                TreeWasExpanded(
+                EditorHierarchyWasExpanded(
                     expansionState,
                     row.entity,
                     true),

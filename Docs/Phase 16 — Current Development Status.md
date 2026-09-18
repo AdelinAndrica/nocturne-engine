@@ -32,7 +32,7 @@ The remaining work is predominantly **completion hardening**:
 
 - general Transaction / CompoundCommand abstraction;
 - editor stress/performance baselines;
-- completion of hierarchy / Inspector / gizmo test matrices;
+- completion of Inspector / gizmo test matrices;
 - remaining reflection contract proofs;
 - explicit prefab-prototype seam;
 - manual Phase 13/14/15 regression and 15+ minute soak;
@@ -419,7 +419,25 @@ Still open under the separate allocation-discipline gate:
 
 ### 11.4 Completion test matrices
 
-Hierarchy still needs explicit coverage for empty/one/many/deep/wide trees, expand/collapse, duplicate names, stale rows, deterministic generation and 10k stress.
+#### Hierarchy — VERIFIED / CLOSED
+
+The hierarchy automated matrix now exercises the same \`EditorHierarchyModel\` consumed by \`EditorShellV3\` and covers:
+
+- empty World;
+- one authored root;
+- many authored roots;
+- duplicate display names without identity aliasing;
+- deep parent/child depth projection;
+- expansion-state lookup keyed by EntityHandle and used by the production shell;
+- rename refresh without identity replacement;
+- reparent refresh;
+- cycle rejection;
+- stale-row eviction after authoritative World destruction;
+- delete refresh;
+- undo restore with new runtime EntityHandles;
+- redo delete refresh.
+
+The editor performance suite supplies the complementary wide/deep/10k hierarchy workloads and deterministic repeated row generation. Expansion rendering/click behavior remains part of the separate manual UI regression gate, but expansion-state preservation semantics are now automated.
 
 Inspector still needs consolidated coverage for no/stale selection, structural mutation while open, invalid numeric text, NaN/Inf, long names, invalid camera lens, add/remove refresh and focus/cancel/commit lifecycle.
 
@@ -491,7 +509,7 @@ e7144560 — phase16: cover editor history failure and budget semantics
 
 ## 13. Recommended next implementation order
 
-1. Complete hierarchy/Inspector/gizmo negative and lifecycle test matrices.
+1. Complete Inspector and gizmo negative/lifecycle test matrices.
 2. Add real-engine function reflection proof and remaining reflection performance measurements.
 3. Close remaining allocation-discipline evidence for editor presentation/hot paths.
 4. Clarify the transient prefab-prototype seam without Phase 17 persistence.
