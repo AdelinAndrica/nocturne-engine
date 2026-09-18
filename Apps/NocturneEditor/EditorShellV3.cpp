@@ -1436,17 +1436,20 @@ namespace nocturne::editor
         std::wstring wide;
         try
         {
-            wide.resize(
+            const size_t characterCount =
                 static_cast<size_t>(
-                    (std::max)(0, length)));
+                    (std::max)(0, length));
 
-            if (length > 0)
-            {
-                GetWindowTextW(
-                    renameEdit_,
-                    wide.data(),
-                    length + 1);
-            }
+            // Reserve explicit space for Win32's terminating NUL, then remove
+            // it from the logical std::wstring length after the copy.
+            wide.resize(characterCount + 1u);
+
+            GetWindowTextW(
+                renameEdit_,
+                wide.data(),
+                static_cast<int>(characterCount + 1u));
+
+            wide.resize(characterCount);
         }
         catch (const std::bad_alloc&)
         {
