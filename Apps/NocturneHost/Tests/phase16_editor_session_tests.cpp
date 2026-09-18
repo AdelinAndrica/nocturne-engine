@@ -246,6 +246,33 @@ bool RunPhase16EditorSessionTests()
                     reflectedRotation.Data())->w == 1.0f,
             "Inspector reflected quaternion read failed");
 
+        ok &= CheckEditorSession(
+            world.AddCamera(authored)
+                && inspectorModel.Refresh(
+                    context,
+                    authored),
+            "Inspector camera presentation setup failed");
+
+        const auto* fovProperty =
+            inspectorModel.FindProperty(
+                noc::TypeId{
+                    noc::kCameraComponentTypeId.value },
+                noc::MakePropertyId(
+                    "Nocturne.Camera.fovYRadians"));
+
+        ok &= CheckEditorSession(
+            fovProperty
+                && fovProperty->editable
+                && fovProperty->displayAngleDegrees,
+            "Inspector did not preserve reflected radian-angle presentation metadata");
+
+        ok &= CheckEditorSession(
+            world.RemoveCamera(authored)
+                && inspectorModel.Refresh(
+                    context,
+                    authored),
+            "Inspector camera presentation cleanup failed");
+
         session.History().Clear();
 
         ok &= CheckEditorSession(

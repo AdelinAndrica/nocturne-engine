@@ -300,6 +300,32 @@ namespace nocturne::editor
                             noc::PropertyFlags::ReadOnly)
                         && SupportsGenericTextEdit(*valueType);
 
+                    const noc::AttributeMetadata* angleAttribute =
+                        context.reflection.FindPropertyAttribute(
+                            type->typeId,
+                            property.propertyId,
+                            noc::AttributeKind::Angle);
+                    const noc::AttributeMetadata* unitsAttribute =
+                        context.reflection.FindPropertyAttribute(
+                            type->typeId,
+                            property.propertyId,
+                            noc::AttributeKind::Units);
+
+                    view.displayAngleDegrees =
+                        valueType->kind
+                            == noc::TypeKind::FloatingPoint
+                        && angleAttribute
+                        && angleAttribute->valueKind
+                            == noc::AttributeValueKind::Boolean
+                        && angleAttribute->boolValue
+                        && unitsAttribute
+                        && unitsAttribute->valueKind
+                            == noc::AttributeValueKind::String
+                        && unitsAttribute->stringValue
+                        && std::strcmp(
+                            unitsAttribute->stringValue,
+                            "radians") == 0;
+
                     if (!FormatValue_(
                             context,
                             *valueType,

@@ -20,6 +20,10 @@ namespace nocturne::editor
         std::string displayName;
         std::string displayValue;
         bool editable = false;
+
+        // Presentation copy only. Set when reflection explicitly marks the
+        // property as an angle whose declared runtime units are radians.
+        bool displayAngleDegrees = false;
     };
 
     struct InspectorComponentView
