@@ -49,6 +49,15 @@ namespace nocturne::editor
             noc::TypeId componentTypeId,
             noc::PropertyId propertyId) const noexcept;
 
+        // Generic reflection-backed property read for editor presentation
+        // extensions. No component pointer or metadata pointer escapes this call.
+        [[nodiscard]] bool ReadValue(
+            EditorCommandContext& context,
+            noc::EntityHandle entity,
+            noc::TypeId componentTypeId,
+            noc::PropertyId propertyId,
+            noc::OwnedReflectedValue& outValue) const;
+
         // Parses generic editor text into the reflected value type and executes
         // the mutation through SetReflectedPropertyCommand + command history.
         [[nodiscard]] bool CommitTextEdit(

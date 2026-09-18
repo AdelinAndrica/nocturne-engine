@@ -144,6 +144,44 @@ bool RunPhase16EditorSessionTests()
                     == noc::BuiltinTypeIds::Vec3,
             "Inspector model did not enumerate reflected properties");
 
+        noc::OwnedReflectedValue reflectedTranslation;
+        ok &= CheckEditorSession(
+            inspectorModel.ReadValue(
+                context,
+                authored,
+                noc::TypeId{
+                    noc::kTransformComponentTypeId.value },
+                noc::MakePropertyId(
+                    "Nocturne.Transform.localTranslation"),
+                reflectedTranslation)
+                && reflectedTranslation.Type()
+                    == noc::BuiltinTypeIds::Vec3
+                && reflectedTranslation.Data()
+                && static_cast<const noc::Vec3*>(
+                    reflectedTranslation.Data())->x == 0.0f
+                && static_cast<const noc::Vec3*>(
+                    reflectedTranslation.Data())->y == 0.0f
+                && static_cast<const noc::Vec3*>(
+                    reflectedTranslation.Data())->z == 0.0f,
+            "Inspector generic reflected value read failed");
+
+        noc::OwnedReflectedValue reflectedRotation;
+        ok &= CheckEditorSession(
+            inspectorModel.ReadValue(
+                context,
+                authored,
+                noc::TypeId{
+                    noc::kTransformComponentTypeId.value },
+                noc::MakePropertyId(
+                    "Nocturne.Transform.localRotation"),
+                reflectedRotation)
+                && reflectedRotation.Type()
+                    == noc::BuiltinTypeIds::Quat
+                && reflectedRotation.Data()
+                && static_cast<const noc::Quat*>(
+                    reflectedRotation.Data())->w == 1.0f,
+            "Inspector reflected quaternion read failed");
+
         session.History().Clear();
 
         ok &= CheckEditorSession(

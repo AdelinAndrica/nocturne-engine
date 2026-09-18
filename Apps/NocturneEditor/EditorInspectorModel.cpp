@@ -367,6 +367,59 @@ namespace nocturne::editor
         return nullptr;
     }
 
+    bool EditorInspectorModel::ReadValue(
+        EditorCommandContext& context,
+        noc::EntityHandle entity,
+        noc::TypeId componentTypeId,
+        noc::PropertyId propertyId,
+        noc::OwnedReflectedValue& outValue) const
+    {
+        if (outValue.IsValid()
+            || !entity.IsValid()
+            || !context.world.IsAlive(entity)
+            || context.IsToolOwned(entity))
+        {
+            return false;
+        }
+
+        const noc::TypeMetadata* componentType =
+            context.reflection.FindType(componentTypeId);
+
+        if (!componentType
+            || componentType->kind != noc::TypeKind::Component
+            || !componentType->componentMetadata
+            || !componentType->componentMetadata->has(
+                context.world,
+                entity))
+        {
+            return false;
+        }
+
+        const noc::PropertyMetadata* property =
+            context.reflection.FindProperty(
+                componentTypeId,
+                propertyId);
+
+        if (!property || !property->read)
+            return false;
+
+        noc::ComponentPropertyRuntimeContext runtime{
+            &context.world,
+            entity
+        };
+
+        noc::PropertyAccessContext propertyContext =
+            noc::MakeComponentPropertyAccessContext(runtime);
+
+        return noc::ReadPropertyValue(
+                context.reflection,
+                *property,
+                propertyContext,
+                context.allocator,
+                outValue)
+            == noc::PropertyAccessStatus::Success;
+    }
+
     bool EditorInspectorModel::CommitTextEdit(
         EditorCommandContext& context,
         EditorCommandHistory& history,
