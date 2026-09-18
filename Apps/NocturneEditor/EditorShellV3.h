@@ -171,6 +171,11 @@ namespace nocturne::editor
         [[nodiscard]] bool ExecuteCreateEntity_();
         [[nodiscard]] bool ExecuteDeleteSelection_();
         [[nodiscard]] bool ExecuteDuplicateSelection_();
+        [[nodiscard]] bool ExecuteReparentEntity_(
+            noc::EntityHandle child,
+            noc::EntityHandle parent);
+        void ShowHierarchyContextMenu_(
+            POINT screenPoint);
         [[nodiscard]] bool BeginRenameSelection_();
         [[nodiscard]] bool CommitRename_();
         void CancelRename_() noexcept;

@@ -47,6 +47,7 @@ namespace nocturne::editor
         constexpr UINT WM_NOC_V3_SCROLL = WM_APP + 0x311;
         constexpr UINT WM_NOC_V3_INSPECTOR_REFRESH = WM_APP + 0x312;
         constexpr UINT WM_NOC_V3_TREE_REPARENT = WM_APP + 0x313;
+        constexpr UINT WM_NOC_V3_TREE_CONTEXT = WM_APP + 0x314;
         constexpr WORD kTreeSelectionChanged = 0x7F01;
 
         struct TreeReparentRequest
@@ -687,6 +688,61 @@ namespace nocturne::editor
                 {
                     state->hover = -1;
                     InvalidateRect(hwnd, nullptr, FALSE);
+                }
+                return 0;
+
+            case WM_RBUTTONDOWN:
+                if (state)
+                {
+                    SetFocus(hwnd);
+
+                    const auto visible =
+                        VisibleTree(*state);
+                    const int visibleRow =
+                        state->firstRow
+                        + GET_Y_LPARAM(lParam) / rowH;
+
+                    int index = 0;
+                    if (visibleRow >= 0
+                        && visibleRow
+                            < static_cast<int>(visible.size()))
+                    {
+                        index = visible[visibleRow];
+                    }
+
+                    state->selected = index;
+                    state->dragSource = -1;
+                    state->dropTarget = -1;
+                    state->dragging = false;
+
+                    InvalidateRect(
+                        hwnd,
+                        nullptr,
+                        FALSE);
+
+                    SendMessageW(
+                        GetParent(hwnd),
+                        WM_COMMAND,
+                        MAKEWPARAM(
+                            GetDlgCtrlID(hwnd),
+                            kTreeSelectionChanged),
+                        reinterpret_cast<LPARAM>(hwnd));
+
+                    POINT screenPoint{
+                        GET_X_LPARAM(lParam),
+                        GET_Y_LPARAM(lParam)
+                    };
+                    ClientToScreen(
+                        hwnd,
+                        &screenPoint);
+
+                    SendMessageW(
+                        GetParent(hwnd),
+                        WM_NOC_V3_TREE_CONTEXT,
+                        static_cast<WPARAM>(
+                            GetDlgCtrlID(hwnd)),
+                        reinterpret_cast<LPARAM>(
+                            &screenPoint));
                 }
                 return 0;
 
@@ -1843,6 +1899,331 @@ namespace nocturne::editor
         {
             AppendConsole_(L"Duplicate Entity failed: allocation failure.");
             return false;
+        }
+    }
+
+    bool EditorShellV3::ExecuteReparentEntity_(
+        noc::EntityHandle child,
+        noc::EntityHandle parent)
+    {
+        if (!session_
+            || !engine_
+            || !child.IsValid())
+        {
+            return false;
+        }
+
+        const noc::EntityHandle selected =
+            session_->SelectedEntity();
+        auto context =
+            session_->CommandContext();
+
+        try
+        {
+            auto command =
+                std::make_unique<
+                    ReparentEntityCommand>();
+
+            if (!command->Init(
+                    context,
+                    child,
+                    parent))
+            {
+                AppendConsole_(
+                    L"Reparent rejected: invalid target, cycle, or non-representable preserve-world transform.");
+                return false;
+            }
+
+            if (!session_->History().Execute(
+                    context,
+                    std::move(command)))
+            {
+                AppendConsole_(
+                    L"Reparent failed; hierarchy unchanged.");
+                return false;
+            }
+        }
+        catch (const std::bad_alloc&)
+        {
+            AppendConsole_(
+                L"Reparent failed: allocation failure.");
+            return false;
+        }
+
+        session_->SetSceneDirty();
+
+        if (selected.IsValid())
+            (void)session_->SetSelection(selected);
+
+        PopulateScene_();
+        RefreshInspector();
+        UpdateStatus_();
+        AppendConsole_(
+            parent.IsValid()
+                ? L"Entity reparented; world pose preserved."
+                : L"Entity unparented to scene root; world pose preserved.");
+        return true;
+    }
+
+    void EditorShellV3::ShowHierarchyContextMenu_(
+        POINT screenPoint)
+    {
+        if (!session_
+            || !engine_
+            || !sceneTree_)
+        {
+            return;
+        }
+
+        noc::World& world =
+            engine_->GetWorld();
+
+        const noc::EntityHandle selected =
+            session_->SelectedEntity();
+
+        const bool hasSelection =
+            selected.IsValid()
+            && world.IsAlive(selected)
+            && !session_->IsToolOwned(selected);
+
+        enum : UINT
+        {
+            ContextCreate = 1,
+            ContextRename,
+            ContextDuplicate,
+            ContextDelete,
+            ContextAddComponent,
+            ContextUnparent,
+            ContextReparentBase = 1000
+        };
+
+        HMENU menu = CreatePopupMenu();
+        if (!menu)
+            return;
+
+        const UINT selectionFlags =
+            hasSelection ? MF_STRING : MF_STRING | MF_GRAYED;
+
+        AppendMenuW(
+            menu,
+            MF_STRING,
+            ContextCreate,
+            L"Create Entity");
+        AppendMenuW(
+            menu,
+            MF_SEPARATOR,
+            0,
+            nullptr);
+        AppendMenuW(
+            menu,
+            selectionFlags,
+            ContextRename,
+            L"Rename");
+        AppendMenuW(
+            menu,
+            selectionFlags,
+            ContextDuplicate,
+            L"Duplicate");
+        AppendMenuW(
+            menu,
+            selectionFlags,
+            ContextDelete,
+            L"Delete");
+        AppendMenuW(
+            menu,
+            selectionFlags,
+            ContextAddComponent,
+            L"Add Component...");
+
+        const noc::EntityHandle currentParent =
+            hasSelection
+                ? world.ParentOf(selected)
+                : noc::EntityHandle::Invalid();
+
+        AppendMenuW(
+            menu,
+            MF_SEPARATOR,
+            0,
+            nullptr);
+        AppendMenuW(
+            menu,
+            hasSelection && currentParent.IsValid()
+                ? MF_STRING
+                : MF_STRING | MF_GRAYED,
+            ContextUnparent,
+            L"Unparent to Scene Root");
+
+        HMENU reparentMenu = CreatePopupMenu();
+        std::vector<noc::EntityHandle> reparentCandidates;
+
+        if (reparentMenu && hasSelection)
+        {
+            try
+            {
+                reparentCandidates.reserve(
+                    world.AliveCount());
+
+                for (uint32_t i = 0;
+                     i < world.EntityCapacity();
+                     ++i)
+                {
+                    const noc::EntityHandle candidate =
+                        world.EntityAtIndex(i);
+
+                    if (!candidate.IsValid()
+                        || candidate == selected
+                        || candidate == currentParent
+                        || !world.IsAlive(candidate)
+                        || session_->IsToolOwned(candidate))
+                    {
+                        continue;
+                    }
+
+                    bool wouldCycle = false;
+                    noc::EntityHandle ancestor =
+                        candidate;
+
+                    while (ancestor.IsValid())
+                    {
+                        if (ancestor == selected)
+                        {
+                            wouldCycle = true;
+                            break;
+                        }
+
+                        ancestor =
+                            world.ParentOf(ancestor);
+                    }
+
+                    if (wouldCycle)
+                        continue;
+
+                    reparentCandidates.push_back(
+                        candidate);
+
+                    std::wstring label;
+                    const noc::NameComponent* name =
+                        world.GetName(candidate);
+
+                    if (name && name->value[0] != '\0')
+                        label = Utf8ToWide_(name->value);
+
+                    if (label.empty())
+                    {
+                        std::wstringstream ss;
+                        ss << L"Entity "
+                            << candidate.index
+                            << L":"
+                            << candidate.generation;
+                        label = ss.str();
+                    }
+
+                    AppendMenuW(
+                        reparentMenu,
+                        MF_STRING,
+                        ContextReparentBase
+                            + static_cast<UINT>(
+                                reparentCandidates.size() - 1),
+                        label.c_str());
+
+                    if (reparentCandidates.size()
+                        >= 0xF000u)
+                    {
+                        break;
+                    }
+                }
+            }
+            catch (const std::bad_alloc&)
+            {
+                reparentCandidates.clear();
+            }
+        }
+
+        if (reparentMenu)
+        {
+            if (reparentCandidates.empty())
+            {
+                AppendMenuW(
+                    reparentMenu,
+                    MF_STRING | MF_GRAYED,
+                    0,
+                    L"No valid parent targets");
+            }
+
+            AppendMenuW(
+                menu,
+                MF_POPUP
+                    | (hasSelection
+                        ? MF_ENABLED
+                        : MF_GRAYED),
+                reinterpret_cast<UINT_PTR>(
+                    reparentMenu),
+                L"Reparent To");
+        }
+
+        const int command =
+            TrackPopupMenuEx(
+                menu,
+                TPM_RETURNCMD
+                    | TPM_LEFTALIGN
+                    | TPM_TOPALIGN,
+                screenPoint.x,
+                screenPoint.y,
+                hwnd_,
+                nullptr);
+
+        DestroyMenu(menu);
+
+        switch (command)
+        {
+        case ContextCreate:
+            (void)ExecuteCreateEntity_();
+            break;
+        case ContextRename:
+            if (hasSelection)
+                (void)BeginRenameSelection_();
+            break;
+        case ContextDuplicate:
+            if (hasSelection)
+                (void)ExecuteDuplicateSelection_();
+            break;
+        case ContextDelete:
+            if (hasSelection)
+                (void)ExecuteDeleteSelection_();
+            break;
+        case ContextAddComponent:
+            if (hasSelection)
+                ShowAddComponentPopup_();
+            break;
+        case ContextUnparent:
+            if (hasSelection
+                && currentParent.IsValid())
+            {
+                (void)ExecuteReparentEntity_(
+                    selected,
+                    noc::EntityHandle::Invalid());
+            }
+            break;
+        default:
+            if (command >=
+                    static_cast<int>(
+                        ContextReparentBase))
+            {
+                const size_t candidateIndex =
+                    static_cast<size_t>(
+                        command
+                        - ContextReparentBase);
+
+                if (candidateIndex
+                    < reparentCandidates.size())
+                {
+                    (void)ExecuteReparentEntity_(
+                        selected,
+                        reparentCandidates[
+                            candidateIndex]);
+                }
+            }
+            break;
         }
     }
 
@@ -4816,57 +5197,30 @@ namespace nocturne::editor
                 return true;
             }
 
-            const noc::EntityHandle selected =
-                session_->SelectedEntity();
-            auto context =
-                session_->CommandContext();
+            (void)ExecuteReparentEntity_(
+                request->child,
+                request->parent);
 
-            try
+            result = 0;
+            return true;
+        }
+
+        case WM_NOC_V3_TREE_CONTEXT:
+        {
+            if (static_cast<int>(wParam) != IdSceneTree)
+                break;
+
+            const auto* point =
+                reinterpret_cast<const POINT*>(
+                    lParam);
+            if (!point)
             {
-                auto command =
-                    std::make_unique<ReparentEntityCommand>();
-
-                if (!command->Init(
-                        context,
-                        request->child,
-                        request->parent))
-                {
-                    AppendConsole_(
-                        L"Reparent rejected: invalid target, cycle, or non-representable preserve-world transform.");
-                    result = 0;
-                    return true;
-                }
-
-                if (!session_->History().Execute(
-                        context,
-                        std::move(command)))
-                {
-                    AppendConsole_(
-                        L"Reparent failed; hierarchy unchanged.");
-                    result = 0;
-                    return true;
-                }
-            }
-            catch (const std::bad_alloc&)
-            {
-                AppendConsole_(
-                    L"Reparent failed: allocation failure.");
                 result = 0;
                 return true;
             }
 
-            session_->SetSceneDirty();
-
-            if (selected.IsValid())
-                (void)session_->SetSelection(selected);
-
-            PopulateScene_();
-            RefreshInspector();
-            UpdateStatus_();
-            AppendConsole_(
-                request->parent.IsValid()
-                    ? L"Entity reparented; world pose preserved."
-                    : L"Entity unparented to scene root; world pose preserved.");
+            ShowHierarchyContextMenu_(
+                *point);
 
             result = 0;
             return true;
