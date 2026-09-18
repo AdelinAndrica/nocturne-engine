@@ -106,5 +106,6 @@ namespace nocturne::editor
         float cameraPitch_ = -0.08f;
         float cameraSpeed_ = 5.0f;
         float fovY_ = 1.0471975512f; // 60 degrees
+        uint64_t observedSessionVersion_ = 0;
     };
 }

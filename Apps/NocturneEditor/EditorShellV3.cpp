@@ -8,6 +8,8 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <memory>
+#include <new>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -837,7 +839,11 @@ namespace nocturne::editor
 
     void EditorShellV3::Shutdown()
     {
-        if (window_) window_->SetMessageSink(nullptr); if (fileMenu_) DestroyMenu(fileMenu_); if (buildMenu_) DestroyMenu(buildMenu_); fileMenu_ = buildMenu_ = nullptr;
+        if (window_) window_->SetMessageSink(nullptr);
+        if (fileMenu_) DestroyMenu(fileMenu_);
+        if (buildMenu_) DestroyMenu(buildMenu_);
+        if (actorMenu_) DestroyMenu(actorMenu_);
+        fileMenu_ = buildMenu_ = actorMenu_ = nullptr;
         if (uiFont_) DeleteObject(uiFont_); if (uiBold_) DeleteObject(uiBold_); if (menuFont_) DeleteObject(menuFont_); if (smallFont_) DeleteObject(smallFont_); if (consoleFont_) DeleteObject(consoleFont_); if (brandFont_) DeleteObject(brandFont_);
         if (windowBrush_) DeleteObject(windowBrush_); if (editBrush_) DeleteObject(editBrush_);
         uiFont_ = uiBold_ = menuFont_ = smallFont_ = consoleFont_ = brandFont_ = nullptr; windowBrush_ = editBrush_ = nullptr; session_ = nullptr; engine_ = nullptr; window_ = nullptr; hwnd_ = nullptr;
@@ -850,6 +856,11 @@ namespace nocturne::editor
         for (const auto& d : defs) menuButtons_.push_back(MakeButton(hwnd_, d.id, d.text, Icon::None, ButtonKind::Menu, menuFont_));
         fileMenu_ = CreatePopupMenu(); AppendMenuW(fileMenu_, MF_STRING, IdToolbarNew, L"New Scene"); AppendMenuW(fileMenu_, MF_STRING, IdToolbarOpen, L"Open Scene..."); AppendMenuW(fileMenu_, MF_STRING, IdToolbarSave, L"Save Scene"); AppendMenuW(fileMenu_, MF_SEPARATOR, 0, nullptr); AppendMenuW(fileMenu_, MF_STRING, IDCANCEL, L"Exit");
         buildMenu_ = CreatePopupMenu(); AppendMenuW(buildMenu_, MF_STRING, IdToolbarBuild, L"Build Content"); AppendMenuW(buildMenu_, MF_STRING, IdToolbarPlay, L"Play");
+        actorMenu_ = CreatePopupMenu();
+        AppendMenuW(actorMenu_, MF_STRING, IdActorCreate, L"Create Entity");
+        AppendMenuW(actorMenu_, MF_SEPARATOR, 0, nullptr);
+        AppendMenuW(actorMenu_, MF_STRING, IdActorDuplicate, L"Duplicate Entity\tCtrl+D");
+        AppendMenuW(actorMenu_, MF_STRING, IdActorDelete, L"Delete Entity\tDelete");
     }
 
     void EditorShellV3::CreateToolbar_()
@@ -1090,6 +1101,243 @@ namespace nocturne::editor
         RECT rc{}; GetClientRect(consoleEdit_, &rc); const int lines = static_cast<int>(SendMessageW(consoleEdit_, EM_GETLINECOUNT, 0, 0)); const int first = static_cast<int>(SendMessageW(consoleEdit_, EM_GETFIRSTVISIBLELINE, 0, 0)); const int page = (std::max)(1, static_cast<int>(rc.bottom) / 15); SetScroll(consoleScroll_, lines, page, first);
     }
 
+    bool EditorShellV3::ExecuteCreateEntity_()
+    {
+        if (!session_)
+            return false;
+
+        auto context = session_->CommandContext();
+
+        try
+        {
+            auto command =
+                std::make_unique<CreateEntityCommand>();
+            auto* commandRaw = command.get();
+
+            // Design choice (not directly from the book): Actor > Create Entity
+            // creates an authored root entity. Parenting remains an explicit
+            // hierarchy operation rather than an implicit side effect of selection.
+            if (!command->Init("Entity")
+                || !session_->History().Execute(
+                    context,
+                    std::move(command)))
+            {
+                AppendConsole_(L"Create Entity failed.");
+                return false;
+            }
+
+            const noc::EntityHandle created =
+                commandRaw->CurrentEntity();
+
+            if (!created.IsValid()
+                || !session_->SetSelection(created))
+            {
+                AppendConsole_(
+                    L"Create Entity succeeded but selection update failed.");
+                return false;
+            }
+
+            session_->SetSceneDirty();
+            PopulateScene_();
+            RefreshInspector();
+            UpdateStatus_();
+            AppendConsole_(L"Entity created.");
+            return true;
+        }
+        catch (const std::bad_alloc&)
+        {
+            AppendConsole_(L"Create Entity failed: allocation failure.");
+            return false;
+        }
+    }
+
+    bool EditorShellV3::ExecuteDeleteSelection_()
+    {
+        if (!session_)
+            return false;
+
+        const noc::EntityHandle selected =
+            session_->SelectedEntity();
+        if (!selected.IsValid())
+            return false;
+
+        auto context = session_->CommandContext();
+
+        try
+        {
+            auto command =
+                std::make_unique<DeleteEntityCommand>();
+
+            if (!command->Init(context, selected)
+                || !session_->History().Execute(
+                    context,
+                    std::move(command)))
+            {
+                AppendConsole_(L"Delete Entity failed.");
+                return false;
+            }
+
+            session_->ClearSelection();
+            session_->SetSceneDirty();
+            PopulateScene_();
+            RefreshInspector();
+            UpdateStatus_();
+            AppendConsole_(L"Entity subtree deleted.");
+            return true;
+        }
+        catch (const std::bad_alloc&)
+        {
+            AppendConsole_(L"Delete Entity failed: allocation failure.");
+            return false;
+        }
+    }
+
+    bool EditorShellV3::ExecuteDuplicateSelection_()
+    {
+        if (!session_)
+            return false;
+
+        const noc::EntityHandle selected =
+            session_->SelectedEntity();
+        if (!selected.IsValid())
+            return false;
+
+        auto context = session_->CommandContext();
+
+        try
+        {
+            auto command =
+                std::make_unique<DuplicateEntityCommand>();
+            auto* commandRaw = command.get();
+
+            if (!command->Init(context, selected)
+                || !session_->History().Execute(
+                    context,
+                    std::move(command)))
+            {
+                AppendConsole_(L"Duplicate Entity failed.");
+                return false;
+            }
+
+            const noc::EntityHandle duplicate =
+                commandRaw->CurrentRoot();
+
+            if (!duplicate.IsValid()
+                || !session_->SetSelection(duplicate))
+            {
+                AppendConsole_(
+                    L"Duplicate Entity succeeded but selection update failed.");
+                return false;
+            }
+
+            session_->SetSceneDirty();
+            PopulateScene_();
+            RefreshInspector();
+            UpdateStatus_();
+            AppendConsole_(L"Entity subtree duplicated.");
+            return true;
+        }
+        catch (const std::bad_alloc&)
+        {
+            AppendConsole_(L"Duplicate Entity failed: allocation failure.");
+            return false;
+        }
+    }
+
+    bool EditorShellV3::HasTextInputFocus_() const
+    {
+        const HWND focus = GetFocus();
+        if (!focus)
+            return false;
+
+        wchar_t className[64]{};
+        const int length =
+            GetClassNameW(
+                focus,
+                className,
+                static_cast<int>(std::size(className)));
+        if (length <= 0)
+            return false;
+
+        if (_wcsicmp(className, L"Edit") == 0)
+            return true;
+
+        return _wcsnicmp(
+            className,
+            L"RichEdit",
+            8) == 0;
+    }
+
+    bool EditorShellV3::FilterMessage(const MSG& message)
+    {
+        if (message.message != WM_KEYDOWN
+            && message.message != WM_SYSKEYDOWN)
+        {
+            return false;
+        }
+
+        if (HasTextInputFocus_())
+            return false;
+
+        const bool control =
+            (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+        const bool shift =
+            (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+
+        enum class ShortcutAction
+        {
+            None,
+            Undo,
+            Redo,
+            Duplicate,
+            Delete
+        };
+
+        ShortcutAction action = ShortcutAction::None;
+
+        if (control && message.wParam == 'Z')
+            action = shift
+                ? ShortcutAction::Redo
+                : ShortcutAction::Undo;
+        else if (control && message.wParam == 'Y')
+            action = ShortcutAction::Redo;
+        else if (control && message.wParam == 'D')
+            action = ShortcutAction::Duplicate;
+        else if (!control && message.wParam == VK_DELETE)
+            action = ShortcutAction::Delete;
+
+        if (action == ShortcutAction::None)
+            return false;
+
+        // Consume keyboard auto-repeat for scene-authoring commands. One physical
+        // press maps to one history operation.
+        const bool wasDown =
+            (static_cast<uint64_t>(message.lParam)
+                & (1ull << 30u)) != 0;
+        if (wasDown)
+            return true;
+
+        switch (action)
+        {
+        case ShortcutAction::Undo:
+            HandleCommand_(IdToolbarUndo);
+            break;
+        case ShortcutAction::Redo:
+            HandleCommand_(IdToolbarRedo);
+            break;
+        case ShortcutAction::Duplicate:
+            (void)ExecuteDuplicateSelection_();
+            break;
+        case ShortcutAction::Delete:
+            (void)ExecuteDeleteSelection_();
+            break;
+        default:
+            break;
+        }
+
+        return true;
+    }
+
     void EditorShellV3::HandleCommand_(int id)
     {
         switch (id)
@@ -1151,6 +1399,15 @@ namespace nocturne::editor
         case IdContentGridMode: AppendConsole_(L"Grid view is a Phase 13 tooling-shell stub; list mode remains active."); break;
         case IdContentSettings: AppendConsole_(L"Content Browser settings shell selected."); break;
         case IdViewportPerspective: case IdViewportLit: case IdViewportShow: AppendConsole_(L"Viewport display control selected; rendering remains Phase 14 scope."); break;
+        case IdActorCreate:
+            (void)ExecuteCreateEntity_();
+            break;
+        case IdActorDuplicate:
+            (void)ExecuteDuplicateSelection_();
+            break;
+        case IdActorDelete:
+            (void)ExecuteDeleteSelection_();
+            break;
         default: break;
         }
         PopulateScene_(); UpdateStatus_();
@@ -1158,7 +1415,11 @@ namespace nocturne::editor
 
     void EditorShellV3::ShowPopup_(int menuId, HWND anchor)
     {
-        HMENU menu = nullptr; if (menuId == IdMenuFile) menu = fileMenu_; else if (menuId == IdMenuBuild) menu = buildMenu_; bool temporary = false;
+        HMENU menu = nullptr;
+        if (menuId == IdMenuFile) menu = fileMenu_;
+        else if (menuId == IdMenuBuild) menu = buildMenu_;
+        else if (menuId == IdMenuActor) menu = actorMenu_;
+        bool temporary = false;
         if (!menu) { menu = CreatePopupMenu(); AppendMenuW(menu, MF_STRING | MF_GRAYED, 0, L"Phase 13 tooling shell"); temporary = true; }
         RECT rc{}; GetWindowRect(anchor, &rc); const int command = TrackPopupMenuEx(menu, TPM_RETURNCMD | TPM_LEFTALIGN | TPM_TOPALIGN, rc.left,rc.bottom+2,hwnd_,nullptr); if (command) HandleCommand_(command); if (temporary) DestroyMenu(menu);
     }
@@ -1200,7 +1461,18 @@ namespace nocturne::editor
             }
             if (id >= IdMenuFile && id <= IdMenuHelp) { ShowPopup_(id, source); result = 0; return true; }
             if (id == IDCANCEL) { if (window_) window_->RequestQuit(); result = 0; return true; }
-            if ((id >= IdToolbarNew && id <= IdToolbarBuild) || id == IdPlay || id == IdBuild || id == IdContentListMode || id == IdContentGridMode || id == IdContentSettings || id == IdViewportPerspective || id == IdViewportLit || id == IdViewportShow) { HandleCommand_(id); result = 0; return true; }
+            if ((id >= IdToolbarNew && id <= IdToolbarBuild)
+                || (id >= IdActorCreate && id <= IdActorDelete)
+                || id == IdPlay || id == IdBuild
+                || id == IdContentListMode || id == IdContentGridMode
+                || id == IdContentSettings
+                || id == IdViewportPerspective || id == IdViewportLit
+                || id == IdViewportShow)
+            {
+                HandleCommand_(id);
+                result = 0;
+                return true;
+            }
             break;
         }
         case WM_NOC_V3_SCROLL:

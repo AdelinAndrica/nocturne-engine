@@ -5,16 +5,25 @@
 
 namespace noc
 {
-    void MainLoop::PumpMessagesNonBlocking(WinWindow& window)
+    void MainLoop::PumpMessagesNonBlocking(
+        WinWindow& window,
+        MessageFilterCallback messageFilter,
+        void* messageUserData)
     {
         MSG msg{};
         while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE))
         {
-            // Defensive: respect WM_QUIT too (e.g., PostQuitMessage)
+            // Defensive: respect WM_QUIT too (e.g., PostQuitMessage).
             if (msg.message == WM_QUIT)
             {
                 window.RequestQuit();
                 return;
+            }
+
+            if (messageFilter
+                && messageFilter(messageUserData, msg))
+            {
+                continue;
             }
 
             TranslateMessage(&msg);
@@ -22,18 +31,26 @@ namespace noc
         }
     }
 
-    void MainLoop::Run(Engine& engine, WinWindow& window,
-        FrameCallback frameCallback, void* userData)
+    void MainLoop::Run(
+        Engine& engine,
+        WinWindow& window,
+        FrameCallback frameCallback,
+        void* frameUserData,
+        MessageFilterCallback messageFilter,
+        void* messageUserData)
     {
         NOC_LOG_INFO("Runtime", "MainLoop starting");
 
         while (!window.ShouldQuit())
         {
-            PumpMessagesNonBlocking(window);
+            PumpMessagesNonBlocking(
+                window,
+                messageFilter,
+                messageUserData);
 
             engine.BeginFrame();
             if (frameCallback)
-                frameCallback(userData);
+                frameCallback(frameUserData);
             engine.Tick();
             engine.EndFrame();
         }

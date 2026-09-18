@@ -10,14 +10,24 @@ namespace noc
     {
     public:
         using FrameCallback = void(*)(void* userData);
+        using MessageFilterCallback =
+            bool(*)(void* userData, const MSG& message);
 
-        // Design choice (not directly from the book): an optional pre-Tick hook lets
-        // editor-only systems consume accumulated UI input exactly once per engine
-        // frame without introducing a second application loop.
-        void Run(Engine& engine, WinWindow& window,
-            FrameCallback frameCallback = nullptr, void* userData = nullptr);
+        // Design choice (not directly from the book): optional hooks let
+        // editor-only systems consume accumulated frame input and filter native
+        // tool messages without introducing a second application loop.
+        void Run(
+            Engine& engine,
+            WinWindow& window,
+            FrameCallback frameCallback = nullptr,
+            void* frameUserData = nullptr,
+            MessageFilterCallback messageFilter = nullptr,
+            void* messageUserData = nullptr);
 
     private:
-        void PumpMessagesNonBlocking(WinWindow& window);
+        void PumpMessagesNonBlocking(
+            WinWindow& window,
+            MessageFilterCallback messageFilter,
+            void* messageUserData);
     };
 }

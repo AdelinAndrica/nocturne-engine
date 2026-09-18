@@ -326,6 +326,7 @@ namespace nocturne::editor
         window_ = &window;
         shell_ = &shell;
         session_ = &session;
+        observedSessionVersion_ = session.StateVersion();
         topLevel_ = static_cast<HWND>(window.Handle());
         body_ = shell.ViewportBody();
         if (!topLevel_ || !body_)
@@ -390,6 +391,25 @@ namespace nocturne::editor
 
     void EditorViewportController::TickFrame()
     {
+        if (session_)
+        {
+            session_->ValidateSelection();
+
+            const uint64_t version =
+                session_->StateVersion();
+            if (version != observedSessionVersion_)
+            {
+                observedSessionVersion_ = version;
+                RefreshDebugSelection_();
+
+                if (overlay_)
+                    InvalidateRect(
+                        overlay_,
+                        nullptr,
+                        FALSE);
+            }
+        }
+
         UpdateCamera_();
     }
 

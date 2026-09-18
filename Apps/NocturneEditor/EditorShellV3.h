@@ -42,6 +42,10 @@ namespace nocturne::editor
         void SyncSceneSelection();
         void RefreshInspector();
 
+        // MainLoop message-filter seam: handles editor accelerators before
+        // focused child HWNDs consume them.
+        [[nodiscard]] bool FilterMessage(const MSG& message);
+
     private:
         enum ControlId : int
         {
@@ -82,7 +86,11 @@ namespace nocturne::editor
             IdMenuBuild,
             IdMenuSelect,
             IdMenuActor,
-            IdMenuHelp
+            IdMenuHelp,
+
+            IdActorCreate = 9101,
+            IdActorDuplicate,
+            IdActorDelete
         };
 
         struct Panel
@@ -101,6 +109,11 @@ namespace nocturne::editor
         void HandleCommand_(int id);
         void ShowPopup_(int menuId, HWND anchor);
         void UpdateStatus_();
+
+        [[nodiscard]] bool ExecuteCreateEntity_();
+        [[nodiscard]] bool ExecuteDeleteSelection_();
+        [[nodiscard]] bool ExecuteDuplicateSelection_();
+        [[nodiscard]] bool HasTextInputFocus_() const;
 
         std::wstring ResolveContentRoot_(const std::wstring& configured) const;
         static std::wstring Utf8ToWide_(const char* text);
@@ -128,6 +141,7 @@ namespace nocturne::editor
 
         HMENU fileMenu_ = nullptr;
         HMENU buildMenu_ = nullptr;
+        HMENU actorMenu_ = nullptr;
 
         Panel scene_;
         Panel viewport_;

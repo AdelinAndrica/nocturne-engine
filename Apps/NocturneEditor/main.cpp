@@ -88,12 +88,23 @@ int main()
     // frame hook lets the editor consume accumulated viewport input exactly once
     // per engine frame before World::Update(), without a second editor loop.
     noc::MainLoop loop;
-    loop.Run(engine, window,
+    loop.Run(
+        engine,
+        window,
         [](void* userData)
         {
-            static_cast<nocturne::editor::EditorViewportController*>(userData)->TickFrame();
+            static_cast<
+                nocturne::editor::EditorViewportController*>(
+                    userData)->TickFrame();
         },
-        &viewport);
+        &viewport,
+        [](void* userData, const MSG& message)
+        {
+            return static_cast<
+                nocturne::editor::EditorShellV3*>(
+                    userData)->FilterMessage(message);
+        },
+        &shell);
 
     viewport.Shutdown();
     shell.Shutdown();
