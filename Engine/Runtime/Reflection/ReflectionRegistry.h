@@ -41,6 +41,7 @@ namespace noc
         DuplicateFunctionParameterName,
         UnknownFunctionParameterType,
         UnknownFunctionReturnType,
+        InvalidComponentMetadata,
         AllocationFailure,
         ValidationFailure
     };
@@ -74,6 +75,7 @@ namespace noc
         case ReflectionRegistryError::DuplicateFunctionParameterName: return "DuplicateFunctionParameterName";
         case ReflectionRegistryError::UnknownFunctionParameterType: return "UnknownFunctionParameterType";
         case ReflectionRegistryError::UnknownFunctionReturnType: return "UnknownFunctionReturnType";
+        case ReflectionRegistryError::InvalidComponentMetadata: return "InvalidComponentMetadata";
         case ReflectionRegistryError::AllocationFailure: return "AllocationFailure";
         case ReflectionRegistryError::ValidationFailure: return "ValidationFailure";
         }
@@ -148,6 +150,10 @@ namespace noc
         [[nodiscard]] const FunctionMetadata* FindFunctionByName(
             TypeId ownerTypeId,
             const char* canonicalName) const noexcept;
+
+        [[nodiscard]] uint32_t ComponentTypeCount() const noexcept;
+        [[nodiscard]] const TypeMetadata* ComponentTypeAt(
+            uint32_t componentIndex) const noexcept;
 
     private:
         struct Impl;

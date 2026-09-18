@@ -11,6 +11,8 @@
 
 namespace noc
 {
+    class World;
+    struct EntityHandle;
     enum class TypeKind : uint8_t
     {
         Invalid = 0,
@@ -66,6 +68,14 @@ namespace noc
         Deprecated = 1u << 5
     };
 
+    enum class ComponentReflectionFlags : uint32_t
+    {
+        None = 0,
+        EditorAddable = 1u << 0,
+        EditorRemovable = 1u << 1,
+        Required = 1u << 2
+    };
+
     [[nodiscard]] constexpr TypeFlags operator|(TypeFlags a, TypeFlags b) noexcept
     {
         return static_cast<TypeFlags>(
@@ -103,6 +113,21 @@ namespace noc
     [[nodiscard]] constexpr bool HasFlag(
         FunctionFlags value,
         FunctionFlags flag) noexcept
+    {
+        return (static_cast<uint32_t>(value) & static_cast<uint32_t>(flag)) != 0;
+    }
+
+    [[nodiscard]] constexpr ComponentReflectionFlags operator|(
+        ComponentReflectionFlags a,
+        ComponentReflectionFlags b) noexcept
+    {
+        return static_cast<ComponentReflectionFlags>(
+            static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
+    }
+
+    [[nodiscard]] constexpr bool HasFlag(
+        ComponentReflectionFlags value,
+        ComponentReflectionFlags flag) noexcept
     {
         return (static_cast<uint32_t>(value) & static_cast<uint32_t>(flag)) != 0;
     }
@@ -376,6 +401,30 @@ namespace noc
         FunctionInvokeFn invoke = nullptr;
     };
 
+    using ComponentHasFn =
+        bool (*)(const World& world, EntityHandle entity);
+    using ComponentAddFn =
+        bool (*)(World& world, EntityHandle entity);
+    using ComponentRemoveFn =
+        bool (*)(World& world, EntityHandle entity);
+    using ComponentGetConstFn =
+        const void* (*)(const World& world, EntityHandle entity);
+    using ComponentGetMutableFn =
+        void* (*)(World& world, EntityHandle entity);
+
+    struct ComponentMetadata
+    {
+        ComponentReflectionFlags flags = ComponentReflectionFlags::None;
+        ComponentHasFn has = nullptr;
+        ComponentAddFn add = nullptr;
+        ComponentRemoveFn remove = nullptr;
+        ComponentGetConstFn getConst = nullptr;
+
+        // Mutable raw access is optional and intentionally null for foundation
+        // components whose authoring mutations must pass through semantic APIs.
+        ComponentGetMutableFn getMutable = nullptr;
+    };
+
     template <typename Enum>
     [[nodiscard]] constexpr EnumValueMetadata MakeEnumValueMetadata(
         EnumValueId valueId,
@@ -577,6 +626,7 @@ namespace noc
 
         const EnumMetadata* enumMetadata = nullptr;
         const ContainerMetadata* containerMetadata = nullptr;
+        const ComponentMetadata* componentMetadata = nullptr;
     };
 
     template <typename T>
@@ -602,6 +652,7 @@ namespace noc
             0,
             nullptr,
             0,
+            nullptr,
             nullptr,
             nullptr
         };

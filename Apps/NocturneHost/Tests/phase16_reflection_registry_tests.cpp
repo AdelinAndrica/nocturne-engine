@@ -3,6 +3,9 @@
 #include "Runtime/Reflection/ReflectedValue.h"
 #include "Runtime/Reflection/PropertyAccess.h"
 #include "Runtime/Reflection/FunctionInvocation.h"
+#include "Runtime/Reflection/ComponentReflection.h"
+#include "Runtime/Reflection/FoundationComponents.h"
+#include "Runtime/World.h"
 
 #include "Core/Math/MathTypes.h"
 #include "Runtime/Bounds.h"
@@ -844,6 +847,121 @@ bool RunPhase16ReflectionRegistryTests()
     ok &= CheckReflectionRegistry(
         allocator.OutstandingBytes() == 0,
         "Invalid enum Freeze path leaked allocator memory");
+
+    {
+        noc::ReflectionRegistry componentRegistry;
+        ok &= CheckReflectionRegistry(
+            componentRegistry.Init(allocator, 4),
+            "Component reflection registry init failed");
+        ok &= CheckReflectionRegistry(
+            noc::RegisterFoundationComponentReflectionTypes(
+                componentRegistry),
+            "Foundation component reflection registration failed");
+        ok &= CheckReflectionRegistry(
+            componentRegistry.Freeze(),
+            "Foundation component reflection Freeze failed");
+
+        ok &= CheckReflectionRegistry(
+            componentRegistry.ComponentTypeCount() == 4,
+            "Foundation reflected component count mismatch");
+
+        const noc::TypeMetadata* transformType =
+            componentRegistry.ComponentTypeAt(0);
+        const noc::TypeMetadata* nameType =
+            componentRegistry.ComponentTypeAt(3);
+
+        ok &= CheckReflectionRegistry(
+            transformType
+                && transformType->typeId.value
+                    == noc::kTransformComponentTypeId.value
+                && transformType->componentMetadata
+                && noc::HasFlag(
+                    transformType->componentMetadata->flags,
+                    noc::ComponentReflectionFlags::EditorAddable),
+            "Transform reflected component metadata mismatch");
+        ok &= CheckReflectionRegistry(
+            nameType
+                && nameType->typeId.value
+                    == noc::kNameComponentTypeId.value,
+            "Component reflection enumeration is not deterministic");
+
+        noc::World componentWorld;
+        ok &= CheckReflectionRegistry(
+            componentWorld.Init(allocator),
+            "Component reflection test World init failed");
+
+        const noc::EntityHandle componentEntity =
+            componentWorld.CreateEntity();
+        ok &= CheckReflectionRegistry(
+            componentEntity.IsValid()
+                && noc::ReflectedComponentCountForEntity(
+                    componentRegistry,
+                    componentWorld,
+                    componentEntity) == 0,
+            "Fresh entity reflected component membership mismatch");
+
+        ok &= CheckReflectionRegistry(
+            transformType->componentMetadata->add(
+                componentWorld,
+                componentEntity),
+            "Generic reflected Transform add failed");
+        ok &= CheckReflectionRegistry(
+            nameType->componentMetadata->add(
+                componentWorld,
+                componentEntity),
+            "Generic reflected Name add failed");
+
+        ok &= CheckReflectionRegistry(
+            noc::ReflectedComponentCountForEntity(
+                componentRegistry,
+                componentWorld,
+                componentEntity) == 2,
+            "Generic reflected component enumeration failed");
+
+        const noc::TypeMetadata* entityComponent0 =
+            noc::ReflectedComponentAtForEntity(
+                componentRegistry,
+                componentWorld,
+                componentEntity,
+                0);
+        const noc::TypeMetadata* entityComponent1 =
+            noc::ReflectedComponentAtForEntity(
+                componentRegistry,
+                componentWorld,
+                componentEntity,
+                1);
+
+        ok &= CheckReflectionRegistry(
+            entityComponent0
+                && entityComponent0->typeId.value
+                    == noc::kTransformComponentTypeId.value
+                && entityComponent1
+                && entityComponent1->typeId.value
+                    == noc::kNameComponentTypeId.value,
+            "Per-entity reflected component order mismatch");
+
+        ok &= CheckReflectionRegistry(
+            transformType->componentMetadata->getConst(
+                componentWorld,
+                componentEntity) != nullptr,
+            "Generic reflected component const access failed");
+
+        ok &= CheckReflectionRegistry(
+            nameType->componentMetadata->remove(
+                componentWorld,
+                componentEntity)
+                && !nameType->componentMetadata->has(
+                    componentWorld,
+                    componentEntity),
+            "Generic reflected Name remove failed");
+
+        componentWorld.Shutdown();
+        componentRegistry.Shutdown();
+
+        ok &= CheckReflectionRegistry(
+            allocator.OutstandingBytes() == 0,
+            "Component reflection test leaked allocator memory");
+    }
 
     {
         noc::ReflectionRegistry functionRegistry;

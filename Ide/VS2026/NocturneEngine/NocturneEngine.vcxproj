@@ -116,6 +116,10 @@
     <ClInclude Include="..\..\..\Engine\Runtime\Frustum.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\MainLoop.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Reflection\BuiltinTypes.h" />
+    <ClInclude Include="..\..\..\Engine\Runtime\Reflection\PropertyAccess.h" />
+    <ClInclude Include="..\..\..\Engine\Runtime\Reflection\FunctionInvocation.h" />
+    <ClInclude Include="..\..\..\Engine\Runtime\Reflection\FoundationComponents.h" />
+    <ClInclude Include="..\..\..\Engine\Runtime\Reflection\ComponentReflection.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Reflection\ReflectionIds.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Reflection\ReflectionMetadata.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Reflection\ReflectionRegistry.h" />
@@ -166,6 +170,7 @@
     <ClCompile Include="..\..\..\Engine\Resources\VirtualFileSystem.cpp" />
     <ClCompile Include="..\..\..\Engine\Resources\VPath.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\ComponentRegistry.cpp" />
+    <ClCompile Include="..\..\..\Engine\Runtime\Reflection\FoundationComponents.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\Reflection\ReflectionRegistry.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\EntityRegistry.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\CameraSystem.cpp" />

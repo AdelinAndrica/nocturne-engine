@@ -324,6 +324,29 @@ namespace noc
             return ReflectionRegistryError::None;
         }
 
+        [[nodiscard]] ReflectionRegistryError ValidateComponentIntrinsic(
+            const TypeMetadata& metadata) noexcept
+        {
+            if (metadata.kind != TypeKind::Component)
+            {
+                return metadata.componentMetadata == nullptr
+                    ? ReflectionRegistryError::None
+                    : ReflectionRegistryError::InvalidComponentMetadata;
+            }
+
+            const ComponentMetadata* component = metadata.componentMetadata;
+            if (!component
+                || !component->has
+                || !component->add
+                || !component->remove
+                || !component->getConst)
+            {
+                return ReflectionRegistryError::InvalidComponentMetadata;
+            }
+
+            return ReflectionRegistryError::None;
+        }
+
         [[nodiscard]] ReflectionRegistryError ValidateTypeIntrinsic(
             const TypeMetadata& metadata) noexcept
         {
@@ -392,7 +415,12 @@ namespace noc
             if (enumError != ReflectionRegistryError::None)
                 return enumError;
 
-            return ValidateContainerIntrinsic(metadata);
+            const ReflectionRegistryError containerError =
+                ValidateContainerIntrinsic(metadata);
+            if (containerError != ReflectionRegistryError::None)
+                return containerError;
+
+            return ValidateComponentIntrinsic(metadata);
         }
 
         [[nodiscard]] char* CopyString(
@@ -485,6 +513,14 @@ namespace noc
             IAllocator& allocator,
             TypeMetadata& metadata)
         {
+            if (metadata.componentMetadata)
+            {
+                auto* component =
+                    const_cast<ComponentMetadata*>(metadata.componentMetadata);
+                component->~ComponentMetadata();
+                allocator.Deallocate(component);
+                metadata.componentMetadata = nullptr;
+            }
             if (metadata.functions)
             {
                 auto* functions =
@@ -602,6 +638,7 @@ namespace noc
             destination.functionCount = 0;
             destination.enumMetadata = nullptr;
             destination.containerMetadata = nullptr;
+            destination.componentMetadata = nullptr;
 
             destination.canonicalName =
                 CopyString(allocator, source.canonicalName);
@@ -658,6 +695,22 @@ namespace noc
                         return false;
                     }
                 }
+            }
+
+            if (source.componentMetadata)
+            {
+                auto* component = static_cast<ComponentMetadata*>(
+                    allocator.Allocate(
+                        sizeof(ComponentMetadata),
+                        alignof(ComponentMetadata)));
+                if (!component)
+                {
+                    DestroyOwnedMetadata(allocator, destination);
+                    return false;
+                }
+
+                new (component) ComponentMetadata(*source.componentMetadata);
+                destination.componentMetadata = component;
             }
 
             if (source.functionCount > 0)
@@ -1284,6 +1337,41 @@ namespace noc
             if (type->functions[i].functionId == functionId)
                 return &type->functions[i];
         }
+        return nullptr;
+    }
+
+    uint32_t ReflectionRegistry::ComponentTypeCount() const noexcept
+    {
+        if (!impl_)
+            return 0;
+
+        uint32_t count = 0;
+        for (uint32_t i = 0; i < impl_->count; ++i)
+        {
+            if (impl_->entries[i].metadata.kind == TypeKind::Component)
+                ++count;
+        }
+        return count;
+    }
+
+    const TypeMetadata* ReflectionRegistry::ComponentTypeAt(
+        uint32_t componentIndex) const noexcept
+    {
+        if (!impl_)
+            return nullptr;
+
+        uint32_t seen = 0;
+        for (uint32_t i = 0; i < impl_->count; ++i)
+        {
+            const TypeMetadata& metadata = impl_->entries[i].metadata;
+            if (metadata.kind != TypeKind::Component)
+                continue;
+
+            if (seen == componentIndex)
+                return &metadata;
+            ++seen;
+        }
+
         return nullptr;
     }
 
