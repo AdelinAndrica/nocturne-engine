@@ -193,6 +193,48 @@ namespace nocturne::editor
         ReflectedComponentSnapshot snapshot_;
     };
 
+    // Design choice (not directly from the book): gizmo/world-space authoring
+    // records the full local TRS atomically because a world-space edit can
+    // legitimately change more than one local field after parent-space
+    // conversion and decomposition.
+    class SetTransformTRSCommand final : public IEditorCommand
+    {
+    public:
+        [[nodiscard]] bool InitExplicit(
+            EditorCommandContext& context,
+            noc::EntityHandle entity,
+            const noc::Vec3& oldTranslation,
+            const noc::Quat& oldRotation,
+            const noc::Vec3& oldScale,
+            const noc::Vec3& newTranslation,
+            const noc::Quat& newRotation,
+            const noc::Vec3& newScale);
+
+        [[nodiscard]] const char* Label() const noexcept override;
+        [[nodiscard]] std::size_t MemoryCostBytes() const noexcept override;
+
+        [[nodiscard]] bool Execute(EditorCommandContext& context) override;
+        [[nodiscard]] bool Undo(EditorCommandContext& context) override;
+        [[nodiscard]] bool Redo(EditorCommandContext& context) override;
+
+    private:
+        [[nodiscard]] bool Apply_(
+            EditorCommandContext& context,
+            const noc::Vec3& translation,
+            const noc::Quat& rotation,
+            const noc::Vec3& scale);
+
+        noc::EntityHandle entity_{};
+
+        noc::Vec3 oldTranslation_{};
+        noc::Quat oldRotation_ = noc::Quat::Identity();
+        noc::Vec3 oldScale_ = noc::Vec3::One();
+
+        noc::Vec3 newTranslation_{};
+        noc::Quat newRotation_ = noc::Quat::Identity();
+        noc::Vec3 newScale_ = noc::Vec3::One();
+    };
+
     class SetReflectedPropertyCommand final : public IEditorCommand
     {
     public:

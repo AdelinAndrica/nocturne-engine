@@ -633,6 +633,104 @@ namespace nocturne::editor
                 entity_);
     }
 
+    bool SetTransformTRSCommand::InitExplicit(
+        EditorCommandContext& context,
+        noc::EntityHandle entity,
+        const noc::Vec3& oldTranslation,
+        const noc::Quat& oldRotation,
+        const noc::Vec3& oldScale,
+        const noc::Vec3& newTranslation,
+        const noc::Quat& newRotation,
+        const noc::Vec3& newScale)
+    {
+        if (entity_.IsValid()
+            || !context.world.IsAlive(entity)
+            || context.IsToolOwned(entity)
+            || !context.world.HasTransform(entity)
+            || !noc::IsFiniteMath(oldTranslation)
+            || !noc::IsFiniteMath(oldRotation)
+            || !noc::IsFiniteMath(oldScale)
+            || !noc::IsFiniteMath(newTranslation)
+            || !noc::IsFiniteMath(newRotation)
+            || !noc::IsFiniteMath(newScale))
+        {
+            return false;
+        }
+
+        entity_ = entity;
+
+        oldTranslation_ = oldTranslation;
+        oldRotation_ = oldRotation;
+        oldScale_ = oldScale;
+
+        newTranslation_ = newTranslation;
+        newRotation_ = newRotation;
+        newScale_ = newScale;
+        return true;
+    }
+
+    const char* SetTransformTRSCommand::Label() const noexcept
+    {
+        return "Transform Entity";
+    }
+
+    std::size_t SetTransformTRSCommand::MemoryCostBytes() const noexcept
+    {
+        return sizeof(*this);
+    }
+
+    bool SetTransformTRSCommand::Execute(
+        EditorCommandContext& context)
+    {
+        return Apply_(
+            context,
+            newTranslation_,
+            newRotation_,
+            newScale_);
+    }
+
+    bool SetTransformTRSCommand::Undo(
+        EditorCommandContext& context)
+    {
+        return Apply_(
+            context,
+            oldTranslation_,
+            oldRotation_,
+            oldScale_);
+    }
+
+    bool SetTransformTRSCommand::Redo(
+        EditorCommandContext& context)
+    {
+        return Execute(context);
+    }
+
+    bool SetTransformTRSCommand::Apply_(
+        EditorCommandContext& context,
+        const noc::Vec3& translation,
+        const noc::Quat& rotation,
+        const noc::Vec3& scale)
+    {
+        if (!context.world.IsAlive(entity_)
+            || context.IsToolOwned(entity_)
+            || !context.world.HasTransform(entity_))
+        {
+            return false;
+        }
+
+        if (!context.world.SetLocalTRS(
+                entity_,
+                translation,
+                rotation,
+                scale))
+        {
+            return false;
+        }
+
+        context.world.Update();
+        return true;
+    }
+
     bool SetReflectedPropertyCommand::Init(
         EditorCommandContext& context,
         noc::EntityHandle entity,

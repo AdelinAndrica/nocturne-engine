@@ -360,6 +360,100 @@ bool RunPhase16EditorSessionTests()
     {
         session.History().Clear();
 
+        const noc::TransformComponent* beforeAtomic =
+            world.GetTransform(authored);
+        const noc::Vec3 oldT =
+            beforeAtomic->localTranslation;
+        const noc::Quat oldR =
+            beforeAtomic->localRotation;
+        const noc::Vec3 oldS =
+            beforeAtomic->localScale;
+
+        const noc::Vec3 newT{ 4.0f, -2.0f, 8.0f };
+        const noc::Quat newR{
+            0.0f,
+            std::sin(0.25f),
+            0.0f,
+            std::cos(0.25f)
+        };
+        const noc::Vec3 newS{ 1.25f, 0.75f, 1.5f };
+
+        auto transformCommand =
+            std::make_unique<
+                nocturne::editor::SetTransformTRSCommand>();
+
+        ok &= CheckEditorSession(
+            transformCommand->InitExplicit(
+                context,
+                authored,
+                oldT,
+                oldR,
+                oldS,
+                newT,
+                newR,
+                newS)
+                && session.History().Execute(
+                    context,
+                    std::move(transformCommand)),
+            "Atomic transform command execute failed");
+
+        const noc::TransformComponent* transformed =
+            world.GetTransform(authored);
+
+        ok &= CheckEditorSession(
+            transformed
+                && transformed->localTranslation.x == newT.x
+                && transformed->localTranslation.y == newT.y
+                && transformed->localTranslation.z == newT.z
+                && transformed->localRotation.y == newR.y
+                && transformed->localRotation.w == newR.w
+                && transformed->localScale.x == newS.x
+                && transformed->localScale.y == newS.y
+                && transformed->localScale.z == newS.z
+                && session.History().CommandCount() == 1,
+            "Atomic transform command did not apply full local TRS");
+
+        ok &= CheckEditorSession(
+            session.History().Undo(context),
+            "Atomic transform command undo failed");
+
+        const noc::TransformComponent* restored =
+            world.GetTransform(authored);
+
+        ok &= CheckEditorSession(
+            restored
+                && restored->localTranslation.x == oldT.x
+                && restored->localTranslation.y == oldT.y
+                && restored->localTranslation.z == oldT.z
+                && restored->localRotation.x == oldR.x
+                && restored->localRotation.y == oldR.y
+                && restored->localRotation.z == oldR.z
+                && restored->localRotation.w == oldR.w
+                && restored->localScale.x == oldS.x
+                && restored->localScale.y == oldS.y
+                && restored->localScale.z == oldS.z,
+            "Atomic transform command undo did not restore full local TRS");
+
+        ok &= CheckEditorSession(
+            session.History().Redo(context),
+            "Atomic transform command redo failed");
+
+        const noc::TransformComponent* redone =
+            world.GetTransform(authored);
+
+        ok &= CheckEditorSession(
+            redone
+                && redone->localTranslation.x == newT.x
+                && redone->localRotation.y == newR.y
+                && redone->localScale.z == newS.z,
+            "Atomic transform command redo did not restore final TRS");
+
+        session.History().Clear();
+    }
+
+    {
+        session.History().Clear();
+
         const noc::TransformComponent* before =
             world.GetTransform(authored);
         const noc::Vec3 liveOld =
