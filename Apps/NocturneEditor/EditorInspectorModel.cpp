@@ -228,6 +228,15 @@ namespace nocturne::editor
                         type->typeId,
                         type->canonicalName);
 
+                component.removable =
+                    type->componentMetadata
+                    && noc::HasFlag(
+                        type->componentMetadata->flags,
+                        noc::ComponentReflectionFlags::EditorRemovable)
+                    && !noc::HasFlag(
+                        type->componentMetadata->flags,
+                        noc::ComponentReflectionFlags::Required);
+
                 component.properties.reserve(
                     type->propertyCount);
 

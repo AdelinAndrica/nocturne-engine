@@ -27,6 +27,7 @@ namespace nocturne::editor
         noc::TypeId typeId{};
         std::string displayName;
         std::vector<InspectorPropertyView> properties;
+        bool removable = false;
     };
 
     // Generic reflection-driven Inspector data model. It stores IDs and display

@@ -37,6 +37,7 @@ namespace nocturne::editor
         constexpr wchar_t kScrollClass[] = L"NocturneV3Scroll";
         constexpr UINT WM_NOC_V3_ACTIVE = WM_APP + 0x310;
         constexpr UINT WM_NOC_V3_SCROLL = WM_APP + 0x311;
+        constexpr UINT WM_NOC_V3_INSPECTOR_REFRESH = WM_APP + 0x312;
         constexpr WORD kTreeSelectionChanged = 0x7F01;
 
         enum class Icon
@@ -958,7 +959,16 @@ namespace nocturne::editor
         auto makeBody = [&](int id = 0) { return CreateWindowExW(0, L"STATIC", L"", WS_CHILD | WS_VISIBLE | SS_OWNERDRAW, 0,0,0,0, hwnd_, id ? reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)) : nullptr, GetModuleHandleW(nullptr), nullptr); };
         scene_.header = MakeHeader(hwnd_, L"Scene Hierarchy", Icon::Hierarchy, uiBold_); sceneTree_ = MakeTree(hwnd_, IdSceneTree, uiFont_); scene_.body = sceneTree_;
         viewport_.header = MakeHeader(hwnd_, L"Viewport", Icon::Viewport, uiBold_); viewport_.body = makeBody(); viewportPerspective_ = MakeButton(hwnd_, IdViewportPerspective, L"Perspective", Icon::None, ButtonKind::Tool, uiFont_); viewportLit_ = MakeButton(hwnd_, IdViewportLit, L"Lit", Icon::None, ButtonKind::Neutral, uiFont_); viewportShow_ = MakeButton(hwnd_, IdViewportShow, L"Show", Icon::None, ButtonKind::Neutral, uiFont_); ButtonActive(viewportPerspective_, true);
-        inspector_.header = MakeHeader(hwnd_, L"Inspector / Properties", Icon::Inspector, uiBold_); inspector_.body = makeBody(IdInspector);
+        inspector_.header = MakeHeader(hwnd_, L"Inspector / Properties", Icon::Inspector, uiBold_);
+        inspector_.body = makeBody(IdInspector);
+        inspectorAddComponent_ = MakeButton(
+            hwnd_,
+            IdInspectorAddComponent,
+            L"+ Add Component",
+            Icon::None,
+            ButtonKind::Neutral,
+            uiFont_);
+        ShowWindow(inspectorAddComponent_, SW_HIDE);
         content_.header = MakeHeader(hwnd_, L"Content Browser", Icon::Folder, uiBold_); content_.body = makeBody();
         contentSearch_ = CreateWindowExW(0, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 0,0,0,0, hwnd_, reinterpret_cast<HMENU>(IdContentSearch), GetModuleHandleW(nullptr), nullptr); SendMessageW(contentSearch_, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont_), FALSE); SendMessageW(contentSearch_, EM_SETCUEBANNER, TRUE, reinterpret_cast<LPARAM>(L"Search Assets..."));
         contentListMode_ = MakeButton(hwnd_, IdContentListMode, L"", Icon::List, ButtonKind::IconOnly, uiFont_); contentGridMode_ = MakeButton(hwnd_, IdContentGridMode, L"", Icon::Grid, ButtonKind::IconOnly, uiFont_); contentSettings_ = MakeButton(hwnd_, IdContentSettings, L"", Icon::Settings, ButtonKind::IconOnly, uiFont_); ButtonActive(contentListMode_, true);
@@ -1352,7 +1362,16 @@ namespace nocturne::editor
             binding.hwnd = nullptr;
         }
 
+        for (InspectorComponentActionBinding& binding :
+             inspectorRemoveButtons_)
+        {
+            if (binding.hwnd)
+                DestroyWindow(binding.hwnd);
+            binding.hwnd = nullptr;
+        }
+
         inspectorEdits_.clear();
+        inspectorRemoveButtons_.clear();
         inspectorControlsRefreshing_ = false;
     }
 
@@ -1368,9 +1387,14 @@ namespace nocturne::editor
         }
 
         size_t editableCount = 0;
+        size_t removableCount = 0;
+
         for (const InspectorComponentView& component :
              inspectorModel_.Components())
         {
+            if (component.removable)
+                ++removableCount;
+
             for (const InspectorPropertyView& property :
                  component.properties)
             {
@@ -1382,6 +1406,7 @@ namespace nocturne::editor
         try
         {
             inspectorEdits_.reserve(editableCount);
+            inspectorRemoveButtons_.reserve(removableCount);
         }
         catch (const std::bad_alloc&)
         {
@@ -1391,6 +1416,51 @@ namespace nocturne::editor
         for (const InspectorComponentView& component :
              inspectorModel_.Components())
         {
+            if (component.removable)
+            {
+                const size_t removeIndex =
+                    inspectorRemoveButtons_.size();
+
+                if (removeIndex
+                    > static_cast<size_t>(
+                        0xFFFF - IdInspectorRemoveBase))
+                {
+                    DestroyInspectorControls_();
+                    return false;
+                }
+
+                HWND removeButton = MakeButton(
+                    hwnd_,
+                    IdInspectorRemoveBase
+                        + static_cast<int>(removeIndex),
+                    L"Remove",
+                    Icon::None,
+                    ButtonKind::Neutral,
+                    smallFont_);
+
+                if (!removeButton)
+                {
+                    DestroyInspectorControls_();
+                    return false;
+                }
+
+                ShowWindow(removeButton, SW_HIDE);
+
+                try
+                {
+                    inspectorRemoveButtons_.push_back({
+                        removeButton,
+                        component.typeId
+                    });
+                }
+                catch (const std::bad_alloc&)
+                {
+                    DestroyWindow(removeButton);
+                    DestroyInspectorControls_();
+                    return false;
+                }
+            }
+
             for (const InspectorPropertyView& property :
                  component.properties)
             {
@@ -1513,12 +1583,59 @@ namespace nocturne::editor
         const int labelWidth =
             (std::max)(95, bodyWidth * 42 / 100);
 
+        if (inspectorAddComponent_)
+        {
+            MoveWindow(
+                inspectorAddComponent_,
+                bodyLeft + 12,
+                bodyTop + (std::max)(0, bodyHeight - 35),
+                (std::max)(60, bodyWidth - 24),
+                28,
+                TRUE);
+            ShowWindow(
+                inspectorAddComponent_,
+                inspectorModel_.Entity().IsValid()
+                    ? SW_SHOW
+                    : SW_HIDE);
+        }
+
         size_t bindingIndex = 0;
+        size_t removeIndex = 0;
         int y = 43;
 
         for (const InspectorComponentView& component :
              inspectorModel_.Components())
         {
+            if (component.removable)
+            {
+                if (removeIndex
+                    < inspectorRemoveButtons_.size())
+                {
+                    HWND button =
+                        inspectorRemoveButtons_[removeIndex].hwnd;
+
+                    if (button)
+                    {
+                        MoveWindow(
+                            button,
+                            bodyLeft
+                                + (std::max)(8, bodyWidth - 70),
+                            bodyTop + y + 2,
+                            58,
+                            22,
+                            TRUE);
+
+                        ShowWindow(
+                            button,
+                            y + 26 <= bodyHeight - 40
+                                ? SW_SHOW
+                                : SW_HIDE);
+                    }
+                }
+
+                ++removeIndex;
+            }
+
             y += 31;
 
             for (const InspectorPropertyView& property :
@@ -1551,7 +1668,7 @@ namespace nocturne::editor
 
                         const bool visible =
                             y >= 0
-                            && y + 24 <= bodyHeight;
+                            && y + 24 <= bodyHeight - 40;
 
                         ShowWindow(
                             edit,
@@ -1584,6 +1701,19 @@ namespace nocturne::editor
     EditorShellV3::FindInspectorEdit_(HWND source) const noexcept
     {
         for (const InspectorEditBinding& binding : inspectorEdits_)
+        {
+            if (binding.hwnd == source)
+                return &binding;
+        }
+
+        return nullptr;
+    }
+
+    EditorShellV3::InspectorComponentActionBinding*
+    EditorShellV3::FindInspectorRemoveButton_(HWND source) noexcept
+    {
+        for (InspectorComponentActionBinding& binding :
+             inspectorRemoveButtons_)
         {
             if (binding.hwnd == source)
                 return &binding;
@@ -1796,6 +1926,240 @@ namespace nocturne::editor
             message,
             wParam,
             lParam);
+    }
+
+    bool EditorShellV3::ExecuteAddComponent_(
+        noc::TypeId componentTypeId)
+    {
+        if (!session_)
+            return false;
+
+        const noc::EntityHandle entity =
+            session_->SelectedEntity();
+        if (!entity.IsValid())
+            return false;
+
+        auto context =
+            session_->CommandContext();
+
+        try
+        {
+            auto command =
+                std::make_unique<AddComponentCommand>();
+
+            if (!command->Init(
+                    context,
+                    entity,
+                    componentTypeId)
+                || !session_->History().Execute(
+                    context,
+                    std::move(command)))
+            {
+                AppendConsole_(
+                    L"Add Component failed.");
+                return false;
+            }
+        }
+        catch (const std::bad_alloc&)
+        {
+            AppendConsole_(
+                L"Add Component failed: allocation failure.");
+            return false;
+        }
+
+        session_->SetSceneDirty();
+        PopulateScene_();
+        PostMessageW(
+            hwnd_,
+            WM_NOC_V3_INSPECTOR_REFRESH,
+            0,
+            0);
+        UpdateStatus_();
+        AppendConsole_(L"Component added.");
+        return true;
+    }
+
+    bool EditorShellV3::ExecuteRemoveComponent_(
+        noc::TypeId componentTypeId)
+    {
+        if (!session_)
+            return false;
+
+        const noc::EntityHandle entity =
+            session_->SelectedEntity();
+        if (!entity.IsValid())
+            return false;
+
+        auto context =
+            session_->CommandContext();
+
+        try
+        {
+            auto command =
+                std::make_unique<RemoveComponentCommand>();
+
+            if (!command->Init(
+                    context,
+                    entity,
+                    componentTypeId)
+                || !session_->History().Execute(
+                    context,
+                    std::move(command)))
+            {
+                AppendConsole_(
+                    L"Remove Component failed.");
+                return false;
+            }
+        }
+        catch (const std::bad_alloc&)
+        {
+            AppendConsole_(
+                L"Remove Component failed: allocation failure.");
+            return false;
+        }
+
+        session_->SetSceneDirty();
+        PopulateScene_();
+        PostMessageW(
+            hwnd_,
+            WM_NOC_V3_INSPECTOR_REFRESH,
+            0,
+            0);
+        UpdateStatus_();
+        AppendConsole_(L"Component removed.");
+        return true;
+    }
+
+    void EditorShellV3::ShowAddComponentPopup_()
+    {
+        if (!engine_
+            || !session_
+            || !inspectorAddComponent_)
+        {
+            return;
+        }
+
+        const noc::EntityHandle entity =
+            session_->SelectedEntity();
+        if (!entity.IsValid())
+            return;
+
+        const noc::ReflectionRegistry& reflection =
+            engine_->Reflection();
+        noc::World& world =
+            engine_->GetWorld();
+
+        std::vector<noc::TypeId> candidates;
+
+        try
+        {
+            candidates.reserve(
+                reflection.ComponentTypeCount());
+        }
+        catch (const std::bad_alloc&)
+        {
+            AppendConsole_(
+                L"Add Component menu allocation failed.");
+            return;
+        }
+
+        HMENU menu = CreatePopupMenu();
+        if (!menu)
+            return;
+
+        for (uint32_t i = 0;
+             i < reflection.ComponentTypeCount();
+             ++i)
+        {
+            const noc::TypeMetadata* type =
+                reflection.ComponentTypeAt(i);
+
+            if (!type
+                || !type->componentMetadata
+                || !noc::HasFlag(
+                    type->componentMetadata->flags,
+                    noc::ComponentReflectionFlags::EditorAddable)
+                || type->componentMetadata->has(
+                    world,
+                    entity))
+            {
+                continue;
+            }
+
+            try
+            {
+                candidates.push_back(
+                    type->typeId);
+            }
+            catch (const std::bad_alloc&)
+            {
+                DestroyMenu(menu);
+                AppendConsole_(
+                    L"Add Component menu allocation failed.");
+                return;
+            }
+
+            const noc::AttributeMetadata* display =
+                reflection.FindTypeAttribute(
+                    type->typeId,
+                    noc::AttributeKind::DisplayName);
+
+            const char* labelUtf8 =
+                display
+                && display->valueKind
+                    == noc::AttributeValueKind::String
+                && display->stringValue
+                    ? display->stringValue
+                    : type->canonicalName;
+
+            const std::wstring label =
+                Utf8ToWide_(labelUtf8);
+
+            AppendMenuW(
+                menu,
+                MF_STRING,
+                static_cast<UINT_PTR>(
+                    candidates.size()),
+                label.empty()
+                    ? L"Unnamed Component"
+                    : label.c_str());
+        }
+
+        if (candidates.empty())
+        {
+            AppendMenuW(
+                menu,
+                MF_STRING | MF_GRAYED,
+                0,
+                L"No addable components");
+        }
+
+        RECT buttonRect{};
+        GetWindowRect(
+            inspectorAddComponent_,
+            &buttonRect);
+
+        const int command =
+            TrackPopupMenuEx(
+                menu,
+                TPM_RETURNCMD
+                    | TPM_LEFTALIGN
+                    | TPM_TOPALIGN,
+                buttonRect.left,
+                buttonRect.bottom + 2,
+                hwnd_,
+                nullptr);
+
+        if (command > 0
+            && static_cast<size_t>(command)
+                <= candidates.size())
+        {
+            (void)ExecuteAddComponent_(
+                candidates[
+                    static_cast<size_t>(command - 1)]);
+        }
+
+        DestroyMenu(menu);
     }
 
     bool EditorShellV3::BeginRenameSelection_()
@@ -2296,6 +2660,29 @@ namespace nocturne::editor
             const int notification = HIWORD(wParam);
             HWND source = reinterpret_cast<HWND>(lParam);
 
+            if (id == IdInspectorAddComponent)
+            {
+                ShowAddComponentPopup_();
+                result = 0;
+                return true;
+            }
+
+            if (source)
+            {
+                InspectorComponentActionBinding* removeBinding =
+                    FindInspectorRemoveButton_(source);
+
+                if (removeBinding)
+                {
+                    const noc::TypeId componentTypeId =
+                        removeBinding->componentTypeId;
+                    (void)ExecuteRemoveComponent_(
+                        componentTypeId);
+                    result = 0;
+                    return true;
+                }
+            }
+
             if (id == IdSceneTree
                 && notification == kTreeSelectionChanged
                 && session_)
@@ -2330,6 +2717,11 @@ namespace nocturne::editor
             }
             break;
         }
+        case WM_NOC_V3_INSPECTOR_REFRESH:
+            RefreshInspector();
+            result = 0;
+            return true;
+
         case WM_NOC_V3_SCROLL:
             if (static_cast<int>(wParam) == IdConsoleScroll && consoleEdit_) { const int target = static_cast<int>(lParam); const int current = static_cast<int>(SendMessageW(consoleEdit_, EM_GETFIRSTVISIBLELINE, 0, 0)); SendMessageW(consoleEdit_, EM_LINESCROLL, 0, target - current); result = 0; return true; } break;
         case WM_DRAWITEM:
@@ -2431,7 +2823,7 @@ namespace nocturne::editor
                 for (const InspectorComponentView& component :
                      inspectorModel_.Components())
                 {
-                    if (y >= rc.bottom - 20)
+                    if (y >= rc.bottom - 44)
                         break;
 
                     RECT componentRc{
@@ -2453,7 +2845,8 @@ namespace nocturne::editor
                     RECT componentText{
                         componentRc.left + 8,
                         componentRc.top,
-                        componentRc.right - 8,
+                        componentRc.right
+                            - (component.removable ? 70 : 8),
                         componentRc.bottom
                     };
                     DrawTextUi(
@@ -2470,7 +2863,7 @@ namespace nocturne::editor
                     for (const InspectorPropertyView& property :
                          component.properties)
                     {
-                        if (y >= rc.bottom - 20)
+                        if (y >= rc.bottom - 44)
                             break;
 
                         const std::wstring propertyName =
