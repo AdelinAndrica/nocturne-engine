@@ -6005,9 +6005,249 @@ namespace nocturne::editor
             }
             if (dis->hwndItem == status_)
             {
-                RECT rc=dis->rcItem; Fill(dis->hDC,rc,c.toolbarBg); Line(dis->hDC,0,0,static_cast<int>(rc.right),0,c.border); const int objects=engine_?static_cast<int>(engine_->GetWorld().AliveCount()):0; std::wstringstream ss;ss<<L"Objects: "<<objects;
-                RECT ready{16,0,130,rc.bottom};DrawTextUi(dis->hDC,L"● Ready",ready,c.success,smallFont_,DT_LEFT|DT_VCENTER|DT_SINGLELINE);RECT issues{138,0,250,rc.bottom};DrawTextUi(dis->hDC,L"✓ No Issues",issues,c.success,smallFont_,DT_LEFT|DT_VCENTER|DT_SINGLELINE);
-                RECT branch{270,0,rc.right-350,rc.bottom};DrawTextUi(dis->hDC,L"Branch: phase-13-editor-framework",branch,c.textMuted,smallFont_,DT_LEFT|DT_VCENTER|DT_SINGLELINE|DT_END_ELLIPSIS);const std::wstring objectText=ss.str();const int objectLeft=(std::max)(0,static_cast<int>(rc.right)-335);RECT objectRc{objectLeft,0,rc.right-220,rc.bottom};DrawTextUi(dis->hDC,objectText.c_str(),objectRc,c.textMuted,smallFont_,DT_LEFT|DT_VCENTER|DT_SINGLELINE);RECT engineRc{rc.right-205,0,rc.right-52,rc.bottom};DrawTextUi(dis->hDC,L"Nocturne Engine",engineRc,c.textPrimary,smallFont_,DT_RIGHT|DT_VCENTER|DT_SINGLELINE);RECT versionRc{rc.right-48,0,rc.right-10,rc.bottom};DrawTextUi(dis->hDC,L"v0.1.0",versionRc,c.textMuted,smallFont_,DT_RIGHT|DT_VCENTER|DT_SINGLELINE);result=TRUE;return true;
+                RECT rc = dis->rcItem;
+                Fill(dis->hDC, rc, c.toolbarBg);
+                Line(
+                    dis->hDC,
+                    0,
+                    0,
+                    static_cast<int>(rc.right),
+                    0,
+                    c.border);
+
+                const bool dirty =
+                    session_ && session_->SceneDirty();
+
+                RECT stateRc{
+                    16,
+                    0,
+                    112,
+                    rc.bottom
+                };
+                DrawTextUi(
+                    dis->hDC,
+                    dirty ? L"● Modified" : L"● Ready",
+                    stateRc,
+                    dirty ? c.warning : c.success,
+                    smallFont_,
+                    DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+
+                uint32_t authoredCount = 0;
+                if (engine_)
+                {
+                    const noc::World& world =
+                        engine_->GetWorld();
+
+                    authoredCount =
+                        world.AliveCount();
+
+                    if (session_)
+                    {
+                        const noc::EntityHandle toolCamera =
+                            session_->ToolCamera();
+
+                        if (toolCamera.IsValid()
+                            && world.IsAlive(toolCamera)
+                            && authoredCount > 0)
+                        {
+                            --authoredCount;
+                        }
+                    }
+                }
+
+                std::wstringstream selectionText;
+                selectionText << L"Sel: ";
+
+                if (session_)
+                {
+                    const noc::EntityHandle selected =
+                        session_->SelectedEntity();
+
+                    if (selected.IsValid())
+                    {
+                        selectionText
+                            << selected.index
+                            << L":"
+                            << selected.generation;
+                    }
+                    else
+                    {
+                        selectionText << L"None";
+                    }
+                }
+                else
+                {
+                    selectionText << L"None";
+                }
+
+                RECT selectionRc{
+                    120,
+                    0,
+                    270,
+                    rc.bottom
+                };
+                const std::wstring selection =
+                    selectionText.str();
+                DrawTextUi(
+                    dis->hDC,
+                    selection.c_str(),
+                    selectionRc,
+                    c.textMuted,
+                    smallFont_,
+                    DT_LEFT | DT_VCENTER
+                        | DT_SINGLELINE
+                        | DT_END_ELLIPSIS);
+
+                std::wstringstream historyText;
+                historyText << L"History: ";
+
+                if (session_)
+                {
+                    const EditorCommandHistory& history =
+                        session_->History();
+
+                    historyText
+                        << history.Cursor()
+                        << L"/"
+                        << history.CommandCount()
+                        << L"  "
+                        << history.UsedBytes()
+                        << L" B";
+                }
+                else
+                {
+                    historyText << L"0/0";
+                }
+
+                RECT historyRc{
+                    278,
+                    0,
+                    470,
+                    rc.bottom
+                };
+                const std::wstring history =
+                    historyText.str();
+                DrawTextUi(
+                    dis->hDC,
+                    history.c_str(),
+                    historyRc,
+                    c.textMuted,
+                    smallFont_,
+                    DT_LEFT | DT_VCENTER
+                        | DT_SINGLELINE
+                        | DT_END_ELLIPSIS);
+
+                const wchar_t* toolName = L"Select";
+                const wchar_t* orientationName = L"Local";
+
+                if (session_)
+                {
+                    switch (session_->ActiveTool())
+                    {
+                    case EditorTool::Move:
+                        toolName = L"Move";
+                        break;
+                    case EditorTool::Rotate:
+                        toolName = L"Rotate";
+                        break;
+                    case EditorTool::Scale:
+                        toolName = L"Scale";
+                        break;
+                    default:
+                        break;
+                    }
+
+                    orientationName =
+                        session_->Orientation()
+                                == TransformOrientation::World
+                            ? L"World"
+                            : L"Local";
+                }
+
+                std::wstringstream toolText;
+                toolText
+                    << L"Tool: "
+                    << toolName
+                    << L" / "
+                    << orientationName;
+
+                RECT toolRc{
+                    478,
+                    0,
+                    (std::max)(
+                        480,
+                        static_cast<int>(rc.right) - 360),
+                    rc.bottom
+                };
+                const std::wstring tool =
+                    toolText.str();
+                DrawTextUi(
+                    dis->hDC,
+                    tool.c_str(),
+                    toolRc,
+                    c.textMuted,
+                    smallFont_,
+                    DT_LEFT | DT_VCENTER
+                        | DT_SINGLELINE
+                        | DT_END_ELLIPSIS);
+
+                std::wstringstream entityText;
+                entityText
+                    << L"Authored: "
+                    << authoredCount;
+
+                const int entityLeft =
+                    (std::max)(
+                        0,
+                        static_cast<int>(rc.right) - 350);
+                RECT entityRc{
+                    entityLeft,
+                    0,
+                    rc.right - 222,
+                    rc.bottom
+                };
+                const std::wstring entities =
+                    entityText.str();
+                DrawTextUi(
+                    dis->hDC,
+                    entities.c_str(),
+                    entityRc,
+                    c.textMuted,
+                    smallFont_,
+                    DT_LEFT | DT_VCENTER
+                        | DT_SINGLELINE
+                        | DT_END_ELLIPSIS);
+
+                RECT engineRc{
+                    rc.right - 210,
+                    0,
+                    rc.right - 52,
+                    rc.bottom
+                };
+                DrawTextUi(
+                    dis->hDC,
+                    L"Nocturne Engine",
+                    engineRc,
+                    c.textPrimary,
+                    smallFont_,
+                    DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+
+                RECT versionRc{
+                    rc.right - 48,
+                    0,
+                    rc.right - 10,
+                    rc.bottom
+                };
+                DrawTextUi(
+                    dis->hDC,
+                    L"v0.1.0",
+                    versionRc,
+                    c.textMuted,
+                    smallFont_,
+                    DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+
+                result = TRUE;
+                return true;
             }
             break;
         }
