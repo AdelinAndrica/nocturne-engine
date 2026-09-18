@@ -286,6 +286,17 @@ namespace nocturne::editor
             }
             case WM_NCDESTROY:
                 delete state; SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0); return 0;
+            case WM_SETTEXT:
+                if (state)
+                {
+                    state->label =
+                        lParam
+                            ? reinterpret_cast<const wchar_t*>(lParam)
+                            : L"";
+                    InvalidateRect(hwnd, nullptr, FALSE);
+                    return TRUE;
+                }
+                break;
             case WM_SETFONT:
                 if (state) state->font = reinterpret_cast<HFONT>(wParam);
                 if (lParam) InvalidateRect(hwnd, nullptr, FALSE);
@@ -1230,7 +1241,22 @@ namespace nocturne::editor
     {
         auto makeBody = [&](int id = 0) { return CreateWindowExW(0, L"STATIC", L"", WS_CHILD | WS_VISIBLE | SS_OWNERDRAW, 0,0,0,0, hwnd_, id ? reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)) : nullptr, GetModuleHandleW(nullptr), nullptr); };
         scene_.header = MakeHeader(hwnd_, L"Scene Hierarchy", Icon::Hierarchy, uiBold_); sceneTree_ = MakeTree(hwnd_, IdSceneTree, uiFont_); scene_.body = sceneTree_;
-        viewport_.header = MakeHeader(hwnd_, L"Viewport", Icon::Viewport, uiBold_); viewport_.body = makeBody(); viewportPerspective_ = MakeButton(hwnd_, IdViewportPerspective, L"Perspective", Icon::None, ButtonKind::Tool, uiFont_); viewportLit_ = MakeButton(hwnd_, IdViewportLit, L"Lit", Icon::None, ButtonKind::Neutral, uiFont_); viewportShow_ = MakeButton(hwnd_, IdViewportShow, L"Show", Icon::None, ButtonKind::Neutral, uiFont_); ButtonActive(viewportPerspective_, true);
+        viewport_.header = MakeHeader(hwnd_, L"Viewport", Icon::Viewport, uiBold_);
+        viewport_.body = makeBody();
+        viewportPerspective_ = MakeButton(hwnd_, IdViewportPerspective, L"Perspective", Icon::None, ButtonKind::Tool, uiFont_);
+        viewportLit_ = MakeButton(hwnd_, IdViewportLit, L"Lit", Icon::None, ButtonKind::Neutral, uiFont_);
+        viewportShow_ = MakeButton(hwnd_, IdViewportShow, L"Show", Icon::None, ButtonKind::Neutral, uiFont_);
+        viewportOrientation_ = MakeButton(
+            hwnd_,
+            IdViewportOrientation,
+            session_ && session_->Orientation() == TransformOrientation::World
+                ? L"World"
+                : L"Local",
+            Icon::None,
+            ButtonKind::Tool,
+            uiFont_);
+        ButtonActive(viewportPerspective_, true);
+        ButtonActive(viewportOrientation_, true);
         inspector_.header = MakeHeader(hwnd_, L"Inspector / Properties", Icon::Inspector, uiBold_);
         inspector_.body = makeBody(IdInspector);
         inspectorAddComponent_ = MakeButton(
@@ -1461,7 +1487,17 @@ namespace nocturne::editor
         const int leftW = (std::clamp)(w * 20 / 100, 250, 330); const int rightW = (std::clamp)(w * 22 / 100, 285, 355); const int centerX = gap + leftW + gap; const int centerW = (std::max)(260, w - leftW - rightW - 4 * gap); const int rightX = centerX + centerW + gap;
         auto panel = [&](Panel& p, int px, int py, int pw, int ph) { MoveWindow(p.header, px,py,pw,headerH,TRUE); MoveWindow(p.body, px,py+headerH,pw,(std::max)(0,ph-headerH),TRUE); };
         panel(scene_, gap,top,leftW,topH); panel(viewport_, centerX,top,centerW,topH); panel(inspector_, rightX,top,rightW,topH);
-        const int viewportY = top + headerH; MoveWindow(viewportPerspective_, centerX+14,viewportY+10,90,30,TRUE); MoveWindow(viewportLit_, centerX+109,viewportY+10,50,30,TRUE); MoveWindow(viewportShow_, centerX+164,viewportY+10,58,30,TRUE);
+        const int viewportY = top + headerH;
+        MoveWindow(viewportPerspective_, centerX + 10, viewportY + 10, 76, 30, TRUE);
+        MoveWindow(viewportLit_, centerX + 90, viewportY + 10, 40, 30, TRUE);
+        MoveWindow(viewportShow_, centerX + 134, viewportY + 10, 42, 30, TRUE);
+        MoveWindow(
+            viewportOrientation_,
+            centerX + (std::max)(182, centerW - 78),
+            viewportY + 10,
+            68,
+            30,
+            TRUE);
         const int bottomLeft = (std::clamp)(w * 31 / 100, 345, 495); const int bottomCenterX = gap + bottomLeft + gap; const int bottomCenter = (std::max)(260, w - bottomLeft - rightW - 4 * gap); const int bottomRightX = bottomCenterX + bottomCenter + gap;
         panel(content_, gap,bottomY,bottomLeft,actualBottom); panel(console_, bottomCenterX,bottomY,bottomCenter,actualBottom); panel(buildPlay_, bottomRightX,bottomY,rightW,actualBottom);
         const int contentY = bottomY + headerH, contentH = (std::max)(0, actualBottom - headerH), pad = 9, searchH = 30, iconW = 30, iconGap = 4; const int actionsW = iconW * 3 + iconGap * 2;
@@ -2864,6 +2900,22 @@ namespace nocturne::editor
                 else if (id == IdToolbarRotate) tool = EditorTool::Rotate;
                 else if (id == IdToolbarScale) tool = EditorTool::Scale;
                 session_->SetActiveTool(tool);
+
+                // Design choice (not directly from the book): scale authoring is
+                // Local-only in Phase 16 because arbitrary world-scale edits can
+                // require shear, which local TRS cannot represent.
+                if (id == IdToolbarScale
+                    && session_->Orientation()
+                        == TransformOrientation::World)
+                {
+                    session_->SetTransformOrientation(
+                        TransformOrientation::Local);
+                    SetWindowTextW(
+                        viewportOrientation_,
+                        L"Local");
+                    AppendConsole_(
+                        L"Scale uses Local orientation; arbitrary World scale is not representable without shear.");
+                }
             }
             for (HWND h : toolbarButtons_)
             {
@@ -2880,7 +2932,42 @@ namespace nocturne::editor
         case IdContentListMode: ButtonActive(contentListMode_, true); ButtonActive(contentGridMode_, false); AppendConsole_(L"Content Browser list view selected."); break;
         case IdContentGridMode: AppendConsole_(L"Grid view is a Phase 13 tooling-shell stub; list mode remains active."); break;
         case IdContentSettings: AppendConsole_(L"Content Browser settings shell selected."); break;
-        case IdViewportPerspective: case IdViewportLit: case IdViewportShow: AppendConsole_(L"Viewport display control selected; rendering remains Phase 14 scope."); break;
+        case IdViewportPerspective: case IdViewportLit: case IdViewportShow:
+            AppendConsole_(L"Viewport display control selected; rendering remains Phase 14 scope.");
+            break;
+        case IdViewportOrientation:
+            if (session_)
+            {
+                if (activeToolId_ == IdToolbarScale)
+                {
+                    session_->SetTransformOrientation(
+                        TransformOrientation::Local);
+                    SetWindowTextW(
+                        viewportOrientation_,
+                        L"Local");
+                    AppendConsole_(
+                        L"World orientation is unavailable for Scale in Phase 16; Scale remains Local.");
+                    break;
+                }
+
+                const TransformOrientation next =
+                    session_->Orientation()
+                        == TransformOrientation::Local
+                            ? TransformOrientation::World
+                            : TransformOrientation::Local;
+
+                session_->SetTransformOrientation(next);
+                SetWindowTextW(
+                    viewportOrientation_,
+                    next == TransformOrientation::World
+                        ? L"World"
+                        : L"Local");
+                AppendConsole_(
+                    next == TransformOrientation::World
+                        ? L"Transform orientation: World."
+                        : L"Transform orientation: Local.");
+            }
+            break;
         case IdActorCreate:
             (void)ExecuteCreateEntity_();
             break;
@@ -2991,7 +3078,7 @@ namespace nocturne::editor
                 || id == IdContentListMode || id == IdContentGridMode
                 || id == IdContentSettings
                 || id == IdViewportPerspective || id == IdViewportLit
-                || id == IdViewportShow)
+                || id == IdViewportShow || id == IdViewportOrientation)
             {
                 HandleCommand_(id);
                 result = 0;

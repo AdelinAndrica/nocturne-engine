@@ -79,6 +79,7 @@ namespace nocturne::editor
             IdViewportPerspective,
             IdViewportLit,
             IdViewportShow,
+            IdViewportOrientation,
 
             IdMenuFile = 9001,
             IdMenuEdit,
@@ -219,6 +220,7 @@ namespace nocturne::editor
         HWND viewportPerspective_ = nullptr;
         HWND viewportLit_ = nullptr;
         HWND viewportShow_ = nullptr;
+        HWND viewportOrientation_ = nullptr;
         HWND contentSearch_ = nullptr;
         HWND contentTree_ = nullptr;
         HWND contentTable_ = nullptr;

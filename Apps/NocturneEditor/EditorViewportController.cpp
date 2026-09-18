@@ -115,6 +115,46 @@ namespace nocturne::editor
             }
         }
 
+        noc::Vec3 MatrixTranslation(
+            const noc::Mat4& matrix)
+        {
+            return {
+                noc::M(matrix, 0, 3),
+                noc::M(matrix, 1, 3),
+                noc::M(matrix, 2, 3)
+            };
+        }
+
+        noc::Vec3 MatrixColumn(
+            const noc::Mat4& matrix,
+            int column)
+        {
+            return {
+                noc::M(matrix, 0, column),
+                noc::M(matrix, 1, column),
+                noc::M(matrix, 2, column)
+            };
+        }
+
+        noc::Vec3 ExpandGizmoBasisVector(
+            const noc::Vec3 axes[3],
+            const noc::Vec3& coefficients)
+        {
+            return axes[0] * coefficients.x
+                + axes[1] * coefficients.y
+                + axes[2] * coefficients.z;
+        }
+
+        noc::Vec3 GizmoRingWorldVector(
+            const noc::Vec3 axes[3],
+            int axis,
+            float angle)
+        {
+            return ExpandGizmoBasisVector(
+                axes,
+                GizmoRingLocalPoint(axis, angle));
+        }
+
         void DrawLine(HDC dc, POINT a, POINT b, COLORREF color, int width = 1)
         {
             HPEN pen = CreatePen(PS_SOLID, width, color);
@@ -429,6 +469,8 @@ namespace nocturne::editor
         pendingMouseDx_ = 0;
         pendingMouseDy_ = 0;
         dragEntity_ = noc::EntityHandle::Invalid();
+        dragStartParent_ = noc::EntityHandle::Invalid();
+        dragWorldOrientation_ = false;
         gizmoAxis_ = -1;
         session_ = nullptr;
         shell_ = nullptr;
@@ -731,167 +773,582 @@ namespace nocturne::editor
         return shell_ ? shell_->ActiveToolId() : kSelectTool;
     }
 
+    bool EditorViewportController::BuildGizmoFrame_(
+        noc::EntityHandle entity,
+        bool worldOrientation,
+        noc::Vec3& outPivot,
+        noc::Vec3 outAxes[3]) const
+    {
+        if (!engine_
+            || !outAxes
+            || !entity.IsValid()
+            || !engine_->GetWorld().IsAlive(entity)
+            || !engine_->GetWorld().HasTransform(entity))
+        {
+            return false;
+        }
+
+        const noc::Mat4 world =
+            engine_->GetWorld().GetWorldMatrix(entity);
+
+        outPivot = MatrixTranslation(world);
+
+        if (worldOrientation)
+        {
+            outAxes[0] = { 1.0f, 0.0f, 0.0f };
+            outAxes[1] = { 0.0f, 1.0f, 0.0f };
+            outAxes[2] = { 0.0f, 0.0f, 1.0f };
+            return true;
+        }
+
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            const noc::Vec3 column =
+                MatrixColumn(world, axis);
+
+            if (!noc::IsFiniteMath(column)
+                || noc::LengthSq(column) <= 1.0e-10f)
+            {
+                return false;
+            }
+
+            outAxes[axis] =
+                noc::Normalize(column);
+        }
+
+        return true;
+    }
+
+    bool EditorViewportController::WorldToLocalTRS_(
+        noc::EntityHandle entity,
+        const noc::Mat4& desiredWorld,
+        noc::Vec3& outTranslation,
+        noc::Quat& outRotation,
+        noc::Vec3& outScale) const
+    {
+        if (!engine_
+            || !entity.IsValid()
+            || !engine_->GetWorld().IsAlive(entity)
+            || !engine_->GetWorld().HasTransform(entity))
+        {
+            return false;
+        }
+
+        noc::Mat4 desiredLocal =
+            desiredWorld;
+
+        const noc::EntityHandle parent =
+            engine_->GetWorld().ParentOf(entity);
+
+        if (parent.IsValid())
+        {
+            const noc::Mat4 parentWorld =
+                engine_->GetWorld().GetWorldMatrix(parent);
+            noc::Mat4 inverseParent{};
+
+            if (!noc::TryInverseAffine(
+                    parentWorld,
+                    inverseParent))
+            {
+                return false;
+            }
+
+            desiredLocal =
+                noc::Mul(
+                    inverseParent,
+                    desiredWorld);
+        }
+
+        return noc::TryDecomposeTRS(
+            desiredLocal,
+            outTranslation,
+            outRotation,
+            outScale);
+    }
+
     int EditorViewportController::HitGizmoAxis_(POINT p) const
     {
-        const noc::EntityHandle selected = SelectedEntity_();
-        if (!selected.IsValid()) return -1;
+        const noc::EntityHandle selected =
+            SelectedEntity_();
+        if (!selected.IsValid())
+            return -1;
+
         const int tool = ActiveTool_();
-        if (tool != kMoveTool && tool != kRotateTool && tool != kScaleTool)
+        if (tool != kMoveTool
+            && tool != kRotateTool
+            && tool != kScaleTool)
+        {
             return -1;
+        }
 
-        const noc::TransformComponent* transform =
-            engine_ ? engine_->GetWorld().GetTransform(selected) : nullptr;
-        if (!transform)
+        const bool worldOrientation =
+            tool != kScaleTool
+            && session_
+            && session_->Orientation()
+                == TransformOrientation::World;
+
+        noc::Vec3 pivot{};
+        noc::Vec3 axes[3]{};
+        if (!BuildGizmoFrame_(
+                selected,
+                worldOrientation,
+                pivot,
+                axes))
+        {
             return -1;
-
-        const noc::Vec3& translation = transform->localTranslation;
-        const noc::Quat& rotation = transform->localRotation;
+        }
 
         POINT center{};
-        if (!Project_(translation, center)) return -1;
-        const float gizmoLength = GizmoWorldLength(renderHost_, cameraPos_, cameraRot_, fovY_, translation);
-        const noc::Vec3 axes[3] = { {1,0,0},{0,1,0},{0,0,1} };
+        if (!Project_(pivot, center))
+            return -1;
+
+        const float gizmoLength =
+            GizmoWorldLength(
+                renderHost_,
+                cameraPos_,
+                cameraRot_,
+                fovY_,
+                pivot);
+
         float best = kGizmoHitRadiusPixels;
         int bestAxis = -1;
 
         if (tool == kRotateTool)
         {
-            constexpr float kTwoPi = 6.28318530718f;
+            constexpr float kTwoPi =
+                6.28318530718f;
+
             for (int axis = 0; axis < 3; ++axis)
             {
                 POINT previous{};
                 bool previousValid = false;
-                for (int segment = 0; segment <= kGizmoRingSegments; ++segment)
+
+                for (int segment = 0;
+                     segment <= kGizmoRingSegments;
+                     ++segment)
                 {
-                    const float angle = kTwoPi * float(segment) / float(kGizmoRingSegments);
-                    const noc::Vec3 local = GizmoRingLocalPoint(axis, angle);
+                    const float angle =
+                        kTwoPi
+                        * float(segment)
+                        / float(kGizmoRingSegments);
+
                     POINT current{};
-                    const bool currentValid = Project_(translation + noc::Rotate(rotation, local) * gizmoLength, current);
-                    if (currentValid && previousValid)
+                    const bool currentValid =
+                        Project_(
+                            pivot
+                                + GizmoRingWorldVector(
+                                    axes,
+                                    axis,
+                                    angle)
+                                    * gizmoLength,
+                            current);
+
+                    if (currentValid
+                        && previousValid)
                     {
-                        const float distance = PointSegmentDistance(p, previous, current);
+                        const float distance =
+                            PointSegmentDistance(
+                                p,
+                                previous,
+                                current);
+
                         if (distance < best)
                         {
                             best = distance;
                             bestAxis = axis;
                         }
                     }
+
                     previous = current;
                     previousValid = currentValid;
                 }
             }
+
             return bestAxis;
         }
 
-        for (int i = 0; i < 3; ++i)
+        for (int axis = 0; axis < 3; ++axis)
         {
             POINT end{};
-            const noc::Vec3 axis = noc::Rotate(rotation, axes[i]);
-            if (!Project_(translation + axis * gizmoLength, end)) continue;
-            const float dist = PointSegmentDistance(p, center, end);
-            if (dist < best) { best = dist; bestAxis = i; }
+            if (!Project_(
+                    pivot
+                        + axes[axis] * gizmoLength,
+                    end))
+            {
+                continue;
+            }
+
+            const float distance =
+                PointSegmentDistance(
+                    p,
+                    center,
+                    end);
+
+            if (distance < best)
+            {
+                best = distance;
+                bestAxis = axis;
+            }
         }
+
         return bestAxis;
     }
 
-    void EditorViewportController::BeginGizmoDrag_(int axis, POINT mouse)
+    void EditorViewportController::BeginGizmoDrag_(
+        int axis,
+        POINT mouse)
     {
-        const noc::EntityHandle selected = SelectedEntity_();
-        if (axis < 0 || axis > 2 || !selected.IsValid() || !engine_)
+        const noc::EntityHandle selected =
+            SelectedEntity_();
+
+        if (axis < 0
+            || axis > 2
+            || !selected.IsValid()
+            || !engine_)
+        {
             return;
+        }
 
         const noc::TransformComponent* transform =
             engine_->GetWorld().GetTransform(selected);
         if (!transform)
             return;
 
+        const int tool =
+            ActiveTool_();
+
+        const bool worldOrientation =
+            tool != kScaleTool
+            && session_
+            && session_->Orientation()
+                == TransformOrientation::World;
+
+        noc::Vec3 pivot{};
+        noc::Vec3 axes[3]{};
+
+        if (!BuildGizmoFrame_(
+                selected,
+                worldOrientation,
+                pivot,
+                axes))
+        {
+            return;
+        }
+
+        dragToolId_ = tool;
+        dragEntity_ = selected;
+        dragStartParent_ =
+            engine_->GetWorld().ParentOf(selected);
+        dragStartMouse_ = mouse;
+
+        dragStartT_ =
+            transform->localTranslation;
+        dragStartR_ =
+            transform->localRotation;
+        dragStartS_ =
+            transform->localScale;
+
+        dragStartWorld_ =
+            engine_->GetWorld().GetWorldMatrix(selected);
+        dragStartPivot_ = pivot;
+        dragStartAxes_[0] = axes[0];
+        dragStartAxes_[1] = axes[1];
+        dragStartAxes_[2] = axes[2];
+        dragWorldOrientation_ =
+            worldOrientation;
+
         gizmoDragging_ = true;
         gizmoAxis_ = axis;
-        dragToolId_ = ActiveTool_();
-        dragEntity_ = selected;
-        dragStartMouse_ = mouse;
-        dragStartT_ = transform->localTranslation;
-        dragStartR_ = transform->localRotation;
-        dragStartS_ = transform->localScale;
+
         SetCapture(renderHost_);
-        if (overlay_) InvalidateRect(overlay_, nullptr, FALSE);
+
+        if (overlay_)
+            InvalidateRect(
+                overlay_,
+                nullptr,
+                FALSE);
     }
 
-    void EditorViewportController::UpdateGizmoDrag_(POINT mouse)
+    void EditorViewportController::UpdateGizmoDrag_(
+        POINT mouse)
     {
         if (!gizmoDragging_
             || !engine_
             || gizmoAxis_ < 0
             || !dragEntity_.IsValid()
-            || !engine_->GetWorld().IsAlive(dragEntity_))
+            || !engine_->GetWorld().IsAlive(
+                dragEntity_)
+            || engine_->GetWorld().ParentOf(
+                dragEntity_) != dragStartParent_)
         {
             return;
         }
 
-        noc::Vec3 newTranslation = dragStartT_;
-        noc::Quat newRotation = dragStartR_;
-        noc::Vec3 newScale = dragStartS_;
+        noc::Vec3 newTranslation =
+            dragStartT_;
+        noc::Quat newRotation =
+            dragStartR_;
+        noc::Vec3 newScale =
+            dragStartS_;
 
-        const noc::Vec3 unit[3] = { {1,0,0},{0,1,0},{0,0,1} };
-        const noc::Vec3 axisWorld = noc::Rotate(dragStartR_, unit[gizmoAxis_]);
-        const float gizmoLength = GizmoWorldLength(renderHost_, cameraPos_, cameraRot_, fovY_, dragStartT_);
-        const int tool = dragToolId_;
+        const noc::Vec3 unit[3] = {
+            { 1,0,0 },
+            { 0,1,0 },
+            { 0,0,1 }
+        };
+
+        const noc::Vec3 axisWorld =
+            dragStartAxes_[gizmoAxis_];
+
+        const float gizmoLength =
+            GizmoWorldLength(
+                renderHost_,
+                cameraPos_,
+                cameraRot_,
+                fovY_,
+                dragStartPivot_);
+
+        const int tool =
+            dragToolId_;
 
         if (tool == kRotateTool)
         {
             POINT center{};
-            if (!Project_(dragStartT_, center)) return;
-            const float sx = float(dragStartMouse_.x - center.x);
-            const float sy = float(dragStartMouse_.y - center.y);
-            const float cx = float(mouse.x - center.x);
-            const float cy = float(mouse.y - center.y);
-            const float startLenSq = sx * sx + sy * sy;
-            const float currentLenSq = cx * cx + cy * cy;
-            if (startLenSq < 16.0f || currentLenSq < 16.0f) return;
-
-            float angle = std::atan2(sx * cy - sy * cx, sx * cx + sy * cy);
-
-            // Preserve an intuitive sign for each projected local rotation ring.
-            // Design choice (not directly from the book): screen-space tangential
-            // dragging drives the selected local-axis rotation.
-            noc::Vec3 localU{}, localV{};
-            GizmoRingBasis(gizmoAxis_, localU, localV);
-            POINT uScreen{}, vScreen{};
-            if (Project_(dragStartT_ + noc::Rotate(dragStartR_, localU) * gizmoLength, uScreen) &&
-                Project_(dragStartT_ + noc::Rotate(dragStartR_, localV) * gizmoLength, vScreen))
+            if (!Project_(
+                    dragStartPivot_,
+                    center))
             {
-                const float ux = float(uScreen.x - center.x);
-                const float uy = float(uScreen.y - center.y);
-                const float vx = float(vScreen.x - center.x);
-                const float vy = float(vScreen.y - center.y);
+                return;
+            }
+
+            const float sx =
+                float(dragStartMouse_.x - center.x);
+            const float sy =
+                float(dragStartMouse_.y - center.y);
+            const float cx =
+                float(mouse.x - center.x);
+            const float cy =
+                float(mouse.y - center.y);
+
+            const float startLenSq =
+                sx * sx + sy * sy;
+            const float currentLenSq =
+                cx * cx + cy * cy;
+
+            if (startLenSq < 16.0f
+                || currentLenSq < 16.0f)
+            {
+                return;
+            }
+
+            float angle =
+                std::atan2(
+                    sx * cy - sy * cx,
+                    sx * cx + sy * cy);
+
+            noc::Vec3 localU{};
+            noc::Vec3 localV{};
+            GizmoRingBasis(
+                gizmoAxis_,
+                localU,
+                localV);
+
+            const noc::Vec3 worldU =
+                ExpandGizmoBasisVector(
+                    dragStartAxes_,
+                    localU);
+            const noc::Vec3 worldV =
+                ExpandGizmoBasisVector(
+                    dragStartAxes_,
+                    localV);
+
+            POINT uScreen{};
+            POINT vScreen{};
+
+            if (Project_(
+                    dragStartPivot_
+                        + worldU * gizmoLength,
+                    uScreen)
+                && Project_(
+                    dragStartPivot_
+                        + worldV * gizmoLength,
+                    vScreen))
+            {
+                const float ux =
+                    float(uScreen.x - center.x);
+                const float uy =
+                    float(uScreen.y - center.y);
+                const float vx =
+                    float(vScreen.x - center.x);
+                const float vy =
+                    float(vScreen.y - center.y);
+
                 if (ux * vy - uy * vx < 0.0f)
                     angle = -angle;
             }
 
-            newRotation = NormalizeQuat(MulQuat(AxisAngle(axisWorld, angle), dragStartR_));
+            if (dragWorldOrientation_)
+            {
+                const noc::Quat delta =
+                    AxisAngle(
+                        axisWorld,
+                        angle);
+
+                noc::Mat4 desiredWorld =
+                    dragStartWorld_;
+
+                for (int column = 0;
+                     column < 3;
+                     ++column)
+                {
+                    const noc::Vec3 rotated =
+                        noc::Rotate(
+                            delta,
+                            MatrixColumn(
+                                dragStartWorld_,
+                                column));
+
+                    noc::M(
+                        desiredWorld,
+                        0,
+                        column) = rotated.x;
+                    noc::M(
+                        desiredWorld,
+                        1,
+                        column) = rotated.y;
+                    noc::M(
+                        desiredWorld,
+                        2,
+                        column) = rotated.z;
+                }
+
+                if (!WorldToLocalTRS_(
+                        dragEntity_,
+                        desiredWorld,
+                        newTranslation,
+                        newRotation,
+                        newScale))
+                {
+                    return;
+                }
+            }
+            else
+            {
+                newRotation =
+                    NormalizeQuat(
+                        MulQuat(
+                            dragStartR_,
+                            AxisAngle(
+                                unit[gizmoAxis_],
+                                angle)));
+            }
         }
         else
         {
-            POINT a{}, b{};
-            if (!Project_(dragStartT_, a) || !Project_(dragStartT_ + axisWorld * gizmoLength, b)) return;
-            const float vx = float(b.x - a.x), vy = float(b.y - a.y);
-            const float len = std::sqrt(vx * vx + vy * vy);
-            if (len < 1.0f) return;
-            const float dx = float(mouse.x - dragStartMouse_.x);
-            const float dy = float(mouse.y - dragStartMouse_.y);
-            const float signedPixels = (dx * vx + dy * vy) / len;
+            POINT startScreen{};
+            POINT axisScreen{};
+
+            if (!Project_(
+                    dragStartPivot_,
+                    startScreen)
+                || !Project_(
+                    dragStartPivot_
+                        + axisWorld * gizmoLength,
+                    axisScreen))
+            {
+                return;
+            }
+
+            const float vx =
+                float(
+                    axisScreen.x
+                    - startScreen.x);
+            const float vy =
+                float(
+                    axisScreen.y
+                    - startScreen.y);
+            const float length =
+                std::sqrt(vx * vx + vy * vy);
+
+            if (length < 1.0f)
+                return;
+
+            const float dx =
+                float(
+                    mouse.x
+                    - dragStartMouse_.x);
+            const float dy =
+                float(
+                    mouse.y
+                    - dragStartMouse_.y);
+
+            const float signedPixels =
+                (dx * vx + dy * vy)
+                / length;
 
             if (tool == kMoveTool)
             {
-                const float worldDelta = (signedPixels / len) * gizmoLength;
-                newTranslation = dragStartT_ + axisWorld * worldDelta;
+                const float worldDelta =
+                    (signedPixels / length)
+                    * gizmoLength;
+
+                noc::Mat4 desiredWorld =
+                    dragStartWorld_;
+
+                const noc::Vec3 desiredPosition =
+                    dragStartPivot_
+                    + axisWorld * worldDelta;
+
+                noc::M(
+                    desiredWorld,
+                    0,
+                    3) = desiredPosition.x;
+                noc::M(
+                    desiredWorld,
+                    1,
+                    3) = desiredPosition.y;
+                noc::M(
+                    desiredWorld,
+                    2,
+                    3) = desiredPosition.z;
+
+                if (!WorldToLocalTRS_(
+                        dragEntity_,
+                        desiredWorld,
+                        newTranslation,
+                        newRotation,
+                        newScale))
+                {
+                    return;
+                }
             }
             else if (tool == kScaleTool)
             {
-                float* component = gizmoAxis_ == 0 ? &newScale.x : (gizmoAxis_ == 1 ? &newScale.y : &newScale.z);
-                const float start = gizmoAxis_ == 0 ? dragStartS_.x : (gizmoAxis_ == 1 ? dragStartS_.y : dragStartS_.z);
-                const float reference = (std::max)(std::fabs(start), 0.25f);
-                *component = (std::max)(0.05f, start + (signedPixels / len) * reference);
+                float* component =
+                    gizmoAxis_ == 0
+                        ? &newScale.x
+                        : (gizmoAxis_ == 1
+                            ? &newScale.y
+                            : &newScale.z);
+
+                const float start =
+                    gizmoAxis_ == 0
+                        ? dragStartS_.x
+                        : (gizmoAxis_ == 1
+                            ? dragStartS_.y
+                            : dragStartS_.z);
+
+                const float reference =
+                    (std::max)(
+                        std::fabs(start),
+                        0.25f);
+
+                *component =
+                    (std::max)(
+                        0.05f,
+                        start
+                            + (signedPixels / length)
+                                * reference);
             }
             else
             {
@@ -915,7 +1372,12 @@ namespace nocturne::editor
 
         engine_->GetWorld().Update();
         RefreshDebugSelection_();
-        InvalidateRect(overlay_, nullptr, FALSE);
+
+        if (overlay_)
+            InvalidateRect(
+                overlay_,
+                nullptr,
+                FALSE);
     }
 
     void EditorViewportController::EndGizmoDrag_()
@@ -923,18 +1385,20 @@ namespace nocturne::editor
         if (!gizmoDragging_)
             return;
 
-        const noc::EntityHandle entity = dragEntity_;
-        const int completedTool = dragToolId_;
+        const noc::EntityHandle entity =
+            dragEntity_;
 
         gizmoDragging_ = false;
         gizmoAxis_ = -1;
         dragToolId_ = 0;
-        dragEntity_ = noc::EntityHandle::Invalid();
+        dragEntity_ =
+            noc::EntityHandle::Invalid();
 
         if (GetCapture() == renderHost_)
             ReleaseCapture();
 
         bool recorded = false;
+        bool changed = false;
 
         if (engine_
             && session_
@@ -946,72 +1410,48 @@ namespace nocturne::editor
 
             if (finalTransform)
             {
-                noc::PropertyId propertyId{};
-                noc::TypeId valueType{};
-                const void* oldValue = nullptr;
-                const void* newValue = nullptr;
-                bool changed = false;
+                changed =
+                    dragStartT_.x
+                        != finalTransform->localTranslation.x
+                    || dragStartT_.y
+                        != finalTransform->localTranslation.y
+                    || dragStartT_.z
+                        != finalTransform->localTranslation.z
+                    || dragStartR_.x
+                        != finalTransform->localRotation.x
+                    || dragStartR_.y
+                        != finalTransform->localRotation.y
+                    || dragStartR_.z
+                        != finalTransform->localRotation.z
+                    || dragStartR_.w
+                        != finalTransform->localRotation.w
+                    || dragStartS_.x
+                        != finalTransform->localScale.x
+                    || dragStartS_.y
+                        != finalTransform->localScale.y
+                    || dragStartS_.z
+                        != finalTransform->localScale.z;
 
-                if (completedTool == kMoveTool)
+                if (changed)
                 {
-                    propertyId = noc::MakePropertyId(
-                        "Nocturne.Transform.localTranslation");
-                    valueType = noc::BuiltinTypeIds::Vec3;
-                    oldValue = &dragStartT_;
-                    newValue = &finalTransform->localTranslation;
-                    changed =
-                        dragStartT_.x != finalTransform->localTranslation.x
-                        || dragStartT_.y != finalTransform->localTranslation.y
-                        || dragStartT_.z != finalTransform->localTranslation.z;
-                }
-                else if (completedTool == kRotateTool)
-                {
-                    propertyId = noc::MakePropertyId(
-                        "Nocturne.Transform.localRotation");
-                    valueType = noc::BuiltinTypeIds::Quat;
-                    oldValue = &dragStartR_;
-                    newValue = &finalTransform->localRotation;
-                    changed =
-                        dragStartR_.x != finalTransform->localRotation.x
-                        || dragStartR_.y != finalTransform->localRotation.y
-                        || dragStartR_.z != finalTransform->localRotation.z
-                        || dragStartR_.w != finalTransform->localRotation.w;
-                }
-                else if (completedTool == kScaleTool)
-                {
-                    propertyId = noc::MakePropertyId(
-                        "Nocturne.Transform.localScale");
-                    valueType = noc::BuiltinTypeIds::Vec3;
-                    oldValue = &dragStartS_;
-                    newValue = &finalTransform->localScale;
-                    changed =
-                        dragStartS_.x != finalTransform->localScale.x
-                        || dragStartS_.y != finalTransform->localScale.y
-                        || dragStartS_.z != finalTransform->localScale.z;
-                }
-
-                if (changed && propertyId.IsValid())
-                {
-                    auto context = session_->CommandContext();
+                    auto context =
+                        session_->CommandContext();
 
                     try
                     {
                         auto command =
                             std::make_unique<
-                                SetReflectedPropertyCommand>();
+                                SetTransformTRSCommand>();
 
                         if (command->InitExplicit(
                                 context,
                                 entity,
-                                noc::TypeId{
-                                    noc::kTransformComponentTypeId.value },
-                                propertyId,
-                                noc::ReflectedConstValueView{
-                                    valueType,
-                                    oldValue },
-                                noc::ReflectedConstValueView{
-                                    valueType,
-                                    newValue }))
+                                dragStartT_,
+                                dragStartR_,
+                                dragStartS_,
+                                finalTransform->localTranslation,
+                                finalTransform->localRotation,
+                                finalTransform->localScale))
                         {
                             recorded =
                                 session_->History().RecordExecuted(
@@ -1026,8 +1466,6 @@ namespace nocturne::editor
 
                     if (!recorded)
                     {
-                        // Init/allocation failure happened before history could
-                        // own the command. Restore the full semantic baseline.
                         (void)engine_->GetWorld().SetLocalTRS(
                             entity,
                             dragStartT_,
@@ -1043,12 +1481,66 @@ namespace nocturne::editor
             }
         }
 
+        dragStartParent_ =
+            noc::EntityHandle::Invalid();
+        dragWorldOrientation_ = false;
+
         RefreshDebugSelection_();
+
         if (shell_)
             shell_->RefreshInspector();
 
         if (overlay_)
-            InvalidateRect(overlay_, nullptr, FALSE);
+            InvalidateRect(
+                overlay_,
+                nullptr,
+                FALSE);
+    }
+
+    void EditorViewportController::CancelGizmoDrag_()
+    {
+        if (!gizmoDragging_)
+            return;
+
+        const noc::EntityHandle entity =
+            dragEntity_;
+
+        gizmoDragging_ = false;
+        gizmoAxis_ = -1;
+        dragToolId_ = 0;
+        dragEntity_ =
+            noc::EntityHandle::Invalid();
+
+        if (GetCapture() == renderHost_)
+            ReleaseCapture();
+
+        if (engine_
+            && entity.IsValid()
+            && engine_->GetWorld().IsAlive(entity)
+            && engine_->GetWorld().HasTransform(entity))
+        {
+            (void)engine_->GetWorld().SetLocalTRS(
+                entity,
+                dragStartT_,
+                dragStartR_,
+                dragStartS_);
+            engine_->GetWorld().Update();
+        }
+
+        dragStartParent_ =
+            noc::EntityHandle::Invalid();
+        dragWorldOrientation_ = false;
+
+        RefreshDebugSelection_();
+
+        if (shell_)
+            shell_->RefreshInspector();
+
+        if (overlay_)
+            InvalidateRect(
+                overlay_,
+                nullptr,
+                FALSE);
     }
 
     void EditorViewportController::HandleViewportMouse_(UINT msg, WPARAM wParam, LPARAM lParam)
@@ -1141,80 +1633,181 @@ namespace nocturne::editor
         }
     }
 
-    void EditorViewportController::PaintOverlay_(HDC dc, const RECT& rc)
+    void EditorViewportController::PaintOverlay_(
+        HDC dc,
+        const RECT& rc)
     {
-        HBRUSH keyBrush = CreateSolidBrush(kOverlayKey);
+        HBRUSH keyBrush =
+            CreateSolidBrush(kOverlayKey);
         FillRect(dc, &rc, keyBrush);
         DeleteObject(keyBrush);
 
-        // Grid and oriented selection bounds are depth-tested DX12 debug geometry.
-        // The Win32 overlay is intentionally limited to transform gizmo handles.
-        const noc::EntityHandle selected = SelectedEntity_();
+        const noc::EntityHandle selected =
+            SelectedEntity_();
         if (!selected.IsValid())
             return;
 
-        const int tool = ActiveTool_();
-        if (tool != kMoveTool && tool != kRotateTool && tool != kScaleTool)
+        const int tool =
+            ActiveTool_();
+        if (tool != kMoveTool
+            && tool != kRotateTool
+            && tool != kScaleTool)
+        {
             return;
+        }
 
-        const noc::TransformComponent* transform =
-            engine_ ? engine_->GetWorld().GetTransform(selected) : nullptr;
-        if (!transform)
+        const bool worldOrientation =
+            tool != kScaleTool
+            && session_
+            && session_->Orientation()
+                == TransformOrientation::World;
+
+        noc::Vec3 pivot{};
+        noc::Vec3 axes[3]{};
+
+        if (!BuildGizmoFrame_(
+                selected,
+                worldOrientation,
+                pivot,
+                axes))
+        {
             return;
+        }
 
-        const noc::Vec3& translation = transform->localTranslation;
-        const noc::Quat& rotation = transform->localRotation;
+        const COLORREF colors[3] = {
+            RGB(224,75,75),
+            RGB(74,207,112),
+            RGB(73,139,239)
+        };
+        constexpr COLORREF highlight =
+            RGB(255,236,130);
 
-        const noc::Vec3 axes[3] = { {1,0,0},{0,1,0},{0,0,1} };
-        const COLORREF colors[3] = { RGB(224,75,75), RGB(74,207,112), RGB(73,139,239) };
-        constexpr COLORREF highlight = RGB(255,236,130);
-        const float gizmoLength = GizmoWorldLength(renderHost_, cameraPos_, cameraRot_, fovY_, translation);
+        const float gizmoLength =
+            GizmoWorldLength(
+                renderHost_,
+                cameraPos_,
+                cameraRot_,
+                fovY_,
+                pivot);
+
         POINT center{};
-        if (!Project_(translation, center))
+        if (!Project_(pivot, center))
             return;
 
         if (tool == kRotateTool)
         {
-            constexpr float kTwoPi = 6.28318530718f;
-            for (int axis = 0; axis < 3; ++axis)
+            constexpr float kTwoPi =
+                6.28318530718f;
+
+            for (int axis = 0;
+                 axis < 3;
+                 ++axis)
             {
-                const bool active = gizmoAxis_ == axis;
-                const COLORREF color = active ? highlight : colors[axis];
-                HPEN pen = CreatePen(PS_SOLID, active ? 4 : 3, color);
-                HGDIOBJ oldPen = SelectObject(dc, pen);
+                const bool active =
+                    gizmoAxis_ == axis;
+                const COLORREF color =
+                    active
+                        ? highlight
+                        : colors[axis];
+
+                HPEN pen =
+                    CreatePen(
+                        PS_SOLID,
+                        active ? 4 : 3,
+                        color);
+                HGDIOBJ oldPen =
+                    SelectObject(dc, pen);
+
                 POINT previous{};
                 bool previousValid = false;
-                for (int segment = 0; segment <= kGizmoRingSegments; ++segment)
+
+                for (int segment = 0;
+                     segment <= kGizmoRingSegments;
+                     ++segment)
                 {
-                    const float angle = kTwoPi * float(segment) / float(kGizmoRingSegments);
-                    const noc::Vec3 local = GizmoRingLocalPoint(axis, angle);
+                    const float angle =
+                        kTwoPi
+                        * float(segment)
+                        / float(kGizmoRingSegments);
+
                     POINT current{};
-                    const bool currentValid = Project_(translation + noc::Rotate(rotation, local) * gizmoLength, current);
-                    if (currentValid && previousValid)
+                    const bool currentValid =
+                        Project_(
+                            pivot
+                                + GizmoRingWorldVector(
+                                    axes,
+                                    axis,
+                                    angle)
+                                    * gizmoLength,
+                            current);
+
+                    if (currentValid
+                        && previousValid)
                     {
-                        MoveToEx(dc, previous.x, previous.y, nullptr);
-                        LineTo(dc, current.x, current.y);
+                        MoveToEx(
+                            dc,
+                            previous.x,
+                            previous.y,
+                            nullptr);
+                        LineTo(
+                            dc,
+                            current.x,
+                            current.y);
                     }
+
                     previous = current;
                     previousValid = currentValid;
                 }
+
                 SelectObject(dc, oldPen);
                 DeleteObject(pen);
             }
+
             return;
         }
 
-        for (int i = 0; i < 3; ++i)
+        for (int axis = 0;
+             axis < 3;
+             ++axis)
         {
             POINT end{};
-            if (!Project_(translation + noc::Rotate(rotation, axes[i]) * gizmoLength, end)) continue;
-            const bool active = gizmoAxis_ == i;
-            const COLORREF color = active ? highlight : colors[i];
-            DrawLine(dc, center, end, color, active ? 4 : 3);
+            if (!Project_(
+                    pivot
+                        + axes[axis] * gizmoLength,
+                    end))
+            {
+                continue;
+            }
+
+            const bool active =
+                gizmoAxis_ == axis;
+            const COLORREF color =
+                active
+                    ? highlight
+                    : colors[axis];
+
+            DrawLine(
+                dc,
+                center,
+                end,
+                color,
+                active ? 4 : 3);
+
             if (tool == kMoveTool)
-                DrawArrowHead(dc, center, end, color);
+            {
+                DrawArrowHead(
+                    dc,
+                    center,
+                    end,
+                    color);
+            }
             else
-                DrawScaleHandle(dc, end, color);
+            {
+                DrawScaleHandle(
+                    dc,
+                    end,
+                    color);
+            }
         }
     }
 
@@ -1278,6 +1871,14 @@ namespace nocturne::editor
         case WM_MOUSEMOVE: case WM_MOUSELEAVE: case WM_MOUSEWHEEL: case WM_CAPTURECHANGED:
             self->HandleViewportMouse_(msg, wParam, lParam);
             return 0;
+        case WM_KEYDOWN:
+            if (wParam == VK_ESCAPE
+                && self->gizmoDragging_)
+            {
+                self->CancelGizmoDrag_();
+                return 0;
+            }
+            break;
         case WM_SETFOCUS:
             if (self->overlay_) InvalidateRect(self->overlay_, nullptr, FALSE);
             return DefSubclassProc(hwnd, msg, wParam, lParam);
