@@ -31,6 +31,8 @@ namespace noc
         DuplicateEnumNumericValue,
         UnknownEnumUnderlyingType,
         InvalidEnumUnderlyingType,
+        InvalidAttributeMetadata,
+        DuplicateAttributeKind,
         AllocationFailure,
         ValidationFailure
     };
@@ -54,6 +56,8 @@ namespace noc
         case ReflectionRegistryError::DuplicateEnumNumericValue: return "DuplicateEnumNumericValue";
         case ReflectionRegistryError::UnknownEnumUnderlyingType: return "UnknownEnumUnderlyingType";
         case ReflectionRegistryError::InvalidEnumUnderlyingType: return "InvalidEnumUnderlyingType";
+        case ReflectionRegistryError::InvalidAttributeMetadata: return "InvalidAttributeMetadata";
+        case ReflectionRegistryError::DuplicateAttributeKind: return "DuplicateAttributeKind";
         case ReflectionRegistryError::AllocationFailure: return "AllocationFailure";
         case ReflectionRegistryError::ValidationFailure: return "ValidationFailure";
         }
@@ -110,6 +114,14 @@ namespace noc
         [[nodiscard]] const EnumValueMetadata* FindEnumValueByRawValue(
             TypeId enumTypeId,
             uint64_t rawValue) const noexcept;
+
+        [[nodiscard]] const AttributeMetadata* FindTypeAttribute(
+            TypeId typeId,
+            AttributeKind kind) const noexcept;
+        [[nodiscard]] const AttributeMetadata* FindPropertyAttribute(
+            TypeId ownerTypeId,
+            PropertyId propertyId,
+            AttributeKind kind) const noexcept;
 
     private:
         struct Impl;

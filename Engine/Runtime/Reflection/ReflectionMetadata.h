@@ -107,6 +107,104 @@ namespace noc
         return (static_cast<uint32_t>(value) & static_cast<uint32_t>(flag)) != 0;
     }
 
+    enum class AttributeKind : uint8_t
+    {
+        Invalid = 0,
+        DisplayName,
+        Category,
+        Tooltip,
+        NumericRange,
+        NumericStep,
+        Units,
+        Angle,
+        Color,
+        Multiline,
+        ResourceTypeConstraint,
+        EditorWidgetHint,
+        SerializationAlias,
+        ScriptingAlias,
+        ReadOnlyReason
+    };
+
+    enum class AttributeValueKind : uint8_t
+    {
+        None = 0,
+        String,
+        Number,
+        Range,
+        TypeId,
+        Boolean
+    };
+
+    struct AttributeMetadata
+    {
+        AttributeKind kind = AttributeKind::Invalid;
+        AttributeValueKind valueKind = AttributeValueKind::None;
+
+        const char* stringValue = nullptr;
+        double numberA = 0.0;
+        double numberB = 0.0;
+        TypeId typeIdValue{};
+        bool boolValue = false;
+    };
+
+    [[nodiscard]] constexpr AttributeMetadata MakeStringAttribute(
+        AttributeKind kind,
+        const char* value) noexcept
+    {
+        AttributeMetadata result{};
+        result.kind = kind;
+        result.valueKind = AttributeValueKind::String;
+        result.stringValue = value;
+        return result;
+    }
+
+    [[nodiscard]] constexpr AttributeMetadata MakeNumberAttribute(
+        AttributeKind kind,
+        double value) noexcept
+    {
+        AttributeMetadata result{};
+        result.kind = kind;
+        result.valueKind = AttributeValueKind::Number;
+        result.numberA = value;
+        return result;
+    }
+
+    [[nodiscard]] constexpr AttributeMetadata MakeRangeAttribute(
+        AttributeKind kind,
+        double minimum,
+        double maximum) noexcept
+    {
+        AttributeMetadata result{};
+        result.kind = kind;
+        result.valueKind = AttributeValueKind::Range;
+        result.numberA = minimum;
+        result.numberB = maximum;
+        return result;
+    }
+
+    [[nodiscard]] constexpr AttributeMetadata MakeTypeIdAttribute(
+        AttributeKind kind,
+        TypeId typeId) noexcept
+    {
+        AttributeMetadata result{};
+        result.kind = kind;
+        result.valueKind = AttributeValueKind::TypeId;
+        result.typeIdValue = typeId;
+        return result;
+    }
+
+    [[nodiscard]] constexpr AttributeMetadata MakeBooleanAttribute(
+        AttributeKind kind,
+        bool value = true) noexcept
+    {
+        AttributeMetadata result{};
+        result.kind = kind;
+        result.valueKind = AttributeValueKind::Boolean;
+        result.boolValue = value;
+        return result;
+    }
+
     struct TypeLifecycleOperations
     {
         void (*defaultConstruct)(void* destination) = nullptr;
@@ -161,6 +259,9 @@ namespace noc
 
         PropertyValidateFn validate = nullptr;
         PropertyDefaultValueFn defaultValue = nullptr;
+
+        const AttributeMetadata* attributes = nullptr;
+        uint32_t attributeCount = 0;
     };
 
     struct EnumValueMetadata
@@ -374,6 +475,9 @@ namespace noc
         const PropertyMetadata* properties = nullptr;
         uint32_t propertyCount = 0;
 
+        const AttributeMetadata* attributes = nullptr;
+        uint32_t attributeCount = 0;
+
         const EnumMetadata* enumMetadata = nullptr;
     };
 
@@ -394,6 +498,8 @@ namespace noc
             static_cast<uint32_t>(alignof(T)),
             flags,
             MakeTypeLifecycleOperations<T>(),
+            nullptr,
+            0,
             nullptr,
             0,
             nullptr
@@ -431,7 +537,9 @@ namespace noc
                 ? nullptr
                 : &reflection_detail::MutableAddressMember<Owner, Value, Member>,
             nullptr,
-            nullptr
+            nullptr,
+            nullptr,
+            0
         };
     }
 }

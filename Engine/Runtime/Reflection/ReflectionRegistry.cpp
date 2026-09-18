@@ -2,6 +2,7 @@
 
 #include "Core/Memory/Allocator.h"
 
+#include <cmath>
 #include <cstddef>
 #include <cstring>
 #include <new>
@@ -15,7 +16,100 @@ namespace noc
             return value != 0 && (value & (value - 1u)) == 0;
         }
 
-        [[nodiscard]] bool IsPropertyValid(
+        [[nodiscard]] AttributeValueKind ExpectedAttributeValueKind(
+            AttributeKind kind) noexcept
+        {
+            switch (kind)
+            {
+            case AttributeKind::DisplayName:
+            case AttributeKind::Category:
+            case AttributeKind::Tooltip:
+            case AttributeKind::Units:
+            case AttributeKind::EditorWidgetHint:
+            case AttributeKind::SerializationAlias:
+            case AttributeKind::ScriptingAlias:
+            case AttributeKind::ReadOnlyReason:
+                return AttributeValueKind::String;
+            case AttributeKind::NumericRange:
+                return AttributeValueKind::Range;
+            case AttributeKind::NumericStep:
+                return AttributeValueKind::Number;
+            case AttributeKind::ResourceTypeConstraint:
+                return AttributeValueKind::TypeId;
+            case AttributeKind::Angle:
+            case AttributeKind::Color:
+            case AttributeKind::Multiline:
+                return AttributeValueKind::Boolean;
+            case AttributeKind::Invalid:
+                break;
+            }
+            return AttributeValueKind::None;
+        }
+
+        [[nodiscard]] ReflectionRegistryError ValidateAttributes(
+            const AttributeMetadata* attributes,
+            uint32_t count) noexcept
+        {
+            if (count == 0)
+                return attributes == nullptr
+                    ? ReflectionRegistryError::None
+                    : ReflectionRegistryError::InvalidAttributeMetadata;
+
+            if (!attributes)
+                return ReflectionRegistryError::InvalidAttributeMetadata;
+
+            for (uint32_t i = 0; i < count; ++i)
+            {
+                const AttributeMetadata& attribute = attributes[i];
+                const AttributeValueKind expected =
+                    ExpectedAttributeValueKind(attribute.kind);
+
+                if (attribute.kind == AttributeKind::Invalid
+                    || expected == AttributeValueKind::None
+                    || attribute.valueKind != expected)
+                {
+                    return ReflectionRegistryError::InvalidAttributeMetadata;
+                }
+
+                if (attribute.valueKind == AttributeValueKind::String)
+                {
+                    if (!attribute.stringValue
+                        || attribute.stringValue[0] == '\0')
+                    {
+                        return ReflectionRegistryError::InvalidAttributeMetadata;
+                    }
+                }
+                else if (attribute.valueKind == AttributeValueKind::Number)
+                {
+                    if (!std::isfinite(attribute.numberA))
+                        return ReflectionRegistryError::InvalidAttributeMetadata;
+                }
+                else if (attribute.valueKind == AttributeValueKind::Range)
+                {
+                    if (!std::isfinite(attribute.numberA)
+                        || !std::isfinite(attribute.numberB)
+                        || attribute.numberA > attribute.numberB)
+                    {
+                        return ReflectionRegistryError::InvalidAttributeMetadata;
+                    }
+                }
+                else if (attribute.valueKind == AttributeValueKind::TypeId)
+                {
+                    if (!attribute.typeIdValue.IsValid())
+                        return ReflectionRegistryError::InvalidAttributeMetadata;
+                }
+
+                for (uint32_t j = 0; j < i; ++j)
+                {
+                    if (attributes[j].kind == attribute.kind)
+                        return ReflectionRegistryError::DuplicateAttributeKind;
+                }
+            }
+
+            return ReflectionRegistryError::None;
+        }
+
+        [[nodiscard]] bool IsPropertyBaseValid(
             const PropertyMetadata& property,
             TypeId expectedOwner) noexcept
         {
@@ -72,10 +166,8 @@ namespace noc
                 {
                     const EnumValueMetadata& previous =
                         metadata.enumMetadata->values[j];
-
                     if (previous.valueId == value.valueId)
                         return ReflectionRegistryError::DuplicateEnumValueId;
-
                     if (std::strcmp(
                             previous.canonicalName,
                             value.canonicalName) == 0)
@@ -83,7 +175,6 @@ namespace noc
                         return ReflectionRegistryError::
                             DuplicateEnumValueCanonicalName;
                     }
-
                     if (previous.rawValue == value.rawValue)
                         return ReflectionRegistryError::DuplicateEnumNumericValue;
                 }
@@ -107,6 +198,11 @@ namespace noc
                 return ReflectionRegistryError::InvalidMetadata;
             }
 
+            ReflectionRegistryError attributeError =
+                ValidateAttributes(metadata.attributes, metadata.attributeCount);
+            if (attributeError != ReflectionRegistryError::None)
+                return attributeError;
+
             if (metadata.propertyCount == 0)
             {
                 if (metadata.properties != nullptr)
@@ -120,8 +216,14 @@ namespace noc
                 for (uint32_t i = 0; i < metadata.propertyCount; ++i)
                 {
                     const PropertyMetadata& property = metadata.properties[i];
-                    if (!IsPropertyValid(property, metadata.typeId))
+                    if (!IsPropertyBaseValid(property, metadata.typeId))
                         return ReflectionRegistryError::InvalidMetadata;
+
+                    attributeError = ValidateAttributes(
+                        property.attributes,
+                        property.attributeCount);
+                    if (attributeError != ReflectionRegistryError::None)
+                        return attributeError;
 
                     for (uint32_t j = 0; j < i; ++j)
                     {
@@ -151,9 +253,81 @@ namespace noc
                 allocator.Allocate(length + 1u, alignof(char)));
             if (!copy)
                 return nullptr;
-
             std::memcpy(copy, source, length + 1u);
             return copy;
+        }
+
+        void DestroyAttributes(
+            IAllocator& allocator,
+            const AttributeMetadata*& attributes,
+            uint32_t& count)
+        {
+            if (!attributes)
+            {
+                count = 0;
+                return;
+            }
+
+            auto* owned = const_cast<AttributeMetadata*>(attributes);
+            for (uint32_t i = 0; i < count; ++i)
+            {
+                if (owned[i].valueKind == AttributeValueKind::String
+                    && owned[i].stringValue)
+                {
+                    allocator.Deallocate(
+                        const_cast<char*>(owned[i].stringValue));
+                }
+            }
+
+            allocator.Deallocate(owned);
+            attributes = nullptr;
+            count = 0;
+        }
+
+        [[nodiscard]] bool CopyAttributes(
+            IAllocator& allocator,
+            const AttributeMetadata* source,
+            uint32_t count,
+            const AttributeMetadata*& destination,
+            uint32_t& destinationCount)
+        {
+            destination = nullptr;
+            destinationCount = 0;
+            if (count == 0)
+                return true;
+
+            auto* copy = static_cast<AttributeMetadata*>(
+                allocator.Allocate(
+                    sizeof(AttributeMetadata) * count,
+                    alignof(AttributeMetadata)));
+            if (!copy)
+                return false;
+
+            for (uint32_t i = 0; i < count; ++i)
+                new (copy + i) AttributeMetadata(source[i]);
+
+            destination = copy;
+            destinationCount = count;
+
+            for (uint32_t i = 0; i < count; ++i)
+            {
+                if (copy[i].valueKind == AttributeValueKind::String)
+                {
+                    copy[i].stringValue = nullptr;
+                    copy[i].stringValue =
+                        CopyString(allocator, source[i].stringValue);
+                    if (!copy[i].stringValue)
+                    {
+                        DestroyAttributes(
+                            allocator,
+                            destination,
+                            destinationCount);
+                        return false;
+                    }
+                }
+            }
+
+            return true;
         }
 
         void DestroyOwnedMetadata(
@@ -189,6 +363,10 @@ namespace noc
                     const_cast<PropertyMetadata*>(metadata.properties);
                 for (uint32_t i = 0; i < metadata.propertyCount; ++i)
                 {
+                    DestroyAttributes(
+                        allocator,
+                        properties[i].attributes,
+                        properties[i].attributeCount);
                     if (properties[i].canonicalName)
                     {
                         allocator.Deallocate(
@@ -199,6 +377,11 @@ namespace noc
                 metadata.properties = nullptr;
                 metadata.propertyCount = 0;
             }
+
+            DestroyAttributes(
+                allocator,
+                metadata.attributes,
+                metadata.attributeCount);
 
             if (metadata.canonicalName)
             {
@@ -217,12 +400,25 @@ namespace noc
             destination.canonicalName = nullptr;
             destination.properties = nullptr;
             destination.propertyCount = 0;
+            destination.attributes = nullptr;
+            destination.attributeCount = 0;
             destination.enumMetadata = nullptr;
 
             destination.canonicalName =
                 CopyString(allocator, source.canonicalName);
             if (!destination.canonicalName)
                 return false;
+
+            if (!CopyAttributes(
+                    allocator,
+                    source.attributes,
+                    source.attributeCount,
+                    destination.attributes,
+                    destination.attributeCount))
+            {
+                DestroyOwnedMetadata(allocator, destination);
+                return false;
+            }
 
             if (source.propertyCount > 0)
             {
@@ -246,9 +442,18 @@ namespace noc
                 {
                     properties[i] = source.properties[i];
                     properties[i].canonicalName = nullptr;
+                    properties[i].attributes = nullptr;
+                    properties[i].attributeCount = 0;
+
                     properties[i].canonicalName =
                         CopyString(allocator, source.properties[i].canonicalName);
-                    if (!properties[i].canonicalName)
+                    if (!properties[i].canonicalName
+                        || !CopyAttributes(
+                            allocator,
+                            source.properties[i].attributes,
+                            source.properties[i].attributeCount,
+                            properties[i].attributes,
+                            properties[i].attributeCount))
                     {
                         DestroyOwnedMetadata(allocator, destination);
                         return false;
@@ -308,7 +513,6 @@ namespace noc
     struct ReflectionRegistry::Impl
     {
         struct Entry { TypeMetadata metadata{}; };
-
         IAllocator* allocator = nullptr;
         Entry* entries = nullptr;
         uint32_t count = 0;
@@ -334,7 +538,6 @@ namespace noc
 
             for (uint32_t i = 0; i < target; ++i)
                 new (newEntries + i) Entry{};
-
             for (uint32_t i = 0; i < count; ++i)
                 newEntries[i] = entries[i];
 
@@ -541,7 +744,6 @@ namespace noc
                         ReflectionRegistryError::UnknownEnumUnderlyingType;
                     return false;
                 }
-
                 if (underlying->kind != TypeKind::SignedInteger
                     && underlying->kind != TypeKind::UnsignedInteger)
                 {
@@ -581,7 +783,6 @@ namespace noc
     {
         if (!impl_ || !typeId.IsValid() || impl_->count == 0)
             return nullptr;
-
         const uint32_t index = impl_->LowerBound(typeId);
         if (index >= impl_->count
             || impl_->entries[index].metadata.typeId != typeId)
@@ -596,7 +797,6 @@ namespace noc
     {
         if (!impl_ || !canonicalName || canonicalName[0] == '\0')
             return nullptr;
-
         for (uint32_t i = 0; i < impl_->count; ++i)
         {
             if (std::strcmp(
@@ -622,11 +822,9 @@ namespace noc
     {
         if (!propertyId.IsValid())
             return nullptr;
-
         const TypeMetadata* type = FindType(ownerTypeId);
         if (!type)
             return nullptr;
-
         for (uint32_t i = 0; i < type->propertyCount; ++i)
         {
             if (type->properties[i].propertyId == propertyId)
@@ -641,11 +839,9 @@ namespace noc
     {
         if (!canonicalName || canonicalName[0] == '\0')
             return nullptr;
-
         const TypeMetadata* type = FindType(ownerTypeId);
         if (!type)
             return nullptr;
-
         for (uint32_t i = 0; i < type->propertyCount; ++i)
         {
             if (std::strcmp(
@@ -664,11 +860,9 @@ namespace noc
     {
         if (!valueId.IsValid())
             return nullptr;
-
         const TypeMetadata* type = FindType(enumTypeId);
         if (!type || type->kind != TypeKind::Enum || !type->enumMetadata)
             return nullptr;
-
         for (uint32_t i = 0; i < type->enumMetadata->valueCount; ++i)
         {
             if (type->enumMetadata->values[i].valueId == valueId)
@@ -683,11 +877,9 @@ namespace noc
     {
         if (!canonicalName || canonicalName[0] == '\0')
             return nullptr;
-
         const TypeMetadata* type = FindType(enumTypeId);
         if (!type || type->kind != TypeKind::Enum || !type->enumMetadata)
             return nullptr;
-
         for (uint32_t i = 0; i < type->enumMetadata->valueCount; ++i)
         {
             if (std::strcmp(
@@ -707,11 +899,42 @@ namespace noc
         const TypeMetadata* type = FindType(enumTypeId);
         if (!type || type->kind != TypeKind::Enum || !type->enumMetadata)
             return nullptr;
-
         for (uint32_t i = 0; i < type->enumMetadata->valueCount; ++i)
         {
             if (type->enumMetadata->values[i].rawValue == rawValue)
                 return &type->enumMetadata->values[i];
+        }
+        return nullptr;
+    }
+
+    const AttributeMetadata* ReflectionRegistry::FindTypeAttribute(
+        TypeId typeId,
+        AttributeKind kind) const noexcept
+    {
+        const TypeMetadata* type = FindType(typeId);
+        if (!type)
+            return nullptr;
+        for (uint32_t i = 0; i < type->attributeCount; ++i)
+        {
+            if (type->attributes[i].kind == kind)
+                return &type->attributes[i];
+        }
+        return nullptr;
+    }
+
+    const AttributeMetadata* ReflectionRegistry::FindPropertyAttribute(
+        TypeId ownerTypeId,
+        PropertyId propertyId,
+        AttributeKind kind) const noexcept
+    {
+        const PropertyMetadata* property =
+            FindProperty(ownerTypeId, propertyId);
+        if (!property)
+            return nullptr;
+        for (uint32_t i = 0; i < property->attributeCount; ++i)
+        {
+            if (property->attributes[i].kind == kind)
+                return &property->attributes[i];
         }
         return nullptr;
     }

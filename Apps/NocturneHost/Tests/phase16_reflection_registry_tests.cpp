@@ -88,7 +88,18 @@ bool RunPhase16ReflectionRegistryTests()
     char mutableTypeName[] = "Nocturne.Tests.RegistryA";
     char mutablePropertyName[] = "value";
 
-    const noc::PropertyMetadata typeAProperties[] = {
+    char mutableAttributeText[] = "Registry Value";
+    const noc::AttributeMetadata valueAttributes[] = {
+        noc::MakeStringAttribute(
+            noc::AttributeKind::DisplayName,
+            mutableAttributeText),
+        noc::MakeRangeAttribute(
+            noc::AttributeKind::NumericRange,
+            -100.0,
+            100.0)
+    };
+
+    noc::PropertyMetadata typeAProperties[] = {
         noc::MakeMemberPropertyMetadata<
             RegistryTypeA,
             int,
@@ -101,6 +112,15 @@ bool RunPhase16ReflectionRegistryTests()
                     | noc::PropertyFlags::Serializable)
     };
 
+    typeAProperties[0].attributes = valueAttributes;
+    typeAProperties[0].attributeCount = 2;
+
+    const noc::AttributeMetadata typeAAttributes[] = {
+        noc::MakeStringAttribute(
+            noc::AttributeKind::Category,
+            "Tests")
+    };
+
     noc::TypeMetadata typeA =
         noc::MakeTypeMetadata<RegistryTypeA>(
             kTypeA,
@@ -110,6 +130,8 @@ bool RunPhase16ReflectionRegistryTests()
             noc::TypeFlags::Serializable);
     typeA.properties = typeAProperties;
     typeA.propertyCount = 1;
+    typeA.attributes = typeAAttributes;
+    typeA.attributeCount = 1;
 
     const noc::TypeMetadata typeB =
         noc::MakeTypeMetadata<RegistryTypeB>(
@@ -138,6 +160,7 @@ bool RunPhase16ReflectionRegistryTests()
 
     mutableTypeName[0] = 'X';
     mutablePropertyName[0] = 'X';
+    mutableAttributeText[0] = 'X';
 
     const noc::TypeMetadata* foundA = registry.FindType(kTypeA);
     const noc::PropertyMetadata* foundValue =
@@ -155,6 +178,29 @@ bool RunPhase16ReflectionRegistryTests()
         foundValue
             && std::strcmp(foundValue->canonicalName, "value") == 0,
         "Registry did not deep-copy property descriptor/name");
+
+    const noc::AttributeMetadata* displayName =
+        registry.FindPropertyAttribute(
+            kTypeA,
+            foundValue->propertyId,
+            noc::AttributeKind::DisplayName);
+    const noc::AttributeMetadata* category =
+        registry.FindTypeAttribute(
+            kTypeA,
+            noc::AttributeKind::Category);
+
+    ok &= CheckReflectionRegistry(
+        displayName
+            && displayName->valueKind
+                == noc::AttributeValueKind::String
+            && std::strcmp(
+                displayName->stringValue,
+                "Registry Value") == 0,
+        "Registry did not own property attribute string");
+    ok &= CheckReflectionRegistry(
+        category
+            && std::strcmp(category->stringValue, "Tests") == 0,
+        "Type attribute lookup failed");
 
     RegistryTypeA object{};
     object.value = 7;
@@ -240,6 +286,29 @@ bool RunPhase16ReflectionRegistryTests()
                 == noc::ReflectionRegistryError::
                     DuplicatePropertyCanonicalName,
         "Duplicate property canonical name must be rejected");
+
+    const noc::AttributeMetadata duplicateAttributes[] = {
+        noc::MakeStringAttribute(
+            noc::AttributeKind::Tooltip,
+            "First"),
+        noc::MakeStringAttribute(
+            noc::AttributeKind::Tooltip,
+            "Second")
+    };
+    noc::TypeMetadata duplicateAttributeType =
+        noc::MakeTypeMetadata<RegistryTypeA>(
+            noc::TypeId{ 412 },
+            "Nocturne.Tests.DuplicateAttribute",
+            noc::TypeKind::Struct,
+            1);
+    duplicateAttributeType.attributes = duplicateAttributes;
+    duplicateAttributeType.attributeCount = 2;
+
+    ok &= CheckReflectionRegistry(
+        !registry.RegisterType(duplicateAttributeType)
+            && registry.LastError()
+                == noc::ReflectionRegistryError::DuplicateAttributeKind,
+        "Duplicate attribute kinds must be rejected");
 
     ok &= CheckReflectionRegistry(
         registry.Freeze(),
