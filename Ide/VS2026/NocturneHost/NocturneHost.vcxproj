@@ -49,6 +49,10 @@
     <ClCompile Include="..\..\..\Apps\NocturneHost\Tests\phase16_reflection_registry_tests.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneHost\Tests\phase16_reflection_ocp_tests.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneHost\Tests\phase16_reflection_perf_tests.cpp" />
+    <ClCompile Include="..\..\..\Apps\NocturneHost\Tests\phase16_editor_session_tests.cpp" />
+    <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorCommands.cpp" />
+    <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorSession.cpp" />
+    <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorCommandHistory.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneHost\ZipWriter.cpp" />
   </ItemGroup>
   <ItemGroup>
