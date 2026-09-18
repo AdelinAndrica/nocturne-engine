@@ -72,21 +72,24 @@ namespace nocturne::editor
             noc::TypeId componentTypeId,
             const InspectorPropertyView& property) noexcept
         {
-            if (componentTypeId != kInspectorTransformTypeId)
-                return InspectorEditPresentation::Generic;
-
-            if ((property.propertyId == kInspectorTranslationPropertyId
-                    || property.propertyId == kInspectorScalePropertyId)
-                && property.valueTypeId == noc::BuiltinTypeIds::Vec3)
+            if (componentTypeId == kInspectorTransformTypeId)
             {
-                return InspectorEditPresentation::Vector3Axis;
+                if ((property.propertyId == kInspectorTranslationPropertyId
+                        || property.propertyId == kInspectorScalePropertyId)
+                    && property.valueTypeId == noc::BuiltinTypeIds::Vec3)
+                {
+                    return InspectorEditPresentation::Vector3Axis;
+                }
+
+                if (property.propertyId == kInspectorRotationPropertyId
+                    && property.valueTypeId == noc::BuiltinTypeIds::Quat)
+                {
+                    return InspectorEditPresentation::EulerDegreesAxis;
+                }
             }
 
-            if (property.propertyId == kInspectorRotationPropertyId
-                && property.valueTypeId == noc::BuiltinTypeIds::Quat)
-            {
-                return InspectorEditPresentation::EulerDegreesAxis;
-            }
+            if (property.displayAngleDegrees)
+                return InspectorEditPresentation::AngleDegrees;
 
             return InspectorEditPresentation::Generic;
         }
@@ -95,12 +98,17 @@ namespace nocturne::editor
             noc::TypeId componentTypeId,
             const InspectorPropertyView& property) noexcept
         {
-            return InspectorPresentationFor(
-                       componentTypeId,
-                       property)
-                    == InspectorEditPresentation::Generic
-                ? 1u
-                : 3u;
+            const InspectorEditPresentation presentation =
+                InspectorPresentationFor(
+                    componentTypeId,
+                    property);
+
+            return presentation
+                        == InspectorEditPresentation::Vector3Axis
+                    || presentation
+                        == InspectorEditPresentation::EulerDegreesAxis
+                ? 3u
+                : 1u;
         }
 
         const wchar_t* InspectorPropertyPresentationLabel(
@@ -165,6 +173,13 @@ namespace nocturne::editor
                 && !noc::HasFlag(
                     property.flags,
                     noc::PropertyFlags::ReadOnly);
+        }
+
+        bool IsBoolToggleProperty(
+            const InspectorPropertyView& property) noexcept
+        {
+            return property.editable
+                && property.valueKind == noc::TypeKind::Bool;
         }
 
         enum class Icon
@@ -1815,9 +1830,18 @@ namespace nocturne::editor
             binding.hwnd = nullptr;
         }
 
+        for (InspectorBoolBinding& binding :
+             inspectorBoolButtons_)
+        {
+            if (binding.hwnd)
+                DestroyWindow(binding.hwnd);
+            binding.hwnd = nullptr;
+        }
+
         inspectorEdits_.clear();
         inspectorRemoveButtons_.clear();
         inspectorResourceButtons_.clear();
+        inspectorBoolButtons_.clear();
         inspectorControlsRefreshing_ = false;
     }
 
@@ -1835,6 +1859,7 @@ namespace nocturne::editor
         size_t editableCount = 0;
         size_t removableCount = 0;
         size_t resourceCount = 0;
+        size_t boolCount = 0;
 
         for (const InspectorComponentView& component :
              inspectorModel_.Components())
@@ -1848,6 +1873,10 @@ namespace nocturne::editor
                 if (IsResourcePickerProperty(property))
                 {
                     ++resourceCount;
+                }
+                else if (IsBoolToggleProperty(property))
+                {
+                    ++boolCount;
                 }
                 else if (property.editable)
                 {
@@ -1864,6 +1893,7 @@ namespace nocturne::editor
             inspectorEdits_.reserve(editableCount);
             inspectorRemoveButtons_.reserve(removableCount);
             inspectorResourceButtons_.reserve(resourceCount);
+            inspectorBoolButtons_.reserve(boolCount);
         }
         catch (const std::bad_alloc&)
         {
@@ -1984,6 +2014,56 @@ namespace nocturne::editor
 
                     (void)SyncInspectorResourceValue_(
                         inspectorResourceButtons_.back());
+                    continue;
+                }
+
+                if (IsBoolToggleProperty(property))
+                {
+                    const size_t boolIndex =
+                        inspectorBoolButtons_.size();
+
+                    if (boolIndex
+                        > static_cast<size_t>(
+                            0xFFFF - IdInspectorBoolBase))
+                    {
+                        DestroyInspectorControls_();
+                        return false;
+                    }
+
+                    HWND toggle = MakeButton(
+                        hwnd_,
+                        IdInspectorBoolBase
+                            + static_cast<int>(boolIndex),
+                        L"Off",
+                        Icon::None,
+                        ButtonKind::Tool,
+                        uiFont_);
+
+                    if (!toggle)
+                    {
+                        DestroyInspectorControls_();
+                        return false;
+                    }
+
+                    ShowWindow(toggle, SW_HIDE);
+
+                    try
+                    {
+                        inspectorBoolButtons_.push_back({
+                            toggle,
+                            component.typeId,
+                            property.propertyId
+                        });
+                    }
+                    catch (const std::bad_alloc&)
+                    {
+                        DestroyWindow(toggle);
+                        DestroyInspectorControls_();
+                        return false;
+                    }
+
+                    (void)SyncInspectorBoolValue_(
+                        inspectorBoolButtons_.back());
                     continue;
                 }
 
@@ -2142,6 +2222,7 @@ namespace nocturne::editor
         size_t bindingIndex = 0;
         size_t removeIndex = 0;
         size_t resourceIndex = 0;
+        size_t boolIndex = 0;
         int y = 43;
 
         for (const InspectorComponentView& component :
@@ -2218,6 +2299,43 @@ namespace nocturne::editor
                     }
 
                     ++resourceIndex;
+                }
+                else if (IsBoolToggleProperty(property))
+                {
+                    if (boolIndex
+                        >= inspectorBoolButtons_.size())
+                    {
+                        return;
+                    }
+
+                    HWND toggle =
+                        inspectorBoolButtons_[boolIndex].hwnd;
+
+                    const int x =
+                        labelWidth + 4;
+                    const int width =
+                        (std::max)(
+                            32,
+                            bodyWidth - x - 12);
+                    const bool visible =
+                        y >= 0
+                        && y + 24 <= bodyHeight - 40;
+
+                    if (toggle)
+                    {
+                        MoveWindow(
+                            toggle,
+                            bodyLeft + x,
+                            bodyTop + y + 1,
+                            width,
+                            22,
+                            TRUE);
+                        ShowWindow(
+                            toggle,
+                            visible ? SW_SHOW : SW_HIDE);
+                    }
+
+                    ++boolIndex;
                 }
                 else if (property.editable)
                 {
@@ -2735,6 +2853,123 @@ namespace nocturne::editor
                 : L"Mesh assignment cleared.");
     }
 
+    EditorShellV3::InspectorBoolBinding*
+    EditorShellV3::FindInspectorBoolButton_(
+        HWND source) noexcept
+    {
+        for (InspectorBoolBinding& binding :
+             inspectorBoolButtons_)
+        {
+            if (binding.hwnd == source)
+                return &binding;
+        }
+
+        return nullptr;
+    }
+
+    bool EditorShellV3::SyncInspectorBoolValue_(
+        const InspectorBoolBinding& binding)
+    {
+        if (!binding.hwnd
+            || !session_
+            || !inspectorModel_.Entity().IsValid())
+        {
+            return false;
+        }
+
+        auto context =
+            session_->CommandContext();
+
+        noc::OwnedReflectedValue value;
+        if (!inspectorModel_.ReadValue(
+                context,
+                inspectorModel_.Entity(),
+                binding.componentTypeId,
+                binding.propertyId,
+                value)
+            || value.Type() != noc::BuiltinTypeIds::Bool
+            || !value.Data())
+        {
+            return false;
+        }
+
+        const bool enabled =
+            *static_cast<const bool*>(value.Data());
+
+        SetWindowTextW(
+            binding.hwnd,
+            enabled ? L"On" : L"Off");
+        ButtonActive(
+            binding.hwnd,
+            enabled);
+        return true;
+    }
+
+    void EditorShellV3::ToggleInspectorBool_(
+        InspectorBoolBinding& binding)
+    {
+        if (!session_
+            || !inspectorModel_.Entity().IsValid())
+        {
+            return;
+        }
+
+        const noc::EntityHandle entity =
+            inspectorModel_.Entity();
+
+        auto context =
+            session_->CommandContext();
+
+        noc::OwnedReflectedValue value;
+        if (!inspectorModel_.ReadValue(
+                context,
+                entity,
+                binding.componentTypeId,
+                binding.propertyId,
+                value)
+            || value.Type() != noc::BuiltinTypeIds::Bool
+            || !value.Data())
+        {
+            AppendConsole_(
+                L"Boolean Inspector toggle could not read the reflected value.");
+            return;
+        }
+
+        const bool current =
+            *static_cast<const bool*>(value.Data());
+
+        if (!inspectorModel_.CommitTextEdit(
+                context,
+                session_->History(),
+                entity,
+                binding.componentTypeId,
+                binding.propertyId,
+                current ? "false" : "true"))
+        {
+            AppendConsole_(
+                L"Boolean Inspector toggle was rejected by the reflected semantic setter.");
+            return;
+        }
+
+        session_->SetSceneDirty();
+
+        if (!inspectorModel_.Refresh(
+                context,
+                entity))
+        {
+            AppendConsole_(
+                L"Inspector refresh after boolean edit failed.");
+            return;
+        }
+
+        SyncInspectorControlValues_();
+
+        if (inspector_.body)
+            InvalidateRect(inspector_.body, nullptr, FALSE);
+
+        UpdateStatus_();
+    }
+
     bool EditorShellV3::SyncInspectorBindingValue_(
         const InspectorEditBinding& binding)
     {
@@ -2762,8 +2997,7 @@ namespace nocturne::editor
         }
 
         if (!session_
-            || !inspectorModel_.Entity().IsValid()
-            || binding.axis > 2)
+            || !inspectorModel_.Entity().IsValid())
         {
             return false;
         }
@@ -2785,44 +3019,80 @@ namespace nocturne::editor
         float componentValue = 0.0f;
 
         if (binding.presentation
-            == InspectorEditPresentation::Vector3Axis)
+            == InspectorEditPresentation::AngleDegrees)
         {
-            if (value.Type() != noc::BuiltinTypeIds::Vec3
-                || !value.Data())
+            constexpr double kRadiansToDegrees =
+                57.29577951308232;
+
+            if (value.Type() == noc::BuiltinTypeIds::Float32
+                && value.Data())
+            {
+                componentValue =
+                    static_cast<float>(
+                        static_cast<double>(
+                            *static_cast<const float*>(
+                                value.Data()))
+                        * kRadiansToDegrees);
+            }
+            else if (value.Type() == noc::BuiltinTypeIds::Float64
+                && value.Data())
+            {
+                componentValue =
+                    static_cast<float>(
+                        *static_cast<const double*>(
+                            value.Data())
+                        * kRadiansToDegrees);
+            }
+            else
             {
                 return false;
             }
-
-            const noc::Vec3& vector =
-                *static_cast<const noc::Vec3*>(
-                    value.Data());
-
-            componentValue =
-                binding.axis == 0
-                    ? vector.x
-                    : (binding.axis == 1
-                        ? vector.y
-                        : vector.z);
         }
         else
         {
-            if (value.Type() != noc::BuiltinTypeIds::Quat
-                || !value.Data())
-            {
+            if (binding.axis > 2)
                 return false;
+
+            if (binding.presentation
+                == InspectorEditPresentation::Vector3Axis)
+            {
+                if (value.Type() != noc::BuiltinTypeIds::Vec3
+                    || !value.Data())
+                {
+                    return false;
+                }
+
+                const noc::Vec3& vector =
+                    *static_cast<const noc::Vec3*>(
+                        value.Data());
+
+                componentValue =
+                    binding.axis == 0
+                        ? vector.x
+                        : (binding.axis == 1
+                            ? vector.y
+                            : vector.z);
             }
+            else
+            {
+                if (value.Type() != noc::BuiltinTypeIds::Quat
+                    || !value.Data())
+                {
+                    return false;
+                }
 
-            const noc::Vec3 euler =
-                EditorEulerXYZDegreesFromQuat(
-                    *static_cast<const noc::Quat*>(
-                        value.Data()));
+                const noc::Vec3 euler =
+                    EditorEulerXYZDegreesFromQuat(
+                        *static_cast<const noc::Quat*>(
+                            value.Data()));
 
-            componentValue =
-                binding.axis == 0
-                    ? euler.x
-                    : (binding.axis == 1
-                        ? euler.y
-                        : euler.z);
+                componentValue =
+                    binding.axis == 0
+                        ? euler.x
+                        : (binding.axis == 1
+                            ? euler.y
+                            : euler.z);
+            }
         }
 
         wchar_t buffer[64]{};
@@ -2851,6 +3121,12 @@ namespace nocturne::editor
              inspectorResourceButtons_)
         {
             (void)SyncInspectorResourceValue_(binding);
+        }
+
+        for (const InspectorBoolBinding& binding :
+             inspectorBoolButtons_)
+        {
+            (void)SyncInspectorBoolValue_(binding);
         }
 
         inspectorControlsRefreshing_ = false;
@@ -2926,6 +3202,38 @@ namespace nocturne::editor
                     componentTypeId,
                     propertyId,
                     utf8.c_str());
+        }
+        else if (binding->presentation
+            == InspectorEditPresentation::AngleDegrees)
+        {
+            float degrees = 0.0f;
+            if (ParseFiniteInspectorFloat(
+                    utf8.c_str(),
+                    degrees))
+            {
+                constexpr double kDegreesToRadians =
+                    0.017453292519943295;
+
+                const double radians =
+                    static_cast<double>(degrees)
+                    * kDegreesToRadians;
+
+                char radiansText[96]{};
+                std::snprintf(
+                    radiansText,
+                    sizeof(radiansText),
+                    "%.17g",
+                    radians);
+
+                committed =
+                    inspectorModel_.CommitTextEdit(
+                        context,
+                        session_->History(),
+                        entity,
+                        componentTypeId,
+                        propertyId,
+                        radiansText);
+            }
         }
         else
         {
@@ -3923,6 +4231,17 @@ namespace nocturne::editor
 
             if (source)
             {
+                InspectorBoolBinding* boolBinding =
+                    FindInspectorBoolButton_(source);
+
+                if (boolBinding)
+                {
+                    ToggleInspectorBool_(
+                        *boolBinding);
+                    result = 0;
+                    return true;
+                }
+
                 InspectorResourceBinding* resourceBinding =
                     FindInspectorResourceButton_(source);
 
@@ -4246,6 +4565,9 @@ namespace nocturne::editor
                         const bool resourcePicker =
                             IsResourcePickerProperty(
                                 property);
+                        const bool boolToggle =
+                            IsBoolToggleProperty(
+                                property);
 
                         const uint32_t controlCount =
                             property.editable
@@ -4254,7 +4576,7 @@ namespace nocturne::editor
                                     property)
                                 : 1u;
 
-                        if (resourcePicker)
+                        if (resourcePicker || boolToggle)
                         {
                             // The child button owns the value field chrome.
                         }

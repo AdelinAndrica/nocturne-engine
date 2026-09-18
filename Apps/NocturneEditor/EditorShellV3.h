@@ -23,7 +23,8 @@ namespace nocturne::editor
     {
         Generic = 0,
         Vector3Axis,
-        EulerDegreesAxis
+        EulerDegreesAxis,
+        AngleDegrees
     };
 
     // Phase 13 UI Fidelity Pass 3 shell.
@@ -106,7 +107,8 @@ namespace nocturne::editor
             IdInspectorAddComponent = 11000,
             IdInspectorEditBase = 12000,
             IdInspectorRemoveBase = 13000,
-            IdInspectorResourceBase = 14000
+            IdInspectorResourceBase = 14000,
+            IdInspectorBoolBase = 15000
         };
 
         struct Panel
@@ -137,6 +139,13 @@ namespace nocturne::editor
             noc::TypeId componentTypeId{};
             noc::PropertyId propertyId{};
             noc::TypeId resourceConstraint{};
+        };
+
+        struct InspectorBoolBinding
+        {
+            HWND hwnd = nullptr;
+            noc::TypeId componentTypeId{};
+            noc::PropertyId propertyId{};
         };
 
         void CreateChrome_();
@@ -192,6 +201,12 @@ namespace nocturne::editor
             const InspectorResourceBinding& binding);
         void ShowResourcePicker_(
             InspectorResourceBinding& binding);
+        [[nodiscard]] InspectorBoolBinding*
+        FindInspectorBoolButton_(HWND source) noexcept;
+        [[nodiscard]] bool SyncInspectorBoolValue_(
+            const InspectorBoolBinding& binding);
+        void ToggleInspectorBool_(
+            InspectorBoolBinding& binding);
 
         static LRESULT CALLBACK InspectorEditSubclassProc_(
             HWND hwnd,
@@ -266,6 +281,8 @@ namespace nocturne::editor
             inspectorRemoveButtons_;
         std::vector<InspectorResourceBinding>
             inspectorResourceButtons_;
+        std::vector<InspectorBoolBinding>
+            inspectorBoolButtons_;
         HWND inspectorAddComponent_ = nullptr;
         bool inspectorControlsRefreshing_ = false;
 
