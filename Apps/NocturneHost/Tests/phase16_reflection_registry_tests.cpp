@@ -1,5 +1,6 @@
 #include "Runtime/Reflection/BuiltinTypes.h"
 #include "Runtime/Reflection/ReflectionRegistry.h"
+#include "Runtime/Reflection/ReflectedValue.h"
 
 #include "Core/Math/MathTypes.h"
 #include "Runtime/Bounds.h"
@@ -40,6 +41,43 @@ namespace
     {
         float value = 0.0f;
         [[nodiscard]] bool operator==(const RegistryTypeC&) const = default;
+    };
+
+    struct OwnedTestValue
+    {
+        static inline int liveCount = 0;
+
+        int value = 0;
+
+        OwnedTestValue() { ++liveCount; }
+        OwnedTestValue(const OwnedTestValue& other)
+            : value(other.value) { ++liveCount; }
+        OwnedTestValue(OwnedTestValue&& other) noexcept
+            : value(other.value)
+        {
+            other.value = -1;
+            ++liveCount;
+        }
+        OwnedTestValue& operator=(const OwnedTestValue&) = default;
+        OwnedTestValue& operator=(OwnedTestValue&&) noexcept = default;
+        ~OwnedTestValue() { --liveCount; }
+
+        [[nodiscard]] bool operator==(
+            const OwnedTestValue& other) const
+        {
+            return value == other.value;
+        }
+    };
+
+    struct alignas(64) OwnedOverAligned
+    {
+        uint64_t words[8]{};
+    };
+
+    struct NoDefaultValue
+    {
+        explicit NoDefaultValue(int inValue) : value(inValue) {}
+        int value = 0;
     };
 
     enum class TestAccess : uint32_t
@@ -639,6 +677,117 @@ bool RunPhase16ReflectionRegistryTests()
     ok &= CheckReflectionRegistry(
         allocator.OutstandingBytes() == 0,
         "Invalid enum Freeze path leaked allocator memory");
+
+    {
+        OwnedTestValue::liveCount = 0;
+
+        const noc::TypeMetadata ownedMetadata =
+            noc::MakeTypeMetadata<OwnedTestValue>(
+                noc::TypeId{ 0x3000000000000001ull },
+                "Nocturne.Tests.OwnedTestValue",
+                noc::TypeKind::Struct,
+                1);
+
+        OwnedTestValue source{};
+        source.value = 77;
+
+        noc::OwnedReflectedValue owned;
+        ok &= CheckReflectionRegistry(
+            owned.InitCopy(allocator, ownedMetadata, &source),
+            "Owned reflected copy initialization failed");
+        ok &= CheckReflectionRegistry(
+            owned.IsValid()
+                && owned.Type() == ownedMetadata.typeId
+                && static_cast<const OwnedTestValue*>(
+                    owned.Data())->value == 77
+                && OwnedTestValue::liveCount == 2,
+            "Owned reflected value state/lifetime mismatch");
+
+        OwnedTestValue replacement{};
+        replacement.value = 91;
+        ok &= CheckReflectionRegistry(
+            owned.CopyAssign(&replacement)
+                && static_cast<const OwnedTestValue*>(
+                    owned.Data())->value == 91,
+            "Owned reflected copy assignment failed");
+
+        noc::OwnedReflectedValue moved = std::move(owned);
+        ok &= CheckReflectionRegistry(
+            !owned.IsValid()
+                && moved.IsValid()
+                && moved.Type() == ownedMetadata.typeId,
+            "Owned reflected move transfer failed");
+
+        ok &= CheckReflectionRegistry(
+            moved.ResetToDefault()
+                && static_cast<const OwnedTestValue*>(
+                    moved.Data())->value == 0,
+            "Owned reflected reset failed");
+
+        OwnedTestValue defaultValue{};
+        ok &= CheckReflectionRegistry(
+            moved.Equals(
+                noc::ReflectedConstValueView{
+                    ownedMetadata.typeId,
+                    &defaultValue }),
+            "Owned reflected equality failed");
+
+        moved.Clear();
+        ok &= CheckReflectionRegistry(
+            OwnedTestValue::liveCount == 3,
+            "Owned reflected Clear did not destroy its object");
+
+        // source, replacement and defaultValue remain alive until scope exit.
+    }
+
+    ok &= CheckReflectionRegistry(
+        OwnedTestValue::liveCount == 0,
+        "Owned reflected value leaked non-trivial objects");
+
+    {
+        const noc::TypeMetadata alignedMetadata =
+            noc::MakeTypeMetadata<OwnedOverAligned>(
+                noc::TypeId{ 0x3000000000000002ull },
+                "Nocturne.Tests.OwnedOverAligned",
+                noc::TypeKind::Struct,
+                1);
+
+        noc::OwnedReflectedValue aligned;
+        ok &= CheckReflectionRegistry(
+            aligned.InitDefault(allocator, alignedMetadata),
+            "Over-aligned reflected value init failed");
+        ok &= CheckReflectionRegistry(
+            reinterpret_cast<uintptr_t>(aligned.Data())
+                % alignof(OwnedOverAligned) == 0,
+            "Owned reflected value lost alignment");
+        aligned.Clear();
+    }
+
+    {
+        const noc::TypeMetadata noDefaultMetadata =
+            noc::MakeTypeMetadata<NoDefaultValue>(
+                noc::TypeId{ 0x3000000000000003ull },
+                "Nocturne.Tests.NoDefault",
+                noc::TypeKind::Struct,
+                1);
+
+        const std::size_t allocationCount =
+            allocator.AllocationCount();
+
+        noc::OwnedReflectedValue unavailable;
+        ok &= CheckReflectionRegistry(
+            !unavailable.InitDefault(
+                allocator,
+                noDefaultMetadata),
+            "Missing default constructor must fail cleanly");
+        ok &= CheckReflectionRegistry(
+            allocator.AllocationCount() == allocationCount,
+            "Failed owned-value init allocated memory");
+    }
+
+    ok &= CheckReflectionRegistry(
+        allocator.OutstandingBytes() == 0,
+        "Reflected value tests leaked allocator memory");
 
     NOC_LOG_INFO(
         "Phase16",
