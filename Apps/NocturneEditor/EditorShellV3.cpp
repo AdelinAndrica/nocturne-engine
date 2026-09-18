@@ -38,7 +38,14 @@ namespace nocturne::editor
         constexpr UINT WM_NOC_V3_ACTIVE = WM_APP + 0x310;
         constexpr UINT WM_NOC_V3_SCROLL = WM_APP + 0x311;
         constexpr UINT WM_NOC_V3_INSPECTOR_REFRESH = WM_APP + 0x312;
+        constexpr UINT WM_NOC_V3_TREE_REPARENT = WM_APP + 0x313;
         constexpr WORD kTreeSelectionChanged = 0x7F01;
+
+        struct TreeReparentRequest
+        {
+            noc::EntityHandle child{};
+            noc::EntityHandle parent{};
+        };
 
         enum class Icon
         {
@@ -71,7 +78,19 @@ namespace nocturne::editor
             bool expanded = true;
             noc::EntityHandle entity{};
         };
-        struct TreeState { std::vector<TreeItem> items; HFONT font = nullptr; int firstRow = 0; int selected = -1; int hover = -1; };
+        struct TreeState
+        {
+            std::vector<TreeItem> items;
+            HFONT font = nullptr;
+            int firstRow = 0;
+            int selected = -1;
+            int hover = -1;
+
+            POINT dragOrigin{};
+            int dragSource = -1;
+            int dropTarget = -1;
+            bool dragging = false;
+        };
         struct TableRow { std::wstring asset; std::wstring type; Icon icon = Icon::None; };
         struct TableState { std::vector<TableRow> rows; HFONT font = nullptr; int firstRow = 0; int selected = -1; int hover = -1; };
         struct ScrollState { int minimum = 0; int maximum = 0; int page = 1; int position = 0; bool thumbHover = false; bool dragging = false; int dragOffset = 0; };
@@ -439,32 +458,121 @@ namespace nocturne::editor
                 if (state)
                 {
                     const auto visible = VisibleTree(*state);
-                    const int visibleRow = state->firstRow + GET_Y_LPARAM(lParam) / rowH;
-                    const int hover = visibleRow >= 0 && visibleRow < static_cast<int>(visible.size()) ? visible[visibleRow] : -1;
-                    if (hover != state->hover) { state->hover = hover; InvalidateRect(hwnd, nullptr, FALSE); }
-                    TRACKMOUSEEVENT t{ sizeof(t), TME_LEAVE, hwnd, 0 }; TrackMouseEvent(&t);
+                    const int visibleRow =
+                        state->firstRow
+                        + GET_Y_LPARAM(lParam) / rowH;
+                    const int hover =
+                        visibleRow >= 0
+                        && visibleRow < static_cast<int>(visible.size())
+                            ? visible[visibleRow]
+                            : -1;
+
+                    bool changed = false;
+
+                    if (hover != state->hover)
+                    {
+                        state->hover = hover;
+                        changed = true;
+                    }
+
+                    if ((wParam & MK_LBUTTON) != 0
+                        && state->dragSource >= 0)
+                    {
+                        const int dx =
+                            GET_X_LPARAM(lParam)
+                            - state->dragOrigin.x;
+                        const int dy =
+                            GET_Y_LPARAM(lParam)
+                            - state->dragOrigin.y;
+
+                        if (!state->dragging
+                            && (std::abs(dx) >= 4
+                                || std::abs(dy) >= 4))
+                        {
+                            state->dragging = true;
+                            SetCapture(hwnd);
+                            changed = true;
+                        }
+
+                        if (state->dragging
+                            && state->dropTarget != hover)
+                        {
+                            state->dropTarget = hover;
+                            changed = true;
+                        }
+                    }
+
+                    if (changed)
+                        InvalidateRect(hwnd, nullptr, FALSE);
+
+                    TRACKMOUSEEVENT t{
+                        sizeof(t),
+                        TME_LEAVE,
+                        hwnd,
+                        0
+                    };
+                    TrackMouseEvent(&t);
                 }
                 return 0;
-            case WM_MOUSELEAVE: if (state) { state->hover = -1; InvalidateRect(hwnd, nullptr, FALSE); } return 0;
+
+            case WM_MOUSELEAVE:
+                if (state && !state->dragging)
+                {
+                    state->hover = -1;
+                    InvalidateRect(hwnd, nullptr, FALSE);
+                }
+                return 0;
+
             case WM_LBUTTONDOWN:
                 if (state)
                 {
                     SetFocus(hwnd);
-                    const auto visible = VisibleTree(*state);
-                    const int visibleRow = state->firstRow + GET_Y_LPARAM(lParam) / rowH;
-                    if (visibleRow >= 0 && visibleRow < static_cast<int>(visible.size()))
+
+                    const auto visible =
+                        VisibleTree(*state);
+                    const int visibleRow =
+                        state->firstRow
+                        + GET_Y_LPARAM(lParam) / rowH;
+
+                    state->dragSource = -1;
+                    state->dropTarget = -1;
+                    state->dragging = false;
+
+                    if (visibleRow >= 0
+                        && visibleRow
+                            < static_cast<int>(visible.size()))
                     {
-                        const int index = visible[visibleRow]; state->selected = index;
-                        const int arrowX = 9 + state->items[index].depth * 16;
-                        if (state->items[index].expandable
+                        const int index =
+                            visible[visibleRow];
+                        state->selected = index;
+
+                        const int arrowX =
+                            9 + state->items[index].depth * 16;
+                        const bool arrowHit =
+                            state->items[index].expandable
                             && GET_X_LPARAM(lParam) >= arrowX
-                            && GET_X_LPARAM(lParam) <= arrowX + 14)
+                            && GET_X_LPARAM(lParam)
+                                <= arrowX + 14;
+
+                        if (arrowHit)
                         {
                             state->items[index].expanded =
                                 !state->items[index].expanded;
                         }
+                        else if (state->items[index].entity.IsValid())
+                        {
+                            state->dragSource = index;
+                            state->dragOrigin = {
+                                GET_X_LPARAM(lParam),
+                                GET_Y_LPARAM(lParam)
+                            };
+                        }
 
-                        InvalidateRect(hwnd, nullptr, FALSE);
+                        InvalidateRect(
+                            hwnd,
+                            nullptr,
+                            FALSE);
+
                         SendMessageW(
                             GetParent(hwnd),
                             WM_COMMAND,
@@ -473,6 +581,59 @@ namespace nocturne::editor
                                 kTreeSelectionChanged),
                             reinterpret_cast<LPARAM>(hwnd));
                     }
+                }
+                return 0;
+
+            case WM_LBUTTONUP:
+                if (state)
+                {
+                    if (GetCapture() == hwnd)
+                        ReleaseCapture();
+
+                    if (state->dragging
+                        && state->dragSource >= 0
+                        && state->dropTarget >= 0
+                        && state->dragSource
+                            < static_cast<int>(state->items.size())
+                        && state->dropTarget
+                            < static_cast<int>(state->items.size()))
+                    {
+                        TreeReparentRequest request{
+                            state->items[
+                                state->dragSource].entity,
+                            state->items[
+                                state->dropTarget].entity
+                        };
+
+                        SendMessageW(
+                            GetParent(hwnd),
+                            WM_NOC_V3_TREE_REPARENT,
+                            static_cast<WPARAM>(
+                                GetDlgCtrlID(hwnd)),
+                            reinterpret_cast<LPARAM>(
+                                &request));
+                    }
+
+                    state->dragSource = -1;
+                    state->dropTarget = -1;
+                    state->dragging = false;
+                    InvalidateRect(
+                        hwnd,
+                        nullptr,
+                        FALSE);
+                }
+                return 0;
+
+            case WM_CAPTURECHANGED:
+                if (state)
+                {
+                    state->dragSource = -1;
+                    state->dropTarget = -1;
+                    state->dragging = false;
+                    InvalidateRect(
+                        hwnd,
+                        nullptr,
+                        FALSE);
                 }
                 return 0;
             case WM_ERASEBKGND: return 1;
@@ -488,7 +649,30 @@ namespace nocturne::editor
                     {
                         const int index = visible[v]; const auto& item = state->items[index];
                         RECT row{ 0, y, rc.right - 10, y + rowH };
-                        if (index == state->selected) Fill(dc, row, Blend(c.panelBg, c.accent, 35)); else if (index == state->hover) Fill(dc, row, c.panelBgAlt);
+                        if (state->dragging
+                            && index == state->dropTarget)
+                        {
+                            Fill(
+                                dc,
+                                row,
+                                Blend(c.panelBg, c.accent, 22));
+                            Line(
+                                dc,
+                                static_cast<int>(row.left) + 2,
+                                static_cast<int>(row.bottom) - 2,
+                                static_cast<int>(row.right) - 2,
+                                static_cast<int>(row.bottom) - 2,
+                                c.accent,
+                                2);
+                        }
+                        else if (index == state->selected)
+                        {
+                            Fill(dc, row, Blend(c.panelBg, c.accent, 35));
+                        }
+                        else if (index == state->hover)
+                        {
+                            Fill(dc, row, c.panelBgAlt);
+                        }
                         const int arrowX = 9 + item.depth * 16;
                         if (item.expandable)
                         {
@@ -692,7 +876,26 @@ namespace nocturne::editor
         }
 
         void ButtonActive(HWND h, bool active) { if (h) SendMessageW(h, WM_NOC_V3_ACTIVE, active ? TRUE : FALSE, 0); }
-        void TreeClear(HWND h) { auto* s = h ? reinterpret_cast<TreeState*>(GetWindowLongPtrW(h, GWLP_USERDATA)) : nullptr; if (!s) return; s->items.clear(); s->firstRow = 0; s->selected = -1; s->hover = -1; InvalidateRect(h, nullptr, FALSE); }
+        void TreeClear(HWND h)
+        {
+            auto* s = h
+                ? reinterpret_cast<TreeState*>(
+                    GetWindowLongPtrW(h, GWLP_USERDATA))
+                : nullptr;
+            if (!s) return;
+
+            if (GetCapture() == h)
+                ReleaseCapture();
+
+            s->items.clear();
+            s->firstRow = 0;
+            s->selected = -1;
+            s->hover = -1;
+            s->dragSource = -1;
+            s->dropTarget = -1;
+            s->dragging = false;
+            InvalidateRect(h, nullptr, FALSE);
+        }
         void TreeAdd(
             HWND h,
             std::wstring text,
@@ -721,6 +924,66 @@ namespace nocturne::editor
                 s->selected = 0;
 
             InvalidateRect(h, nullptr, FALSE);
+        }
+
+        struct TreeExpansionEntry
+        {
+            noc::EntityHandle entity{};
+            bool expanded = true;
+        };
+
+        void TreeCaptureExpansion(
+            HWND h,
+            std::vector<TreeExpansionEntry>& outEntries,
+            bool& outRootExpanded)
+        {
+            outEntries.clear();
+            outRootExpanded = true;
+
+            auto* state = h
+                ? reinterpret_cast<TreeState*>(
+                    GetWindowLongPtrW(h, GWLP_USERDATA))
+                : nullptr;
+            if (!state)
+                return;
+
+            if (!state->items.empty())
+                outRootExpanded = state->items[0].expanded;
+
+            try
+            {
+                outEntries.reserve(state->items.size());
+
+                for (const TreeItem& item : state->items)
+                {
+                    if (!item.entity.IsValid())
+                        continue;
+
+                    outEntries.push_back({
+                        item.entity,
+                        item.expanded
+                    });
+                }
+            }
+            catch (const std::bad_alloc&)
+            {
+                outEntries.clear();
+                outRootExpanded = true;
+            }
+        }
+
+        bool TreeWasExpanded(
+            const std::vector<TreeExpansionEntry>& entries,
+            noc::EntityHandle entity,
+            bool fallback = true)
+        {
+            for (const TreeExpansionEntry& entry : entries)
+            {
+                if (entry.entity == entity)
+                    return entry.expanded;
+            }
+
+            return fallback;
         }
 
         [[nodiscard]] noc::EntityHandle TreeSelectedEntity(HWND h)
@@ -981,6 +1244,13 @@ namespace nocturne::editor
 
     void EditorShellV3::PopulateScene_()
     {
+        std::vector<TreeExpansionEntry> expansionState;
+        bool rootExpanded = true;
+        TreeCaptureExpansion(
+            sceneTree_,
+            expansionState,
+            rootExpanded);
+
         TreeClear(sceneTree_);
         TreeAdd(
             sceneTree_,
@@ -988,7 +1258,7 @@ namespace nocturne::editor
             0,
             Icon::World,
             true,
-            true);
+            rootExpanded);
 
         if (!engine_ || !session_)
             return;
@@ -1082,7 +1352,10 @@ namespace nocturne::editor
                 row.depth,
                 iconFor(row.entity),
                 hasAuthoredChild(row.entity),
-                true,
+                TreeWasExpanded(
+                    expansionState,
+                    row.entity,
+                    true),
                 row.entity);
 
             std::vector<noc::EntityHandle> children;
@@ -2717,6 +2990,81 @@ namespace nocturne::editor
             }
             break;
         }
+        case WM_NOC_V3_TREE_REPARENT:
+        {
+            if (static_cast<int>(wParam) != IdSceneTree
+                || !session_
+                || !engine_)
+            {
+                break;
+            }
+
+            const auto* request =
+                reinterpret_cast<const TreeReparentRequest*>(
+                    lParam);
+            if (!request
+                || !request->child.IsValid())
+            {
+                result = 0;
+                return true;
+            }
+
+            const noc::EntityHandle selected =
+                session_->SelectedEntity();
+            auto context =
+                session_->CommandContext();
+
+            try
+            {
+                auto command =
+                    std::make_unique<ReparentEntityCommand>();
+
+                if (!command->Init(
+                        context,
+                        request->child,
+                        request->parent))
+                {
+                    AppendConsole_(
+                        L"Reparent rejected: invalid target, cycle, or non-representable preserve-world transform.");
+                    result = 0;
+                    return true;
+                }
+
+                if (!session_->History().Execute(
+                        context,
+                        std::move(command)))
+                {
+                    AppendConsole_(
+                        L"Reparent failed; hierarchy unchanged.");
+                    result = 0;
+                    return true;
+                }
+            }
+            catch (const std::bad_alloc&)
+            {
+                AppendConsole_(
+                    L"Reparent failed: allocation failure.");
+                result = 0;
+                return true;
+            }
+
+            session_->SetSceneDirty();
+
+            if (selected.IsValid())
+                (void)session_->SetSelection(selected);
+
+            PopulateScene_();
+            RefreshInspector();
+            UpdateStatus_();
+            AppendConsole_(
+                request->parent.IsValid()
+                    ? L"Entity reparented; world pose preserved."
+                    : L"Entity unparented to scene root; world pose preserved.");
+
+            result = 0;
+            return true;
+        }
+
         case WM_NOC_V3_INSPECTOR_REFRESH:
             RefreshInspector();
             result = 0;
