@@ -1698,8 +1698,14 @@ bool RunPhase16EditorSessionTests()
                 && inspectorHistory.CommandCount()
                     == invalidHistoryCount
                 && inspectorWorld.GetTransform(multi)
-                    ->localTranslation
-                    == originalTranslation,
+                    ->localTranslation.x
+                    == originalTranslation.x
+                && inspectorWorld.GetTransform(multi)
+                    ->localTranslation.y
+                    == originalTranslation.y
+                && inspectorWorld.GetTransform(multi)
+                    ->localTranslation.z
+                    == originalTranslation.z,
             "Inspector invalid/NaN/Inf numeric input mutated state or history");
 
         const std::string tooLongName(
