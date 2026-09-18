@@ -1,6 +1,7 @@
 #include "../../NocturneEditor/EditorCommands.h"
 #include "../../NocturneEditor/EditorInspectorModel.h"
 #include "../../NocturneEditor/EditorSession.h"
+#include "../../NocturneEditor/EditorTransformMath.h"
 
 #include "Core/Log.h"
 #include "Core/Memory/Allocator.h"
@@ -69,6 +70,69 @@ bool RunPhase16EditorSessionTests()
     nocturne::editor::EditorSession session;
 
     bool ok = true;
+
+    {
+        const noc::Vec3 authoredEuler{
+            30.0f,
+            -35.0f,
+            70.0f
+        };
+
+        const noc::Quat authoredQuat =
+            nocturne::editor::EditorQuatFromEulerXYZDegrees(
+                authoredEuler);
+
+        const noc::Vec3 displayedEuler =
+            nocturne::editor::EditorEulerXYZDegreesFromQuat(
+                authoredQuat);
+
+        const noc::Quat roundTripQuat =
+            nocturne::editor::EditorQuatFromEulerXYZDegrees(
+                displayedEuler);
+
+        const float dot =
+            authoredQuat.x * roundTripQuat.x
+            + authoredQuat.y * roundTripQuat.y
+            + authoredQuat.z * roundTripQuat.z
+            + authoredQuat.w * roundTripQuat.w;
+
+        ok &= CheckEditorSession(
+            std::isfinite(displayedEuler.x)
+                && std::isfinite(displayedEuler.y)
+                && std::isfinite(displayedEuler.z)
+                && std::fabs(std::fabs(dot) - 1.0f) < 1.0e-4f,
+            "Editor Euler XYZ quaternion round-trip failed");
+
+        const noc::Vec3 nearSingularEuler{
+            12.0f,
+            89.0f,
+            -27.0f
+        };
+
+        const noc::Quat nearSingularQuat =
+            nocturne::editor::EditorQuatFromEulerXYZDegrees(
+                nearSingularEuler);
+
+        const noc::Vec3 nearSingularDisplay =
+            nocturne::editor::EditorEulerXYZDegreesFromQuat(
+                nearSingularQuat);
+
+        const noc::Quat nearSingularRoundTrip =
+            nocturne::editor::EditorQuatFromEulerXYZDegrees(
+                nearSingularDisplay);
+
+        const float nearSingularDot =
+            nearSingularQuat.x * nearSingularRoundTrip.x
+            + nearSingularQuat.y * nearSingularRoundTrip.y
+            + nearSingularQuat.z * nearSingularRoundTrip.z
+            + nearSingularQuat.w * nearSingularRoundTrip.w;
+
+        ok &= CheckEditorSession(
+            std::fabs(
+                std::fabs(nearSingularDot) - 1.0f)
+                < 2.0e-4f,
+            "Editor Euler XYZ near-gimbal round-trip failed");
+    }
 
     ok &= CheckEditorSession(
         reflection.Init(allocator, 32)
