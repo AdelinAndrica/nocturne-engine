@@ -66,6 +66,36 @@ bool RunPhase15NameTests()
         !names.SetName(e0, nullptr),
         "Null name must be rejected");
 
+    const char validUtf8[] = {
+        'N', 'a', 'm', 'e', ' ',
+        static_cast<char>(0xE2),
+        static_cast<char>(0x98),
+        static_cast<char>(0x83),
+        '\0'
+    };
+
+    ok &= CheckName(
+        names.SetName(e0, validUtf8),
+        "Valid UTF-8 name was rejected");
+    ok &= CheckName(
+        std::strcmp(names.Get(e0)->value, validUtf8) == 0,
+        "Valid UTF-8 name did not persist");
+
+    const char invalidUtf8[] = {
+        'B', 'a', 'd', ' ',
+        static_cast<char>(0xE2),
+        static_cast<char>(0x28),
+        static_cast<char>(0xA1),
+        '\0'
+    };
+
+    ok &= CheckName(
+        !names.SetName(e0, invalidUtf8),
+        "Invalid UTF-8 name was accepted");
+    ok &= CheckName(
+        std::strcmp(names.Get(e0)->value, validUtf8) == 0,
+        "Rejected invalid UTF-8 name mutated previous value");
+
     // Exact maximum payload (63 bytes) is valid.
     char maxName[noc::kNameComponentCapacity]{};
     for (uint32_t i = 0; i < noc::kNameComponentMaxBytes; ++i)
