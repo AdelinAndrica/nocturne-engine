@@ -63,6 +63,7 @@ namespace noc
         // --- Transform component ---
         [[nodiscard]] bool AddTransform(EntityHandle entity);
         [[nodiscard]] bool RemoveTransform(EntityHandle entity);
+        [[nodiscard]] bool HasTransform(EntityHandle entity) const;
         [[nodiscard]] const TransformComponent* GetTransform(EntityHandle entity) const;
 
         [[nodiscard]] bool SetLocalTRS(
@@ -84,6 +85,7 @@ namespace noc
             const AABB& localBounds);
 
         [[nodiscard]] bool RemoveRenderable(EntityHandle entity);
+        [[nodiscard]] bool HasRenderable(EntityHandle entity) const;
         [[nodiscard]] const RenderableComponent* GetRenderable(EntityHandle entity) const;
 
         [[nodiscard]] bool SetRenderable(
@@ -96,6 +98,7 @@ namespace noc
         // --- Camera component ---
         [[nodiscard]] bool AddCamera(EntityHandle entity);
         [[nodiscard]] bool RemoveCamera(EntityHandle entity);
+        [[nodiscard]] bool HasCamera(EntityHandle entity) const;
         [[nodiscard]] const CameraComponent* GetCamera(EntityHandle entity) const;
 
         // Compatibility policy used by Phase 14: lens settings are retained as
@@ -112,6 +115,7 @@ namespace noc
         // --- Name component ---
         [[nodiscard]] bool AddName(EntityHandle entity, const char* name = "");
         [[nodiscard]] bool RemoveName(EntityHandle entity);
+        [[nodiscard]] bool HasName(EntityHandle entity) const;
         [[nodiscard]] bool SetName(EntityHandle entity, const char* name);
         [[nodiscard]] const NameComponent* GetName(EntityHandle entity) const;
 

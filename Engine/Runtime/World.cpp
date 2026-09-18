@@ -366,6 +366,13 @@ namespace noc
         return impl_->transforms.Remove(entity);
     }
 
+    bool World::HasTransform(EntityHandle entity) const
+    {
+        return impl_
+            && impl_->entities.IsAlive(entity)
+            && impl_->transforms.Has(entity);
+    }
+
     const TransformComponent* World::GetTransform(EntityHandle entity) const
     {
         if (!impl_ || !impl_->entities.IsAlive(entity))
@@ -447,6 +454,13 @@ namespace noc
             && impl_->renderables.Remove(entity);
     }
 
+    bool World::HasRenderable(EntityHandle entity) const
+    {
+        return impl_
+            && impl_->entities.IsAlive(entity)
+            && impl_->renderables.Has(entity);
+    }
+
     const RenderableComponent* World::GetRenderable(EntityHandle entity) const
     {
         if (!impl_)
@@ -488,6 +502,13 @@ namespace noc
         return impl_
             && impl_->entities.IsAlive(entity)
             && impl_->cameras.Remove(entity);
+    }
+
+    bool World::HasCamera(EntityHandle entity) const
+    {
+        return impl_
+            && impl_->entities.IsAlive(entity)
+            && impl_->cameras.Has(entity);
     }
 
     const CameraComponent* World::GetCamera(EntityHandle entity) const
@@ -578,6 +599,13 @@ namespace noc
         return impl_
             && impl_->entities.IsAlive(entity)
             && impl_->names.Remove(entity);
+    }
+
+    bool World::HasName(EntityHandle entity) const
+    {
+        return impl_
+            && impl_->entities.IsAlive(entity)
+            && impl_->names.Has(entity);
     }
 
     bool World::SetName(EntityHandle entity, const char* name)

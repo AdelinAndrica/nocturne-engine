@@ -62,7 +62,9 @@ bool RunPhase15WorldTests()
         "Generic entity unexpectedly received TransformComponent");
 
     ok &= CheckWorld(world.AddTransform(generic), "AddTransform(generic) failed");
+    ok &= CheckWorld(world.HasTransform(generic), "HasTransform(generic) failed");
     ok &= CheckWorld(world.AddName(generic, "Generic"), "AddName(generic) failed");
+    ok &= CheckWorld(world.HasName(generic), "HasName(generic) failed");
     ok &= CheckWorld(
         world.GetName(generic)
             && std::strcmp(world.GetName(generic)->value, "Generic") == 0,
@@ -112,6 +114,7 @@ bool RunPhase15WorldTests()
         world.SetRenderable(child, mesh, localBounds),
         "SetRenderable(child) failed");
 
+    ok &= CheckWorld(world.HasRenderable(child), "HasRenderable(child) failed");
     const noc::RenderableComponent* renderable = world.GetRenderable(child);
     ok &= CheckWorld(
         renderable && renderable->mesh == mesh,
@@ -140,6 +143,7 @@ bool RunPhase15WorldTests()
         world.SetCameraFromObject(camera),
         "SetCameraFromObject failed");
 
+    ok &= CheckWorld(world.HasCamera(camera), "HasCamera(camera) failed");
     ok &= CheckWorld(
         world.ActiveCamera() == camera
             && world.GetCamera(camera) != nullptr,
@@ -186,6 +190,8 @@ bool RunPhase15WorldTests()
 
     const noc::EntityHandle staleChild = child;
     ok &= CheckWorld(world.DestroyEntity(child), "Destroy child failed");
+    ok &= CheckWorld(!world.HasTransform(staleChild), "Destroyed Transform still reported present");
+    ok &= CheckWorld(!world.HasRenderable(staleChild), "Destroyed Renderable still reported present");
     ok &= CheckWorld(world.GetTransform(staleChild) == nullptr, "Destroyed Transform still visible");
     ok &= CheckWorld(world.GetRenderable(staleChild) == nullptr, "Destroyed Renderable still visible");
 
