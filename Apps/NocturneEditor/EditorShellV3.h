@@ -12,6 +12,7 @@
 
 #include "Platform/Win32/WinWindow.h"
 #include "EditorInspectorModel.h"
+#include "Runtime/Entity.h"
 
 namespace noc { class Engine; }
 namespace nocturne::editor { class EditorSession; }
@@ -90,7 +91,9 @@ namespace nocturne::editor
 
             IdActorCreate = 9101,
             IdActorDuplicate,
-            IdActorDelete
+            IdActorDelete,
+            IdActorRename,
+            IdSceneRenameEdit
         };
 
         struct Panel
@@ -113,10 +116,24 @@ namespace nocturne::editor
         [[nodiscard]] bool ExecuteCreateEntity_();
         [[nodiscard]] bool ExecuteDeleteSelection_();
         [[nodiscard]] bool ExecuteDuplicateSelection_();
+        [[nodiscard]] bool BeginRenameSelection_();
+        [[nodiscard]] bool CommitRename_();
+        void CancelRename_() noexcept;
         [[nodiscard]] bool HasTextInputFocus_() const;
+
+        static LRESULT CALLBACK RenameEditSubclassProc_(
+            HWND hwnd,
+            UINT message,
+            WPARAM wParam,
+            LPARAM lParam,
+            UINT_PTR subclassId,
+            DWORD_PTR refData);
 
         std::wstring ResolveContentRoot_(const std::wstring& configured) const;
         static std::wstring Utf8ToWide_(const char* text);
+        static bool WideToUtf8_(
+            const wchar_t* text,
+            std::string& outText);
 
     private:
         noc::Engine* engine_ = nullptr;
@@ -151,6 +168,10 @@ namespace nocturne::editor
         Panel buildPlay_;
 
         HWND sceneTree_ = nullptr;
+        HWND renameEdit_ = nullptr;
+        noc::EntityHandle renameEntity_{};
+        bool renameEnding_ = false;
+
         HWND viewportPerspective_ = nullptr;
         HWND viewportLit_ = nullptr;
         HWND viewportShow_ = nullptr;

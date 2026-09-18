@@ -448,6 +448,7 @@ namespace nocturne::editor
             case WM_LBUTTONDOWN:
                 if (state)
                 {
+                    SetFocus(hwnd);
                     const auto visible = VisibleTree(*state);
                     const int visibleRow = state->firstRow + GET_Y_LPARAM(lParam) / rowH;
                     if (visibleRow >= 0 && visibleRow < static_cast<int>(visible.size()))
@@ -769,6 +770,69 @@ namespace nocturne::editor
                 InvalidateRect(h, nullptr, FALSE);
             }
         }
+        bool TreeSelectedLabelRect(
+            HWND h,
+            RECT& outRect)
+        {
+            auto* state = h
+                ? reinterpret_cast<TreeState*>(
+                    GetWindowLongPtrW(h, GWLP_USERDATA))
+                : nullptr;
+
+            if (!state
+                || state->selected < 0
+                || state->selected
+                    >= static_cast<int>(state->items.size()))
+            {
+                return false;
+            }
+
+            const auto visible = VisibleTree(*state);
+            int visibleIndex = -1;
+
+            for (int i = 0;
+                 i < static_cast<int>(visible.size());
+                 ++i)
+            {
+                if (visible[i] == state->selected)
+                {
+                    visibleIndex = i;
+                    break;
+                }
+            }
+
+            if (visibleIndex < 0)
+                return false;
+
+            constexpr int rowHeight = 24;
+            const int localRow =
+                visibleIndex - state->firstRow;
+
+            RECT client{};
+            GetClientRect(h, &client);
+
+            if (localRow < 0
+                || localRow * rowHeight >= client.bottom)
+            {
+                return false;
+            }
+
+            const TreeItem& item =
+                state->items[state->selected];
+            const int arrowX =
+                9 + item.depth * 16;
+
+            outRect = {
+                arrowX + 32,
+                localRow * rowHeight + 2,
+                (std::max)(
+                    arrowX + 92,
+                    static_cast<int>(client.right) - 11),
+                localRow * rowHeight + rowHeight - 2
+            };
+            return true;
+        }
+
         void TableClear(HWND h) { auto* s = h ? reinterpret_cast<TableState*>(GetWindowLongPtrW(h, GWLP_USERDATA)) : nullptr; if (!s) return; s->rows.clear(); s->firstRow = 0; s->selected = -1; s->hover = -1; InvalidateRect(h, nullptr, FALSE); }
         void TableAdd(HWND h, std::wstring asset, std::wstring type, Icon icon) { auto* s = h ? reinterpret_cast<TableState*>(GetWindowLongPtrW(h, GWLP_USERDATA)) : nullptr; if (!s) return; s->rows.push_back({ std::move(asset), std::move(type), icon }); InvalidateRect(h, nullptr, FALSE); }
         void SetScroll(HWND h, int maximum, int page, int pos) { auto* s = h ? reinterpret_cast<ScrollState*>(GetWindowLongPtrW(h, GWLP_USERDATA)) : nullptr; if (!s) return; s->minimum = 0; s->maximum = maximum; s->page = (std::max)(1, page); s->position = (std::clamp)(pos, 0, ScrollMax(*s)); InvalidateRect(h, nullptr, FALSE); }
@@ -839,6 +903,18 @@ namespace nocturne::editor
 
     void EditorShellV3::Shutdown()
     {
+        if (renameEdit_)
+        {
+            RemoveWindowSubclass(
+                renameEdit_,
+                &EditorShellV3::RenameEditSubclassProc_,
+                0x1610);
+            DestroyWindow(renameEdit_);
+            renameEdit_ = nullptr;
+        }
+        renameEntity_ = noc::EntityHandle::Invalid();
+        renameEnding_ = false;
+
         if (window_) window_->SetMessageSink(nullptr);
         if (fileMenu_) DestroyMenu(fileMenu_);
         if (buildMenu_) DestroyMenu(buildMenu_);
@@ -861,6 +937,7 @@ namespace nocturne::editor
         AppendMenuW(actorMenu_, MF_SEPARATOR, 0, nullptr);
         AppendMenuW(actorMenu_, MF_STRING, IdActorDuplicate, L"Duplicate Entity\tCtrl+D");
         AppendMenuW(actorMenu_, MF_STRING, IdActorDelete, L"Delete Entity\tDelete");
+        AppendMenuW(actorMenu_, MF_STRING, IdActorRename, L"Rename Entity\tF2");
     }
 
     void EditorShellV3::CreateToolbar_()
@@ -1244,6 +1321,279 @@ namespace nocturne::editor
         }
     }
 
+    bool EditorShellV3::BeginRenameSelection_()
+    {
+        if (!engine_ || !session_ || !sceneTree_)
+            return false;
+
+        const noc::EntityHandle selected =
+            session_->SelectedEntity();
+
+        if (!selected.IsValid()
+            || !engine_->GetWorld().IsAlive(selected)
+            || !engine_->GetWorld().HasName(selected))
+        {
+            return false;
+        }
+
+        RECT row{};
+        if (!TreeSelectedLabelRect(sceneTree_, row))
+            return false;
+
+        const noc::NameComponent* name =
+            engine_->GetWorld().GetName(selected);
+        if (!name)
+            return false;
+
+        if (!renameEdit_)
+        {
+            renameEdit_ = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                L"EDIT",
+                L"",
+                WS_CHILD | WS_BORDER | ES_AUTOHSCROLL,
+                row.left,
+                row.top,
+                row.right - row.left,
+                row.bottom - row.top,
+                sceneTree_,
+                reinterpret_cast<HMENU>(
+                    static_cast<INT_PTR>(IdSceneRenameEdit)),
+                GetModuleHandleW(nullptr),
+                nullptr);
+
+            if (!renameEdit_)
+                return false;
+
+            SendMessageW(
+                renameEdit_,
+                WM_SETFONT,
+                reinterpret_cast<WPARAM>(uiFont_),
+                TRUE);
+
+            if (!SetWindowSubclass(
+                    renameEdit_,
+                    &EditorShellV3::RenameEditSubclassProc_,
+                    0x1610,
+                    reinterpret_cast<DWORD_PTR>(this)))
+            {
+                DestroyWindow(renameEdit_);
+                renameEdit_ = nullptr;
+                return false;
+            }
+        }
+
+        const std::wstring current =
+            Utf8ToWide_(name->value);
+
+        renameEntity_ = selected;
+        renameEnding_ = false;
+
+        MoveWindow(
+            renameEdit_,
+            row.left,
+            row.top,
+            row.right - row.left,
+            row.bottom - row.top,
+            TRUE);
+        SetWindowTextW(
+            renameEdit_,
+            current.c_str());
+        ShowWindow(renameEdit_, SW_SHOW);
+        SetWindowPos(
+            renameEdit_,
+            HWND_TOP,
+            0, 0, 0, 0,
+            SWP_NOMOVE | SWP_NOSIZE);
+        SetFocus(renameEdit_);
+        SendMessageW(
+            renameEdit_,
+            EM_SETSEL,
+            0,
+            -1);
+
+        return true;
+    }
+
+    bool EditorShellV3::CommitRename_()
+    {
+        if (renameEnding_
+            || !renameEdit_
+            || !renameEntity_.IsValid()
+            || !session_
+            || !engine_)
+        {
+            return false;
+        }
+
+        renameEnding_ = true;
+
+        const noc::EntityHandle entity =
+            renameEntity_;
+        const int length =
+            GetWindowTextLengthW(renameEdit_);
+
+        std::wstring wide;
+        try
+        {
+            wide.resize(
+                static_cast<size_t>(
+                    (std::max)(0, length)));
+
+            if (length > 0)
+            {
+                GetWindowTextW(
+                    renameEdit_,
+                    wide.data(),
+                    length + 1);
+            }
+        }
+        catch (const std::bad_alloc&)
+        {
+            renameEnding_ = false;
+            AppendConsole_(
+                L"Rename failed: allocation failure.");
+            CancelRename_();
+            return false;
+        }
+
+        std::string utf8;
+        if (!WideToUtf8_(
+                wide.c_str(),
+                utf8))
+        {
+            renameEnding_ = false;
+            AppendConsole_(
+                L"Rename failed: invalid Unicode input.");
+            CancelRename_();
+            return false;
+        }
+
+        const noc::NameComponent* current =
+            engine_->GetWorld().GetName(entity);
+
+        if (current
+            && utf8 == current->value)
+        {
+            ShowWindow(renameEdit_, SW_HIDE);
+            renameEntity_ =
+                noc::EntityHandle::Invalid();
+            renameEnding_ = false;
+            SetFocus(sceneTree_);
+            return true;
+        }
+
+        bool success = false;
+        auto context = session_->CommandContext();
+
+        try
+        {
+            auto command =
+                std::make_unique<RenameEntityCommand>();
+
+            success =
+                command->Init(
+                    context,
+                    entity,
+                    utf8.c_str())
+                && session_->History().Execute(
+                    context,
+                    std::move(command));
+        }
+        catch (const std::bad_alloc&)
+        {
+            success = false;
+        }
+
+        ShowWindow(renameEdit_, SW_HIDE);
+        renameEntity_ =
+            noc::EntityHandle::Invalid();
+        renameEnding_ = false;
+        SetFocus(sceneTree_);
+
+        if (!success)
+        {
+            AppendConsole_(
+                L"Rename rejected; name unchanged.");
+            return false;
+        }
+
+        session_->SetSceneDirty();
+        PopulateScene_();
+        (void)session_->SetSelection(entity);
+        SyncSceneSelection();
+        RefreshInspector();
+        UpdateStatus_();
+        AppendConsole_(L"Entity renamed.");
+        return true;
+    }
+
+    void EditorShellV3::CancelRename_() noexcept
+    {
+        if (!renameEdit_)
+            return;
+
+        renameEnding_ = true;
+        ShowWindow(renameEdit_, SW_HIDE);
+        renameEntity_ =
+            noc::EntityHandle::Invalid();
+        renameEnding_ = false;
+
+        if (sceneTree_)
+            SetFocus(sceneTree_);
+    }
+
+    LRESULT CALLBACK EditorShellV3::RenameEditSubclassProc_(
+        HWND hwnd,
+        UINT message,
+        WPARAM wParam,
+        LPARAM lParam,
+        UINT_PTR subclassId,
+        DWORD_PTR refData)
+    {
+        (void)subclassId;
+
+        auto* self =
+            reinterpret_cast<EditorShellV3*>(refData);
+        if (!self)
+            return DefSubclassProc(
+                hwnd,
+                message,
+                wParam,
+                lParam);
+
+        switch (message)
+        {
+        case WM_KEYDOWN:
+            if (wParam == VK_RETURN)
+            {
+                (void)self->CommitRename_();
+                return 0;
+            }
+
+            if (wParam == VK_ESCAPE)
+            {
+                self->CancelRename_();
+                return 0;
+            }
+            break;
+
+        case WM_KILLFOCUS:
+            if (!self->renameEnding_
+                && self->renameEntity_.IsValid())
+            {
+                (void)self->CommitRename_();
+            }
+            break;
+        }
+
+        return DefSubclassProc(
+            hwnd,
+            message,
+            wParam,
+            lParam);
+    }
+
     bool EditorShellV3::HasTextInputFocus_() const
     {
         const HWND focus = GetFocus();
@@ -1290,7 +1640,8 @@ namespace nocturne::editor
             Undo,
             Redo,
             Duplicate,
-            Delete
+            Delete,
+            Rename
         };
 
         ShortcutAction action = ShortcutAction::None;
@@ -1305,6 +1656,8 @@ namespace nocturne::editor
             action = ShortcutAction::Duplicate;
         else if (!control && message.wParam == VK_DELETE)
             action = ShortcutAction::Delete;
+        else if (!control && message.wParam == VK_F2)
+            action = ShortcutAction::Rename;
 
         if (action == ShortcutAction::None)
             return false;
@@ -1330,6 +1683,9 @@ namespace nocturne::editor
             break;
         case ShortcutAction::Delete:
             (void)ExecuteDeleteSelection_();
+            break;
+        case ShortcutAction::Rename:
+            (void)BeginRenameSelection_();
             break;
         default:
             break;
@@ -1408,6 +1764,9 @@ namespace nocturne::editor
         case IdActorDelete:
             (void)ExecuteDeleteSelection_();
             break;
+        case IdActorRename:
+            (void)BeginRenameSelection_();
+            break;
         default: break;
         }
         PopulateScene_(); UpdateStatus_();
@@ -1462,7 +1821,7 @@ namespace nocturne::editor
             if (id >= IdMenuFile && id <= IdMenuHelp) { ShowPopup_(id, source); result = 0; return true; }
             if (id == IDCANCEL) { if (window_) window_->RequestQuit(); result = 0; return true; }
             if ((id >= IdToolbarNew && id <= IdToolbarBuild)
-                || (id >= IdActorCreate && id <= IdActorDelete)
+                || (id >= IdActorCreate && id <= IdActorRename)
                 || id == IdPlay || id == IdBuild
                 || id == IdContentListMode || id == IdContentGridMode
                 || id == IdContentSettings
@@ -1716,5 +2075,56 @@ namespace nocturne::editor
         MultiByteToWideChar(CP_UTF8,0,text,-1,out.data(),n);
         out.resize(static_cast<size_t>(n-1));
         return out;
+    }
+
+    bool EditorShellV3::WideToUtf8_(
+        const wchar_t* text,
+        std::string& outText)
+    {
+        outText.clear();
+        if (!text)
+            return false;
+
+        const int required =
+            WideCharToMultiByte(
+                CP_UTF8,
+                WC_ERR_INVALID_CHARS,
+                text,
+                -1,
+                nullptr,
+                0,
+                nullptr,
+                nullptr);
+
+        if (required <= 0)
+            return false;
+
+        try
+        {
+            outText.resize(
+                static_cast<size_t>(required));
+        }
+        catch (const std::bad_alloc&)
+        {
+            return false;
+        }
+
+        if (WideCharToMultiByte(
+                CP_UTF8,
+                WC_ERR_INVALID_CHARS,
+                text,
+                -1,
+                outText.data(),
+                required,
+                nullptr,
+                nullptr) <= 0)
+        {
+            outText.clear();
+            return false;
+        }
+
+        outText.resize(
+            static_cast<size_t>(required - 1));
+        return true;
     }
 }
