@@ -20,6 +20,11 @@ This document consolidates the entire Markdown pack into a single coherent spec 
 > - `Docs/Phase 15 — Completion Report.md`
 > - `Docs/Phase 16 — Editor Scene Editing Handoff.md`
 >
+> Phase 16 planning / production-grade contract:
+>
+> - `Docs/Phase 16 — Professional Grade Implementation Contract.md`
+> - `Docs/Phase 16 — Editor Scene Editing Implementation Checklist.md`
+>
 > Any shorter future-phase descriptions embedded later in this generated snapshot are superseded by those documents.
 
 ## Table of Contents
