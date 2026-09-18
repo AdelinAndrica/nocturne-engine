@@ -321,10 +321,10 @@ Keyboard shortcuts, Actor menu actions, hierarchy drag/drop and hierarchy contex
 | Nested transaction policy | IMPLEMENTED — nested Begin is rejected |
 | Generic compound rollback semantics | IMPLEMENTED — execute/redo compensate prior children; failed undo restores already-undone suffix when possible |
 | Required-component policy | IMPLEMENTED — Required is opt-in removal protection; foundation components remain non-required by Phase 16 policy; Inspector/RemoveComponentCommand precedence is tested |
-| Full editor performance baseline | OPEN |
-| 10k hierarchy stress gate | OPEN |
-| 10k command-history stress | OPEN |
-| 1k delete/duplicate subtree stress | OPEN |
+| Full editor performance baseline | PARTIAL / ACTIVE — hierarchy 100/1k/10k, wide/deep, Inspector refresh, history 10k/memory, delete+undo/duplicate subtree 1k are now measured; select/create/reparent/gizmo remain |
+| 10k hierarchy stress gate | IMPLEMENTED |
+| 10k command-history stress | IMPLEMENTED |
+| 1k delete/duplicate subtree stress | IMPLEMENTED |
 | Dedicated hierarchy test matrix | PARTIAL |
 | Dedicated Inspector robustness matrix | PARTIAL |
 | Dedicated gizmo matrix | PARTIAL |
@@ -383,25 +383,39 @@ When a reflected component is flagged Required and is present:
 
 The synthetic reflected enum component in Phase 16 editor-session tests is also flagged Required, proving Required precedence in both Inspector presentation and RemoveComponentCommand admission.
 
-### 11.3 Editor stress/performance
+### 11.3 Editor stress/performance — PARTIAL / ACTIVE
 
-Reflection has a baseline. The broader editor still needs measurements for:
+The production World→Hierarchy traversal is now extracted into \`EditorHierarchyModel\`, a transient projection consumed directly by \`EditorShellV3::PopulateScene_()\`. The editor stress suite uses this same implementation rather than duplicating hierarchy logic in tests.
+
+Automated measured workloads now include:
+
+- hierarchy rebuild at 100 entities;
+- hierarchy rebuild at 1k entities;
+- hierarchy rebuild at 10k entities;
+- deterministic repeated hierarchy projection;
+- tool-owned entity filtering;
+- 1k-wide hierarchy traversal;
+- 1k-deep hierarchy traversal;
+- 10k small command push;
+- 10k undo;
+- 10k redo;
+- retained history bytes after the 10k editing workload;
+- 1k Inspector refreshes on an entity with Name/Transform/Renderable/Camera;
+- delete 1k-node subtree;
+- undo delete 1k-node subtree;
+- duplicate 1k-node subtree;
+- undo duplicate subtree;
+- allocator leak invariant across the suite.
+
+**Design choice (not directly from the book):** performance timings are logged as observations only. CI pass/fail is based on correctness, capacity, rollback/history semantics and allocator leak invariants until stable hardware baselines justify timing budgets.
+
+Still open from the full checklist:
 
 - select entity latency;
-- hierarchy rebuild at 100 / 1k / 10k entities;
-- wide/deep hierarchy traversal;
-- Inspector refresh;
-- command push;
-- undo/redo;
-- create 1k;
-- delete subtree 1k;
-- undo delete subtree 1k;
-- duplicate subtree 1k;
-- reparent;
-- gizmo commit;
-- representative history memory usage.
-
-Timings should be observations first; correctness/leak/allocation invariants remain hard gates.
+- create 1k timing;
+- isolated reparent timing;
+- isolated gizmo commit timing;
+- deeper allocation instrumentation for Win32 control rebuild/paint paths.
 
 ### 11.4 Completion test matrices
 
@@ -477,7 +491,7 @@ e7144560 — phase16: cover editor history failure and budget semantics
 
 ## 13. Recommended next implementation order
 
-1. Add editor stress/performance workloads: hierarchy 100/1k/10k, history 10k, subtree 1k, Inspector refresh, representative history memory.
+1. Finish the remaining editor performance observations: select, create 1k, isolated reparent and gizmo commit.
 2. Complete hierarchy/Inspector/gizmo negative and lifecycle test matrices.
 3. Add real-engine function reflection proof and remaining reflection performance measurements.
 4. Clarify the transient prefab-prototype seam without Phase 17 persistence.

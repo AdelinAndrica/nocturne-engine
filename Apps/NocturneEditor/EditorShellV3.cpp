@@ -1584,42 +1584,33 @@ namespace nocturne::editor
             rootExpanded);
 
         if (!engine_ || !session_)
+        {
+            hierarchyModel_.Clear();
             return;
+        }
 
-        noc::World& world = engine_->GetWorld();
+        noc::World& world =
+            engine_->GetWorld();
 
-        struct PendingRow
+        if (!hierarchyModel_.Rebuild(
+                world,
+                session_->ToolCamera()))
         {
-            noc::EntityHandle entity{};
-            int depth = 1;
-        };
-
-        auto isAuthored = [&](noc::EntityHandle entity)
-        {
-            return entity.IsValid()
-                && world.IsAlive(entity)
-                && !session_->IsToolOwned(entity);
-        };
-
-        auto hasAuthoredChild = [&](noc::EntityHandle entity)
-        {
-            noc::EntityHandle child = world.FirstChildOf(entity);
-            while (child.IsValid())
-            {
-                if (isAuthored(child))
-                    return true;
-                child = world.NextSiblingOf(child);
-            }
-            return false;
-        };
+            AppendConsole_(
+                L"Scene Hierarchy rebuild failed: allocation failure.");
+            return;
+        }
 
         auto displayName = [&](noc::EntityHandle entity)
         {
-            const noc::NameComponent* name = world.GetName(entity);
+            const noc::NameComponent* name =
+                world.GetName(entity);
+
             if (name && name->value[0] != '\0')
             {
                 const std::wstring converted =
                     Utf8ToWide_(name->value);
+
                 if (!converted.empty())
                     return converted;
             }
@@ -1641,66 +1632,20 @@ namespace nocturne::editor
             return Icon::Hierarchy;
         };
 
-        std::vector<noc::EntityHandle> roots;
-        roots.reserve(world.AliveCount());
-
-        for (uint32_t i = 0; i < world.EntityCapacity(); ++i)
+        for (const EditorHierarchyRow& row :
+             hierarchyModel_.Rows())
         {
-            const noc::EntityHandle entity =
-                world.EntityAtIndex(i);
-            if (!isAuthored(entity))
-                continue;
-
-            const noc::EntityHandle parent =
-                world.ParentOf(entity);
-
-            if (!isAuthored(parent))
-                roots.push_back(entity);
-        }
-
-        std::vector<PendingRow> stack;
-        stack.reserve(world.AliveCount());
-
-        for (auto it = roots.rbegin(); it != roots.rend(); ++it)
-            stack.push_back({ *it, 1 });
-
-        while (!stack.empty())
-        {
-            const PendingRow row = stack.back();
-            stack.pop_back();
-
             TreeAdd(
                 sceneTree_,
                 displayName(row.entity),
                 row.depth,
                 iconFor(row.entity),
-                hasAuthoredChild(row.entity),
+                row.hasAuthoredChildren,
                 TreeWasExpanded(
                     expansionState,
                     row.entity,
                     true),
                 row.entity);
-
-            std::vector<noc::EntityHandle> children;
-            noc::EntityHandle child =
-                world.FirstChildOf(row.entity);
-
-            while (child.IsValid())
-            {
-                if (isAuthored(child))
-                    children.push_back(child);
-                child = world.NextSiblingOf(child);
-            }
-
-            for (auto it = children.rbegin();
-                 it != children.rend();
-                 ++it)
-            {
-                stack.push_back({
-                    *it,
-                    row.depth + 1
-                });
-            }
         }
 
         SyncSceneSelection();

@@ -27,6 +27,7 @@ bool RunPhase16ReflectionRegistryTests();
 bool RunPhase16ReflectionOcpTests();
 bool RunPhase16ReflectionPerfTests();
 bool RunPhase16EditorSessionTests();
+bool RunPhase16EditorPerfTests();
 
 // Phase 12 tooling
 #include "Phase12CookPack.h"
@@ -61,6 +62,7 @@ int main(int argc, char** argv)
         ok &= RunPhase16ReflectionOcpTests();
         ok &= RunPhase16ReflectionPerfTests();
         ok &= RunPhase16EditorSessionTests();
+        ok &= RunPhase16EditorPerfTests();
         return ok ? 0 : 1;
     }
 
@@ -70,6 +72,10 @@ int main(int argc, char** argv)
 
     if (HasArg(args, "--phase16-reflection-registry-tests")) {
         return RunPhase16ReflectionRegistryTests() ? 0 : 1;
+    }
+
+    if (HasArg(args, "--phase16-editor-perf-tests")) {
+        return RunPhase16EditorPerfTests() ? 0 : 1;
     }
 
     // Phase 15 foundation tests are pure runtime tests. Keep them before

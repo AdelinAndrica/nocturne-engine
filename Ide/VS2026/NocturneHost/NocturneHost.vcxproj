@@ -50,6 +50,7 @@
     <ClCompile Include="..\..\..\Apps\NocturneHost\Tests\phase16_reflection_ocp_tests.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneHost\Tests\phase16_reflection_perf_tests.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneHost\Tests\phase16_editor_session_tests.cpp" />
+    <ClCompile Include="..\..\..\Apps\NocturneHost\Tests\phase16_editor_perf_tests.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorCommands.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorReflectionSnapshot.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorEntitySnapshot.cpp" />
@@ -67,6 +68,7 @@
     <ClInclude Include="..\..\..\Apps\NocturneHost\AppConfig.h" />
     <ClInclude Include="..\..\..\Apps\NocturneHost\Phase12CookPack.h" />
     <ClInclude Include="..\..\..\Apps\NocturneHost\ZipWriter.h" />
+    <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorHierarchyModel.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>18.0</VCProjectVersion>

@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "Platform/Win32/WinWindow.h"
+#include "EditorHierarchyModel.h"
 #include "EditorInspectorModel.h"
 #include "Runtime/Entity.h"
 
@@ -325,6 +326,7 @@ namespace nocturne::editor
         std::vector<InspectorEnumBinding>
             inspectorEnumButtons_;
         HWND inspectorAddComponent_ = nullptr;
+        EditorHierarchyModel hierarchyModel_;
         bool inspectorControlsRefreshing_ = false;
         int inspectorScrollY_ = 0;
 

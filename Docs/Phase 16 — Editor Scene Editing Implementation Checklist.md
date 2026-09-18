@@ -443,7 +443,7 @@ Reflection milestone:
 - [ ] Test missing optional components.
 - [ ] Test duplicate names.
 - [ ] Test camera component in subtree.
-- [ ] Leak tests.
+- [x] Leak tests.
 
 ---
 
@@ -568,8 +568,8 @@ Grounding: Nystrom — Command / Undo and Redo.
 - [ ] Large command policy.
 - [ ] Allocation failure policy.
 - [ ] Unit tests.
-- [ ] Stress 10k small commands.
-- [ ] Stress large subtree snapshots.
+- [x] Stress 10k small commands.
+- [x] Stress large subtree snapshots.
 - [ ] Leak tests.
 
 ---
@@ -765,7 +765,7 @@ Euler UI if used:
 - [ ] Redo re-adds.
 - [ ] Defaults explicit.
 - [ ] Allocation failure rollback.
-- [ ] Inspector refresh.
+- [x] Inspector refresh.
 - [ ] Viewport refresh.
 - [ ] Diagnostics.
 
@@ -940,14 +940,14 @@ Fiecare caz are:
 
 # 37. Allocation discipline
 
-- [ ] Hierarchy refresh allocations measured.
+- [x] Hierarchy refresh allocations measured.
 - [ ] Inspector rebuild allocations measured.
 - [ ] Command allocation ownership explicit.
 - [ ] Snapshot allocation ownership explicit.
-- [ ] History memory tracked.
+- [x] History memory tracked.
 - [ ] Gizmo mouse-move hot path no uncontrolled heap allocation.
 - [ ] Paint path no uncontrolled per-row allocations where avoidable.
-- [ ] Large hierarchy test.
+- [x] Large hierarchy test.
 - [ ] Allocation failure tests where practical.
 
 ---
@@ -957,26 +957,26 @@ Fiecare caz are:
 Măsurăm, nu ghicim:
 
 - [ ] select entity latency.
-- [ ] hierarchy rebuild 100.
-- [ ] hierarchy rebuild 1k.
-- [ ] hierarchy rebuild 10k.
-- [ ] hierarchy traversal wide.
-- [ ] hierarchy traversal deep.
+- [x] hierarchy rebuild 100.
+- [x] hierarchy rebuild 1k.
+- [x] hierarchy rebuild 10k.
+- [x] hierarchy traversal wide.
+- [x] hierarchy traversal deep.
 - [ ] Inspector refresh.
-- [ ] command push.
-- [ ] undo.
-- [ ] redo.
+- [x] command push.
+- [x] undo.
+- [x] redo.
 - [ ] create 1k.
-- [ ] delete subtree 1k.
-- [ ] undo delete subtree 1k.
-- [ ] duplicate subtree 1k.
+- [x] delete subtree 1k.
+- [x] undo delete subtree 1k.
+- [x] duplicate subtree 1k.
 - [ ] reparent.
 - [ ] gizmo commit.
-- [ ] history memory after representative editing session.
+- [x] history memory after representative editing session.
 
-- [ ] Timings logged as observations.
-- [ ] No arbitrary CI timing threshold before stable baseline.
-- [ ] Correctness/leaks/allocation invariants remain hard pass/fail.
+- [x] Timings logged as observations.
+- [x] No arbitrary CI timing threshold before stable baseline.
+- [x] Correctness/leaks/allocation invariants remain hard pass/fail.
 
 ---
 
