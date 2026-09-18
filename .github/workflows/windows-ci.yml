@@ -62,7 +62,7 @@ jobs:
           & "$env:GITHUB_WORKSPACE\Build\CI\bin\NocturneHost.exe" --phase15-tests
           exit $LASTEXITCODE
 
-      - name: Build NocturneEditor regression target (Debug x64)
+      - name: Run Phase 16 reflection foundation tests\n        shell: pwsh\n        run: |\n          & "$env:GITHUB_WORKSPACE\\Build\\CI\\bin\\NocturneHost.exe" --phase16-tests\n          exit $LASTEXITCODE\n\n      - name: Build NocturneEditor regression target (Debug x64)
         shell: pwsh
         run: |
           msbuild "Ide\VS2026\NocturneEditor\NocturneEditor.vcxproj" `

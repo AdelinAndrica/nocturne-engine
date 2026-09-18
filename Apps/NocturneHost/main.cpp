@@ -21,7 +21,7 @@ bool RunPhase15NameTests();
 bool RunPhase15WorldTests();
 bool RunPhase15StressPerfTests();
 
-// Phase 12 tooling
+// Phase 16 runtime reflection tests\nbool RunPhase16ReflectionFoundationTests();\n\n// Phase 12 tooling
 #include "Phase12CookPack.h"
 
 #ifndef NOC_CONTENT_ROOT
@@ -46,7 +46,7 @@ int main(int argc, char** argv)
     args.reserve((size_t)argc);
     for (int i = 1; i < argc; ++i) args.emplace_back(argv[i]);
 
-    // Phase 15 foundation tests are pure runtime tests. Keep them before
+    // Phase 16 reflection tests are pure runtime tests and intentionally run\n    // before Engine::Init(), so CI does not require DX12 or a native window.\n    if (HasArg(args, "--phase16-tests")\n        || HasArg(args, "--phase16-reflection-foundation-tests")) {\n        return RunPhase16ReflectionFoundationTests() ? 0 : 1;\n    }\n\n    // Phase 15 foundation tests are pure runtime tests. Keep them before
     // Engine::Init() so CI does not depend on DX12, a GPU, content mounts, or
     // a native window.
     if (HasArg(args, "--phase15-tests")) {
