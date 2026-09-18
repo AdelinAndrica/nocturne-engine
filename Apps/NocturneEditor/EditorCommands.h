@@ -1,6 +1,7 @@
 #pragma once
 
 #include "EditorCommandHistory.h"
+#include "EditorReflectionSnapshot.h"
 #include "Runtime/Entity.h"
 #include "Runtime/Reflection/ReflectedValue.h"
 #include "Runtime/Reflection/ReflectionIds.h"
@@ -61,6 +62,52 @@ namespace nocturne::editor
         noc::EntityHandle entity_{};
         std::string oldName_;
         std::string newName_;
+    };
+
+    class AddComponentCommand final : public IEditorCommand
+    {
+    public:
+        [[nodiscard]] bool Init(
+            EditorCommandContext& context,
+            noc::EntityHandle entity,
+            noc::TypeId componentTypeId);
+
+        [[nodiscard]] const char* Label() const noexcept override;
+        [[nodiscard]] std::size_t MemoryCostBytes() const noexcept override;
+
+        [[nodiscard]] bool Execute(EditorCommandContext& context) override;
+        [[nodiscard]] bool Undo(EditorCommandContext& context) override;
+        [[nodiscard]] bool Redo(EditorCommandContext& context) override;
+
+    private:
+        [[nodiscard]] bool Add_(EditorCommandContext& context);
+        [[nodiscard]] bool Remove_(EditorCommandContext& context);
+
+        noc::EntityHandle entity_{};
+        noc::TypeId componentTypeId_{};
+    };
+
+    class RemoveComponentCommand final : public IEditorCommand
+    {
+    public:
+        [[nodiscard]] bool Init(
+            EditorCommandContext& context,
+            noc::EntityHandle entity,
+            noc::TypeId componentTypeId);
+
+        [[nodiscard]] const char* Label() const noexcept override;
+        [[nodiscard]] std::size_t MemoryCostBytes() const noexcept override;
+
+        [[nodiscard]] bool Execute(EditorCommandContext& context) override;
+        [[nodiscard]] bool Undo(EditorCommandContext& context) override;
+        [[nodiscard]] bool Redo(EditorCommandContext& context) override;
+
+    private:
+        [[nodiscard]] bool Remove_(EditorCommandContext& context);
+
+        noc::EntityHandle entity_{};
+        noc::TypeId componentTypeId_{};
+        ReflectedComponentSnapshot snapshot_;
     };
 
     class SetReflectedPropertyCommand final : public IEditorCommand

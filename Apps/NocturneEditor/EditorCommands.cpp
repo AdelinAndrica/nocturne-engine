@@ -170,6 +170,200 @@ namespace nocturne::editor
                 value.c_str());
     }
 
+    bool AddComponentCommand::Init(
+        EditorCommandContext& context,
+        noc::EntityHandle entity,
+        noc::TypeId componentTypeId)
+    {
+        if (entity_.IsValid()
+            || !context.world.IsAlive(entity))
+        {
+            return false;
+        }
+
+        const noc::TypeMetadata* type =
+            context.reflection.FindType(componentTypeId);
+
+        if (!type
+            || type->kind != noc::TypeKind::Component
+            || !type->componentMetadata
+            || !noc::HasFlag(
+                type->componentMetadata->flags,
+                noc::ComponentReflectionFlags::EditorAddable)
+            || type->componentMetadata->has(
+                context.world,
+                entity))
+        {
+            return false;
+        }
+
+        entity_ = entity;
+        componentTypeId_ = componentTypeId;
+        return true;
+    }
+
+    const char* AddComponentCommand::Label() const noexcept
+    {
+        return "Add Component";
+    }
+
+    std::size_t AddComponentCommand::MemoryCostBytes() const noexcept
+    {
+        return sizeof(*this);
+    }
+
+    bool AddComponentCommand::Execute(EditorCommandContext& context)
+    {
+        return Add_(context);
+    }
+
+    bool AddComponentCommand::Undo(EditorCommandContext& context)
+    {
+        return Remove_(context);
+    }
+
+    bool AddComponentCommand::Redo(EditorCommandContext& context)
+    {
+        return Add_(context);
+    }
+
+    bool AddComponentCommand::Add_(EditorCommandContext& context)
+    {
+        const noc::TypeMetadata* type =
+            context.reflection.FindType(componentTypeId_);
+
+        return context.world.IsAlive(entity_)
+            && type
+            && type->componentMetadata
+            && !type->componentMetadata->has(
+                context.world,
+                entity_)
+            && type->componentMetadata->add(
+                context.world,
+                entity_);
+    }
+
+    bool AddComponentCommand::Remove_(EditorCommandContext& context)
+    {
+        const noc::TypeMetadata* type =
+            context.reflection.FindType(componentTypeId_);
+
+        return context.world.IsAlive(entity_)
+            && type
+            && type->componentMetadata
+            && type->componentMetadata->has(
+                context.world,
+                entity_)
+            && type->componentMetadata->remove(
+                context.world,
+                entity_);
+    }
+
+    bool RemoveComponentCommand::Init(
+        EditorCommandContext& context,
+        noc::EntityHandle entity,
+        noc::TypeId componentTypeId)
+    {
+        if (entity_.IsValid()
+            || !context.world.IsAlive(entity))
+        {
+            return false;
+        }
+
+        const noc::TypeMetadata* type =
+            context.reflection.FindType(componentTypeId);
+
+        if (!type
+            || type->kind != noc::TypeKind::Component
+            || !type->componentMetadata
+            || !noc::HasFlag(
+                type->componentMetadata->flags,
+                noc::ComponentReflectionFlags::EditorRemovable)
+            || noc::HasFlag(
+                type->componentMetadata->flags,
+                noc::ComponentReflectionFlags::Required)
+            || !type->componentMetadata->has(
+                context.world,
+                entity)
+            || !snapshot_.Capture(
+                context,
+                entity,
+                componentTypeId))
+        {
+            return false;
+        }
+
+        entity_ = entity;
+        componentTypeId_ = componentTypeId;
+        return true;
+    }
+
+    const char* RemoveComponentCommand::Label() const noexcept
+    {
+        return "Remove Component";
+    }
+
+    std::size_t RemoveComponentCommand::MemoryCostBytes() const noexcept
+    {
+        return sizeof(*this) + snapshot_.MemoryCostBytes();
+    }
+
+    bool RemoveComponentCommand::Execute(EditorCommandContext& context)
+    {
+        return Remove_(context);
+    }
+
+    bool RemoveComponentCommand::Undo(EditorCommandContext& context)
+    {
+        const noc::TypeMetadata* type =
+            context.reflection.FindType(componentTypeId_);
+
+        if (!context.world.IsAlive(entity_)
+            || !type
+            || !type->componentMetadata
+            || type->componentMetadata->has(
+                context.world,
+                entity_)
+            || !type->componentMetadata->add(
+                context.world,
+                entity_))
+        {
+            return false;
+        }
+
+        if (!snapshot_.Restore(context, entity_))
+        {
+            (void)type->componentMetadata->remove(
+                context.world,
+                entity_);
+            return false;
+        }
+
+        return true;
+    }
+
+    bool RemoveComponentCommand::Redo(EditorCommandContext& context)
+    {
+        return Remove_(context);
+    }
+
+    bool RemoveComponentCommand::Remove_(
+        EditorCommandContext& context)
+    {
+        const noc::TypeMetadata* type =
+            context.reflection.FindType(componentTypeId_);
+
+        return context.world.IsAlive(entity_)
+            && type
+            && type->componentMetadata
+            && type->componentMetadata->has(
+                context.world,
+                entity_)
+            && type->componentMetadata->remove(
+                context.world,
+                entity_);
+    }
+
     bool SetReflectedPropertyCommand::Init(
         EditorCommandContext& context,
         noc::EntityHandle entity,

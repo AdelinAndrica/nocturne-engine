@@ -331,6 +331,86 @@ bool RunPhase16EditorSessionTests()
             "Recorded live transaction redo failed");
     }
 
+    {
+        session.History().Clear();
+
+        auto addCamera =
+            std::make_unique<
+                nocturne::editor::AddComponentCommand>();
+
+        ok &= CheckEditorSession(
+            addCamera->Init(
+                context,
+                authored,
+                noc::TypeId{
+                    noc::kCameraComponentTypeId.value }),
+            "AddComponentCommand(Camera) init failed");
+
+        ok &= CheckEditorSession(
+            session.History().Execute(
+                context,
+                std::move(addCamera))
+                && world.HasCamera(authored),
+            "Generic AddComponentCommand execute failed");
+
+        ok &= CheckEditorSession(
+            session.History().Undo(context)
+                && !world.HasCamera(authored),
+            "Generic AddComponentCommand undo failed");
+
+        ok &= CheckEditorSession(
+            session.History().Redo(context)
+                && world.HasCamera(authored),
+            "Generic AddComponentCommand redo failed");
+
+        ok &= CheckEditorSession(
+            world.SetCameraPerspective(
+                authored,
+                0.9f,
+                1.5f,
+                1000.0f,
+                2000.0f),
+            "Camera setup for reflected component snapshot failed");
+
+        session.History().Clear();
+
+        auto removeCamera =
+            std::make_unique<
+                nocturne::editor::RemoveComponentCommand>();
+
+        ok &= CheckEditorSession(
+            removeCamera->Init(
+                context,
+                authored,
+                noc::TypeId{
+                    noc::kCameraComponentTypeId.value }),
+            "RemoveComponentCommand(Camera) init failed");
+
+        ok &= CheckEditorSession(
+            session.History().Execute(
+                context,
+                std::move(removeCamera))
+                && !world.HasCamera(authored),
+            "Generic RemoveComponentCommand execute failed");
+
+        ok &= CheckEditorSession(
+            session.History().Undo(context)
+                && world.HasCamera(authored)
+                && world.GetCamera(authored)
+                && world.GetCamera(authored)->fovYRadians == 0.9f
+                && world.GetCamera(authored)->aspect == 1.5f
+                && world.GetCamera(authored)->nearZ == 1000.0f
+                && world.GetCamera(authored)->farZ == 2000.0f,
+            "Reflected component snapshot restore failed");
+
+        ok &= CheckEditorSession(
+            session.History().Redo(context)
+                && !world.HasCamera(authored),
+            "Generic RemoveComponentCommand redo failed");
+
+        session.History().Clear();
+    }
+
     // Failed commands must not enter history.
     const uint32_t historyCountBeforeFailure =
         session.History().CommandCount();
