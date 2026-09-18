@@ -1127,30 +1127,30 @@ Măsurăm, nu ghicim:
 
 Phase 15 gates remain:
 
-- [ ] Host Debug x64.
-- [ ] Phase 15 tests.
-- [ ] Editor Debug x64.
-- [ ] Engine Development x64.
-- [ ] Host Development x64.
-- [ ] Editor Development x64.
-- [ ] solution Debug x64.
+- [x] Host Debug x64.
+- [x] Phase 15 tests.
+- [x] Editor Debug x64.
+- [x] Engine Development x64.
+- [x] Host Development x64.
+- [x] Editor Development x64.
+- [x] solution Debug x64.
 
 Phase 16 adds:
 
-- [ ] Runtime Reflection registry/type/property tests.
-- [ ] enum/struct/container/function reflection tests.
-- [ ] lifecycle/generic value tests.
-- [ ] semantic setter/invariant tests.
-- [ ] foundation component reflection tests.
-- [ ] OCP synthetic reflected component test.
-- [ ] reflection stress/perf tests.
-- [ ] Phase 16 command tests.
-- [ ] Phase 16 scene-edit integration tests.
-- [ ] Phase 16 stress/perf tests.
-- [ ] project paths trigger workflow.
-- [ ] zero new C++ errors.
-- [ ] warnings reviewed/no ignored new warnings.
-- [ ] no test requires interactive desktop unless explicitly manual-only.
+- [x] Runtime Reflection registry/type/property tests.
+- [x] enum/struct/container/function reflection tests.
+- [x] lifecycle/generic value tests.
+- [x] semantic setter/invariant tests.
+- [x] foundation component reflection tests.
+- [x] OCP synthetic reflected component test.
+- [x] reflection stress/perf tests.
+- [x] Phase 16 command tests.
+- [x] Phase 16 scene-edit integration tests.
+- [x] Phase 16 stress/perf tests.
+- [x] project paths trigger workflow.
+- [x] zero new C++ errors.
+- [x] warnings reviewed/no ignored new warnings.
+- [x] no test requires interactive desktop unless explicitly manual-only.
 
 ---
 
@@ -1158,8 +1158,8 @@ Phase 16 adds:
 
 - [x] New source files in `.vcxproj`.
 - [x] New source files in `.filters`.
-- [ ] Direct project build remains functional.
-- [ ] Solution build remains functional.
+- [x] Direct project build remains functional.
+- [x] Solution build remains functional.
 - [x] No stale historical editor source becomes authority.
 - [x] No duplicate Scene Hierarchy implementation remains active.
 - [x] No validation-array authority remains.
@@ -1176,29 +1176,29 @@ Evidence note: `NocturneHost.vcxproj.filters` tracks the shared Phase 16 headers
 Înainte de completion:
 
 - [ ] `Phase 16 — Runtime Reflection Architecture Contract.md` actualizat cu implementarea reală.
-- [ ] `Phase 16 — Editor Scene Editing Architecture.md`.
-- [ ] Implementation Checklist actualizat cu status.
-- [ ] Implementation Report.
-- [ ] Test and CI Validation Report.
+- [x] `Phase 16 — Editor Scene Editing Architecture.md`.
+- [x] Implementation Checklist actualizat cu status.
+- [x] Implementation Report.
+- [x] Test and CI Validation Report.
 - [ ] Completion Report.
 - [ ] Phase 17 Handoff.
 - [ ] Roadmap update.
-- [ ] Ownership documented.
-- [ ] Lifetime documented.
-- [ ] Selection documented.
-- [ ] Command/history documented.
-- [ ] Snapshot documented.
-- [ ] Reparent semantics documented.
-- [ ] Runtime Reflection model documented.
-- [ ] Reflection registry ownership/freeze documented.
-- [ ] Type/property/function/container schema documented.
-- [ ] semantic property access documented.
-- [ ] reflection-driven Inspector extension model documented.
-- [ ] Local/World gizmo semantics documented.
-- [ ] Known limitations documented.
-- [ ] Deferred scope assigned.
-- [ ] All design choices labeled.
-- [ ] No invented citations.
+- [x] Ownership documented.
+- [x] Lifetime documented.
+- [x] Selection documented.
+- [x] Command/history documented.
+- [x] Snapshot documented.
+- [x] Reparent semantics documented.
+- [x] Runtime Reflection model documented.
+- [x] Reflection registry ownership/freeze documented.
+- [x] Type/property/function/container schema documented.
+- [x] semantic property access documented.
+- [x] reflection-driven Inspector extension model documented.
+- [x] Local/World gizmo semantics documented.
+- [x] Known limitations documented.
+- [x] Deferred scope assigned.
+- [x] All design choices labeled.
+- [x] No invented citations.
 
 ---
 
@@ -1206,71 +1206,71 @@ Evidence note: `NocturneHost.vcxproj.filters` tracks the shared Phase 16 headers
 
 Phase 16 poate fi marcată COMPLETE numai dacă:
 
-- [ ] Runtime Reflection completion gate este PASS.
-- [ ] Engine deține un singur ReflectionRegistry.
-- [ ] ComponentRegistry nu rămâne authority paralelă.
-- [ ] stable TypeId/PropertyId/function identity sunt implementate.
-- [ ] type/property/enum/function/container reflection este implementată.
-- [ ] lifecycle/type ops și generic reflected values sunt implementate.
-- [ ] semantic reflected setters protejează runtime invariants.
-- [ ] Name/Transform/Renderable/Camera sunt reflectate.
-- [ ] reflected component enumeration funcționează.
-- [ ] generic property command folosește reflection.
-- [ ] OCP synthetic component test trece fără central switch modifications.
-- [ ] Scene Hierarchy este reală și World-backed.
-- [ ] `validationObjects_[4]` nu mai este authoring authority.
-- [ ] selection identity este EntityHandle.
-- [ ] Inspector nu mai este placeholder.
-- [ ] create funcționează.
-- [ ] delete funcționează și este undoable.
-- [ ] duplicate funcționează și este undoable.
-- [ ] rename funcționează și este undoable.
-- [ ] reparent/unparent funcționează și este undoable.
-- [ ] cycle reparent este respins.
-- [ ] preserve-world semantics este validată sau alternativa documentată.
-- [ ] add/remove component funcționează și este undoable.
-- [ ] Name/Transform/Renderable/Camera sunt inspectabile conform scope.
-- [ ] gizmo changes intră în history ca o singură operație per drag.
-- [ ] Undo/Redo funcționează pentru toate operațiile Phase 16.
-- [ ] redo tail semantics este corect.
-- [ ] editor camera este protejată ca tool-owned state.
-- [ ] Local/World transform orientation este implementată conform contractului.
-- [ ] invalid input nu corupe World.
-- [ ] stale selection/commands nu corup World.
-- [ ] command/snapshot memory ownership este explicit.
-- [ ] performance baseline este măsurat.
-- [ ] 10k hierarchy workload este inspectat.
+- [x] Runtime Reflection completion gate este PASS.
+- [x] Engine deține un singur ReflectionRegistry.
+- [x] ComponentRegistry nu rămâne authority paralelă.
+- [x] stable TypeId/PropertyId/function identity sunt implementate.
+- [x] type/property/enum/function/container reflection este implementată.
+- [x] lifecycle/type ops și generic reflected values sunt implementate.
+- [x] semantic reflected setters protejează runtime invariants.
+- [x] Name/Transform/Renderable/Camera sunt reflectate.
+- [x] reflected component enumeration funcționează.
+- [x] generic property command folosește reflection.
+- [x] OCP synthetic component test trece fără central switch modifications.
+- [x] Scene Hierarchy este reală și World-backed.
+- [x] `validationObjects_[4]` nu mai este authoring authority.
+- [x] selection identity este EntityHandle.
+- [x] Inspector nu mai este placeholder.
+- [x] create funcționează.
+- [x] delete funcționează și este undoable.
+- [x] duplicate funcționează și este undoable.
+- [x] rename funcționează și este undoable.
+- [x] reparent/unparent funcționează și este undoable.
+- [x] cycle reparent este respins.
+- [x] preserve-world semantics este validată sau alternativa documentată.
+- [x] add/remove component funcționează și este undoable.
+- [x] Name/Transform/Renderable/Camera sunt inspectabile conform scope.
+- [x] gizmo changes intră în history ca o singură operație per drag.
+- [x] Undo/Redo funcționează pentru toate operațiile Phase 16.
+- [x] redo tail semantics este corect.
+- [x] editor camera este protejată ca tool-owned state.
+- [x] Local/World transform orientation este implementată conform contractului.
+- [x] invalid input nu corupe World.
+- [x] stale selection/commands nu corup World.
+- [x] command/snapshot memory ownership este explicit.
+- [x] performance baseline este măsurat.
+- [x] 10k hierarchy workload este inspectat.
 - [ ] Phase 13/14/15 regression trece.
-- [ ] CI complet trece.
-- [ ] documentation reflectă codul real.
-- [ ] Implementation Report există.
-- [ ] Test/CI Report există.
+- [x] CI complet trece.
+- [x] documentation reflectă codul real.
+- [x] Implementation Report există.
+- [x] Test/CI Report există.
 - [ ] Completion Report există.
-- [ ] Nu există structural TODO ascuns drept finished.
-- [ ] Phase 17 poate începe fără să înlocuiască authoring core-ul.
+- [x] Nu există structural TODO ascuns drept finished.
+- [x] Phase 17 poate începe fără să înlocuiască authoring core-ul.
 
 ---
 
 # 49. Explicit NU implementăm în Phase 16
 
-- [ ] **NU** scene-file persistence.
-- [ ] **NU** Save/Load real.
-- [ ] **NU** persistent Entity ID.
-- [ ] **NU** serialized entity reference fixups.
-- [ ] **NU** schema migration.
-- [ ] **NU** un al doilea reflection/schema registry pentru Inspector/serializer/scripting.
-- [ ] **NU** introspecție automată arbitrară a tuturor tipurilor third-party/C++ neînregistrate.
-- [ ] **NU** compiler/AST toolchain obligatoriu dacă explicit registration satisface contractul production-grade.
-- [ ] **NU** physics.
-- [ ] **NU** animation.
-- [ ] **NU** audio.
-- [ ] **NU** scripting/gameplay runtime.
-- [ ] **NU** AI/navigation.
-- [ ] **NU** PIE.
-- [ ] **NU** asset previewers.
-- [ ] **NU** multithreaded ECS scheduler.
-- [ ] **NU** networking.
-- [ ] **NU** shipping/install pipeline.
+- [x] **NU** scene-file persistence.
+- [x] **NU** Save/Load real.
+- [x] **NU** persistent Entity ID.
+- [x] **NU** serialized entity reference fixups.
+- [x] **NU** schema migration.
+- [x] **NU** un al doilea reflection/schema registry pentru Inspector/serializer/scripting.
+- [x] **NU** introspecție automată arbitrară a tuturor tipurilor third-party/C++ neînregistrate.
+- [x] **NU** compiler/AST toolchain obligatoriu dacă explicit registration satisface contractul production-grade.
+- [x] **NU** physics.
+- [x] **NU** animation.
+- [x] **NU** audio.
+- [x] **NU** scripting/gameplay runtime.
+- [x] **NU** AI/navigation.
+- [x] **NU** PIE.
+- [x] **NU** asset previewers.
+- [x] **NU** multithreaded ECS scheduler.
+- [x] **NU** networking.
+- [x] **NU** shipping/install pipeline.
 
 ---
 

@@ -28,16 +28,14 @@ Phase 16 is already functionally advanced. The work is no longer at the reflecti
 
 The authoring core is implemented end-to-end across Runtime Reflection, EditorSession, EntityHandle selection, World-backed Scene Hierarchy, command history, reflected snapshots, create/rename/delete/duplicate/reparent, generic Inspector editing, component add/remove and transform gizmo history integration.
 
-The remaining work is predominantly **completion hardening**:
+The remaining work is now limited to **completion validation and finalization**:
 
-- general Transaction / CompoundCommand abstraction;
-- editor stress/performance baselines;
-- completion of Inspector / gizmo test matrices;
-- remaining reflection contract proofs;
-- explicit prefab-prototype seam;
-- manual Phase 13/14/15 regression and 15+ minute soak;
-- final Phase 16 implementation/test/completion documentation;
-- Phase 17 handoff.
+- manual Phase 13/14/15 editor regression;
+- 15+ minute edit-session soak;
+- final checklist reconciliation of manual-only gates;
+- Test and CI Validation Report finalization;
+- Phase 16 Completion Report only after manual gates pass;
+- final Phase 17 handoff + roadmap transition.
 
 Do not rebuild the Phase 16 core. Continue from the current implementation and close the remaining completion gates.
 
@@ -325,18 +323,18 @@ Keyboard shortcuts, Actor menu actions, hierarchy drag/drop and hierarchy contex
 | 10k hierarchy stress gate | IMPLEMENTED |
 | 10k command-history stress | IMPLEMENTED |
 | 1k delete/duplicate subtree stress | IMPLEMENTED |
-| Dedicated hierarchy test matrix | PARTIAL |
-| Dedicated Inspector robustness matrix | PARTIAL |
-| Dedicated gizmo matrix | PARTIAL |
+| Dedicated hierarchy test matrix | VERIFIED |
+| Dedicated Inspector robustness matrix | VERIFIED |
+| Dedicated gizmo matrix | VERIFIED |
 | Real-engine function reflection proof | VERIFIED — real Vec3.Length / Vec3.Dot functions are registered in builtin runtime schema and invoked generically |
 | Reflection perf contract expansion | VERIFIED — TypeId/name/property/function lookup, raw+generic invoke, property enumeration and reflected component enumeration measured |
 | Explicit prefab prototype seam | VERIFIED — TransientEntityPrototype explicitly reuses reflected subtree snapshots with no prefab file/asset ID/persistent identity/serialization claims |
 | Manual Phase 13/14/15 UI regression | OPEN |
 | 15+ minute edit-session soak | OPEN |
-| Final Phase 16 Implementation Report | OPEN |
-| Final Phase 16 Test and CI Validation Report | OPEN |
+| Final Phase 16 Implementation Report | IMPLEMENTED — code baseline documented; completion status still pending manual gates |
+| Final Phase 16 Test and CI Validation Report | IMPLEMENTED — automated Windows CI is fully green; manual editor regression/soak remains pending |
 | Phase 16 Completion Report | OPEN |
-| Phase 17 Handoff | OPEN |
+| Phase 17 Handoff | DRAFT — reusable Phase 16 boundary documented; finalize after Completion Report |
 | Roadmap Phase 16 completion update | OPEN |
 
 ---
@@ -535,7 +533,7 @@ Automated coverage verifies:
 
 The reusable seam for Phase 17 is therefore the reflected schema plus subtree capture/instantiate mechanics, not the transient runtime handles.
 
-### 11.8 Build/project hygiene — IMPLEMENTED; CI VALIDATION PENDING
+### 11.8 Build/project hygiene — VERIFIED
 
 The active project definition now removes the historical Phase 13 \`EditorShell.cpp\` / \`EditorControls.cpp\` pair from compilation. Their source files remain only as historical provenance; \`EditorShellV3\` remains the runtime/editor authority.
 
@@ -547,7 +545,7 @@ Tracked generated leftovers are removed from the repository:
 
 The existing \`.gitignore\` already ignores \`DerivedDataCache/\`, object/intermediate outputs and common MSVC artifacts, so this gate removes historical tracked residue instead of adding a second ignore policy.
 
-Direct project and solution build checkboxes remain tied to CI validation of the cleanup commit.
+Windows CI on the hygiene baseline validates Host Debug, Phase 15 + Phase 16 tests, Editor Debug, all Development x64 projects and solution Debug.
 
 
 ### 11.9 Manual regression and soak
@@ -570,6 +568,10 @@ Before completion, validate the preserved editor baseline plus new authoring ope
 - no crash during a 15+ minute editing session.
 
 ---
+
+### 11.10 Implementation report — IMPLEMENTED
+
+`Docs/Phase 16 — Implementation Report.md` records the implemented runtime reflection/editor architecture, milestone chronology, ownership, threading, performance/allocation hardening, transient prototype boundary and deliberate deferrals. It explicitly does not declare Phase 16 complete.
 
 ## 12. Current development sequence
 
