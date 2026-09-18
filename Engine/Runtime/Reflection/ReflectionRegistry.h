@@ -26,6 +26,11 @@ namespace noc
         DuplicatePropertyId,
         DuplicatePropertyCanonicalName,
         UnknownPropertyValueType,
+        DuplicateEnumValueId,
+        DuplicateEnumValueCanonicalName,
+        DuplicateEnumNumericValue,
+        UnknownEnumUnderlyingType,
+        InvalidEnumUnderlyingType,
         AllocationFailure,
         ValidationFailure
     };
@@ -44,6 +49,11 @@ namespace noc
         case ReflectionRegistryError::DuplicatePropertyId: return "DuplicatePropertyId";
         case ReflectionRegistryError::DuplicatePropertyCanonicalName: return "DuplicatePropertyCanonicalName";
         case ReflectionRegistryError::UnknownPropertyValueType: return "UnknownPropertyValueType";
+        case ReflectionRegistryError::DuplicateEnumValueId: return "DuplicateEnumValueId";
+        case ReflectionRegistryError::DuplicateEnumValueCanonicalName: return "DuplicateEnumValueCanonicalName";
+        case ReflectionRegistryError::DuplicateEnumNumericValue: return "DuplicateEnumNumericValue";
+        case ReflectionRegistryError::UnknownEnumUnderlyingType: return "UnknownEnumUnderlyingType";
+        case ReflectionRegistryError::InvalidEnumUnderlyingType: return "InvalidEnumUnderlyingType";
         case ReflectionRegistryError::AllocationFailure: return "AllocationFailure";
         case ReflectionRegistryError::ValidationFailure: return "ValidationFailure";
         }
@@ -90,6 +100,16 @@ namespace noc
         [[nodiscard]] const PropertyMetadata* FindPropertyByName(
             TypeId ownerTypeId,
             const char* canonicalName) const noexcept;
+
+        [[nodiscard]] const EnumValueMetadata* FindEnumValue(
+            TypeId enumTypeId,
+            EnumValueId valueId) const noexcept;
+        [[nodiscard]] const EnumValueMetadata* FindEnumValueByName(
+            TypeId enumTypeId,
+            const char* canonicalName) const noexcept;
+        [[nodiscard]] const EnumValueMetadata* FindEnumValueByRawValue(
+            TypeId enumTypeId,
+            uint64_t rawValue) const noexcept;
 
     private:
         struct Impl;

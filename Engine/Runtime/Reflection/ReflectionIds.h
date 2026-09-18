@@ -31,6 +31,14 @@ namespace noc
         [[nodiscard]] static constexpr FunctionId Invalid() noexcept { return {}; }
     };
 
+    struct EnumValueId
+    {
+        uint64_t value = 0;
+
+        [[nodiscard]] constexpr bool IsValid() const noexcept { return value != 0; }
+        [[nodiscard]] static constexpr EnumValueId Invalid() noexcept { return {}; }
+    };
+
     [[nodiscard]] constexpr bool operator==(TypeId a, TypeId b) noexcept { return a.value == b.value; }
     [[nodiscard]] constexpr bool operator!=(TypeId a, TypeId b) noexcept { return !(a == b); }
     [[nodiscard]] constexpr bool operator<(TypeId a, TypeId b) noexcept { return a.value < b.value; }
@@ -42,6 +50,10 @@ namespace noc
     [[nodiscard]] constexpr bool operator==(FunctionId a, FunctionId b) noexcept { return a.value == b.value; }
     [[nodiscard]] constexpr bool operator!=(FunctionId a, FunctionId b) noexcept { return !(a == b); }
     [[nodiscard]] constexpr bool operator<(FunctionId a, FunctionId b) noexcept { return a.value < b.value; }
+
+    [[nodiscard]] constexpr bool operator==(EnumValueId a, EnumValueId b) noexcept { return a.value == b.value; }
+    [[nodiscard]] constexpr bool operator!=(EnumValueId a, EnumValueId b) noexcept { return !(a == b); }
+    [[nodiscard]] constexpr bool operator<(EnumValueId a, EnumValueId b) noexcept { return a.value < b.value; }
 
     // Deterministic FNV-1a helper for schema declarations/tests. Canonical engine
     // types still use named constants so identity changes remain reviewable.
@@ -76,5 +88,10 @@ namespace noc
     [[nodiscard]] constexpr FunctionId MakeFunctionId(const char* canonicalName) noexcept
     {
         return FunctionId{ StableReflectionHash64(canonicalName) };
+    }
+
+    [[nodiscard]] constexpr EnumValueId MakeEnumValueId(const char* canonicalName) noexcept
+    {
+        return EnumValueId{ StableReflectionHash64(canonicalName) };
     }
 }

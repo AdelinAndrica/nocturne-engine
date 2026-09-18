@@ -163,6 +163,44 @@ namespace noc
         PropertyDefaultValueFn defaultValue = nullptr;
     };
 
+    struct EnumValueMetadata
+    {
+        EnumValueId valueId{};
+        const char* canonicalName = nullptr;
+
+        // Raw underlying bits. Interpretation is determined by the enum's
+        // reflected signed/unsigned underlying type.
+        uint64_t rawValue = 0;
+    };
+
+    struct EnumMetadata
+    {
+        TypeId underlyingTypeId{};
+        const EnumValueMetadata* values = nullptr;
+        uint32_t valueCount = 0;
+        bool isFlags = false;
+    };
+
+    template <typename Enum>
+    [[nodiscard]] constexpr EnumValueMetadata MakeEnumValueMetadata(
+        EnumValueId valueId,
+        const char* canonicalName,
+        Enum value) noexcept
+    {
+        static_assert(std::is_enum_v<Enum>, "Enum reflection requires an enum type.");
+
+        using Underlying = std::underlying_type_t<Enum>;
+        using Unsigned = std::make_unsigned_t<Underlying>;
+
+        return EnumValueMetadata{
+            valueId,
+            canonicalName,
+            static_cast<uint64_t>(
+                static_cast<Unsigned>(
+                    static_cast<Underlying>(value)))
+        };
+    }
+
     namespace reflection_detail
     {
         template <typename T>
@@ -335,6 +373,8 @@ namespace noc
 
         const PropertyMetadata* properties = nullptr;
         uint32_t propertyCount = 0;
+
+        const EnumMetadata* enumMetadata = nullptr;
     };
 
     template <typename T>
@@ -355,7 +395,8 @@ namespace noc
             flags,
             MakeTypeLifecycleOperations<T>(),
             nullptr,
-            0
+            0,
+            nullptr
         };
     }
 

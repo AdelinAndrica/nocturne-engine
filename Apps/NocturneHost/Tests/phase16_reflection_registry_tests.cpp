@@ -41,6 +41,14 @@ namespace
         float value = 0.0f;
         [[nodiscard]] bool operator==(const RegistryTypeC&) const = default;
     };
+
+    enum class TestAccess : uint32_t
+    {
+        None = 0,
+        Read = 1,
+        Write = 2,
+        ReadWrite = 3
+    };
 }
 
 bool RunPhase16ReflectionRegistryTests()
@@ -315,6 +323,123 @@ bool RunPhase16ReflectionRegistryTests()
         builtinRegistry.TypeCount() == 17,
         "Unexpected builtin reflected type count");
 
+    char mutableEnumValueName[] = "Read";
+    const noc::EnumValueMetadata enumValues[] = {
+        noc::MakeEnumValueMetadata<TestAccess>(
+            noc::MakeEnumValueId("Nocturne.Tests.TestAccess.None"),
+            "None",
+            TestAccess::None),
+        noc::MakeEnumValueMetadata<TestAccess>(
+            noc::MakeEnumValueId("Nocturne.Tests.TestAccess.Read"),
+            mutableEnumValueName,
+            TestAccess::Read),
+        noc::MakeEnumValueMetadata<TestAccess>(
+            noc::MakeEnumValueId("Nocturne.Tests.TestAccess.Write"),
+            "Write",
+            TestAccess::Write),
+        noc::MakeEnumValueMetadata<TestAccess>(
+            noc::MakeEnumValueId("Nocturne.Tests.TestAccess.ReadWrite"),
+            "ReadWrite",
+            TestAccess::ReadWrite)
+    };
+
+    const noc::EnumMetadata enumMetadata{
+        noc::BuiltinTypeIds::UInt32,
+        enumValues,
+        4,
+        true
+    };
+
+    noc::TypeMetadata enumType =
+        noc::MakeTypeMetadata<TestAccess>(
+            noc::TypeId{ 0x2000000000000001ull },
+            "Nocturne.Tests.TestAccess",
+            noc::TypeKind::Enum,
+            1,
+            noc::TypeFlags::EditorVisible
+                | noc::TypeFlags::Serializable);
+    enumType.enumMetadata = &enumMetadata;
+
+    ok &= CheckReflectionRegistry(
+        builtinRegistry.RegisterType(enumType),
+        "Enum registration failed");
+
+    mutableEnumValueName[0] = 'X';
+
+    const noc::EnumValueMetadata* reflectedRead =
+        builtinRegistry.FindEnumValueByName(
+            enumType.typeId,
+            "Read");
+
+    ok &= CheckReflectionRegistry(
+        reflectedRead
+            && reflectedRead->valueId
+                == noc::MakeEnumValueId(
+                    "Nocturne.Tests.TestAccess.Read")
+            && reflectedRead->rawValue == 1,
+        "Enum registry did not own/value metadata correctly");
+
+    ok &= CheckReflectionRegistry(
+        builtinRegistry.FindEnumValueByRawValue(
+            enumType.typeId, 3)
+            == builtinRegistry.FindEnumValue(
+                enumType.typeId,
+                noc::MakeEnumValueId(
+                    "Nocturne.Tests.TestAccess.ReadWrite")),
+        "Enum value lookup mismatch");
+
+    const noc::EnumValueMetadata duplicateEnumIdValues[] = {
+        noc::MakeEnumValueMetadata<TestAccess>(
+            noc::EnumValueId{ 1 }, "A", TestAccess::Read),
+        noc::MakeEnumValueMetadata<TestAccess>(
+            noc::EnumValueId{ 1 }, "B", TestAccess::Write)
+    };
+    const noc::EnumMetadata duplicateEnumIdMetadata{
+        noc::BuiltinTypeIds::UInt32,
+        duplicateEnumIdValues,
+        2,
+        false
+    };
+    noc::TypeMetadata duplicateEnumId =
+        noc::MakeTypeMetadata<TestAccess>(
+            noc::TypeId{ 0x2000000000000002ull },
+            "Nocturne.Tests.DuplicateEnumId",
+            noc::TypeKind::Enum,
+            1);
+    duplicateEnumId.enumMetadata = &duplicateEnumIdMetadata;
+
+    ok &= CheckReflectionRegistry(
+        !builtinRegistry.RegisterType(duplicateEnumId)
+            && builtinRegistry.LastError()
+                == noc::ReflectionRegistryError::DuplicateEnumValueId,
+        "Duplicate enum value IDs must be rejected");
+
+    const noc::EnumValueMetadata duplicateNumericValues[] = {
+        noc::MakeEnumValueMetadata<TestAccess>(
+            noc::EnumValueId{ 2 }, "A", TestAccess::Read),
+        noc::MakeEnumValueMetadata<TestAccess>(
+            noc::EnumValueId{ 3 }, "B", TestAccess::Read)
+    };
+    const noc::EnumMetadata duplicateNumericMetadata{
+        noc::BuiltinTypeIds::UInt32,
+        duplicateNumericValues,
+        2,
+        false
+    };
+    noc::TypeMetadata duplicateNumeric =
+        noc::MakeTypeMetadata<TestAccess>(
+            noc::TypeId{ 0x2000000000000003ull },
+            "Nocturne.Tests.DuplicateEnumNumeric",
+            noc::TypeKind::Enum,
+            1);
+    duplicateNumeric.enumMetadata = &duplicateNumericMetadata;
+
+    ok &= CheckReflectionRegistry(
+        !builtinRegistry.RegisterType(duplicateNumeric)
+            && builtinRegistry.LastError()
+                == noc::ReflectionRegistryError::DuplicateEnumNumericValue,
+        "Duplicate enum numeric values must be rejected");
+
     const noc::TypeMetadata* vec3 =
         builtinRegistry.FindType(noc::BuiltinTypeIds::Vec3);
     const noc::PropertyMetadata* vec3X =
@@ -374,7 +499,17 @@ bool RunPhase16ReflectionRegistryTests()
 
     ok &= CheckReflectionRegistry(
         builtinRegistry.Freeze(),
-        "Builtin reflection Freeze failed");
+        "Builtin/enum reflection Freeze failed");
+
+    const noc::TypeMetadata* reflectedEnum =
+        builtinRegistry.FindType(enumType.typeId);
+    ok &= CheckReflectionRegistry(
+        reflectedEnum
+            && reflectedEnum->enumMetadata
+            && reflectedEnum->enumMetadata->isFlags
+            && reflectedEnum->enumMetadata->underlyingTypeId
+                == noc::BuiltinTypeIds::UInt32,
+        "Frozen enum metadata mismatch");
 
     const std::size_t builtinAllocationsBefore =
         allocator.AllocationCount();
@@ -398,7 +533,43 @@ bool RunPhase16ReflectionRegistryTests()
     builtinRegistry.Shutdown();
     ok &= CheckReflectionRegistry(
         allocator.OutstandingBytes() == 0,
-        "Builtin reflection leaked allocator memory");
+        "Builtin/enum reflection leaked allocator memory");
+
+    noc::ReflectionRegistry invalidEnumRegistry;
+    ok &= CheckReflectionRegistry(
+        invalidEnumRegistry.Init(allocator, 1),
+        "Invalid enum registry init failed");
+
+    const noc::EnumValueMetadata loneEnumValue =
+        noc::MakeEnumValueMetadata<TestAccess>(
+            noc::EnumValueId{ 10 }, "Read", TestAccess::Read);
+    const noc::EnumMetadata unresolvedUnderlying{
+        noc::TypeId{ 0xDEADBEEFull },
+        &loneEnumValue,
+        1,
+        false
+    };
+    noc::TypeMetadata unresolvedEnum =
+        noc::MakeTypeMetadata<TestAccess>(
+            noc::TypeId{ 0x2000000000000010ull },
+            "Nocturne.Tests.UnresolvedEnumUnderlying",
+            noc::TypeKind::Enum,
+            1);
+    unresolvedEnum.enumMetadata = &unresolvedUnderlying;
+
+    ok &= CheckReflectionRegistry(
+        invalidEnumRegistry.RegisterType(unresolvedEnum),
+        "Unresolved enum underlying type should register while Building");
+    ok &= CheckReflectionRegistry(
+        !invalidEnumRegistry.Freeze()
+            && invalidEnumRegistry.LastError()
+                == noc::ReflectionRegistryError::UnknownEnumUnderlyingType,
+        "Freeze must reject unresolved enum underlying type");
+
+    invalidEnumRegistry.Shutdown();
+    ok &= CheckReflectionRegistry(
+        allocator.OutstandingBytes() == 0,
+        "Invalid enum Freeze path leaked allocator memory");
 
     NOC_LOG_INFO(
         "Phase16",

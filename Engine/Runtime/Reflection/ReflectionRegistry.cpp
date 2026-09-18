@@ -40,6 +40,58 @@ namespace noc
             return property.write != nullptr;
         }
 
+        [[nodiscard]] ReflectionRegistryError ValidateEnumIntrinsic(
+            const TypeMetadata& metadata) noexcept
+        {
+            if (metadata.kind != TypeKind::Enum)
+            {
+                return metadata.enumMetadata == nullptr
+                    ? ReflectionRegistryError::None
+                    : ReflectionRegistryError::InvalidMetadata;
+            }
+
+            if (!metadata.enumMetadata
+                || !metadata.enumMetadata->underlyingTypeId.IsValid()
+                || !metadata.enumMetadata->values
+                || metadata.enumMetadata->valueCount == 0)
+            {
+                return ReflectionRegistryError::InvalidMetadata;
+            }
+
+            for (uint32_t i = 0; i < metadata.enumMetadata->valueCount; ++i)
+            {
+                const EnumValueMetadata& value = metadata.enumMetadata->values[i];
+                if (!value.valueId.IsValid()
+                    || !value.canonicalName
+                    || value.canonicalName[0] == '\0')
+                {
+                    return ReflectionRegistryError::InvalidMetadata;
+                }
+
+                for (uint32_t j = 0; j < i; ++j)
+                {
+                    const EnumValueMetadata& previous =
+                        metadata.enumMetadata->values[j];
+
+                    if (previous.valueId == value.valueId)
+                        return ReflectionRegistryError::DuplicateEnumValueId;
+
+                    if (std::strcmp(
+                            previous.canonicalName,
+                            value.canonicalName) == 0)
+                    {
+                        return ReflectionRegistryError::
+                            DuplicateEnumValueCanonicalName;
+                    }
+
+                    if (previous.rawValue == value.rawValue)
+                        return ReflectionRegistryError::DuplicateEnumNumericValue;
+                }
+            }
+
+            return ReflectionRegistryError::None;
+        }
+
         [[nodiscard]] ReflectionRegistryError ValidateTypeIntrinsic(
             const TypeMetadata& metadata) noexcept
         {
@@ -57,36 +109,37 @@ namespace noc
 
             if (metadata.propertyCount == 0)
             {
-                return metadata.properties == nullptr
-                    ? ReflectionRegistryError::None
-                    : ReflectionRegistryError::InvalidMetadata;
+                if (metadata.properties != nullptr)
+                    return ReflectionRegistryError::InvalidMetadata;
             }
-
-            if (!metadata.properties)
-                return ReflectionRegistryError::InvalidMetadata;
-
-            for (uint32_t i = 0; i < metadata.propertyCount; ++i)
+            else
             {
-                const PropertyMetadata& property = metadata.properties[i];
-                if (!IsPropertyValid(property, metadata.typeId))
+                if (!metadata.properties)
                     return ReflectionRegistryError::InvalidMetadata;
 
-                for (uint32_t j = 0; j < i; ++j)
+                for (uint32_t i = 0; i < metadata.propertyCount; ++i)
                 {
-                    const PropertyMetadata& previous = metadata.properties[j];
-                    if (previous.propertyId == property.propertyId)
-                        return ReflectionRegistryError::DuplicatePropertyId;
-                    if (std::strcmp(
-                            previous.canonicalName,
-                            property.canonicalName) == 0)
+                    const PropertyMetadata& property = metadata.properties[i];
+                    if (!IsPropertyValid(property, metadata.typeId))
+                        return ReflectionRegistryError::InvalidMetadata;
+
+                    for (uint32_t j = 0; j < i; ++j)
                     {
-                        return ReflectionRegistryError::
-                            DuplicatePropertyCanonicalName;
+                        const PropertyMetadata& previous = metadata.properties[j];
+                        if (previous.propertyId == property.propertyId)
+                            return ReflectionRegistryError::DuplicatePropertyId;
+                        if (std::strcmp(
+                                previous.canonicalName,
+                                property.canonicalName) == 0)
+                        {
+                            return ReflectionRegistryError::
+                                DuplicatePropertyCanonicalName;
+                        }
                     }
                 }
             }
 
-            return ReflectionRegistryError::None;
+            return ValidateEnumIntrinsic(metadata);
         }
 
         [[nodiscard]] char* CopyString(
@@ -107,6 +160,29 @@ namespace noc
             IAllocator& allocator,
             TypeMetadata& metadata)
         {
+            if (metadata.enumMetadata)
+            {
+                auto* enumMetadata =
+                    const_cast<EnumMetadata*>(metadata.enumMetadata);
+                if (enumMetadata->values)
+                {
+                    auto* values =
+                        const_cast<EnumValueMetadata*>(enumMetadata->values);
+                    for (uint32_t i = 0; i < enumMetadata->valueCount; ++i)
+                    {
+                        if (values[i].canonicalName)
+                        {
+                            allocator.Deallocate(
+                                const_cast<char*>(values[i].canonicalName));
+                        }
+                    }
+                    allocator.Deallocate(values);
+                }
+                enumMetadata->~EnumMetadata();
+                allocator.Deallocate(enumMetadata);
+                metadata.enumMetadata = nullptr;
+            }
+
             if (metadata.properties)
             {
                 auto* properties =
@@ -141,41 +217,87 @@ namespace noc
             destination.canonicalName = nullptr;
             destination.properties = nullptr;
             destination.propertyCount = 0;
+            destination.enumMetadata = nullptr;
 
             destination.canonicalName =
                 CopyString(allocator, source.canonicalName);
             if (!destination.canonicalName)
                 return false;
 
-            if (source.propertyCount == 0)
-                return true;
-
-            auto* properties = static_cast<PropertyMetadata*>(
-                allocator.Allocate(
-                    sizeof(PropertyMetadata) * source.propertyCount,
-                    alignof(PropertyMetadata)));
-            if (!properties)
+            if (source.propertyCount > 0)
             {
-                DestroyOwnedMetadata(allocator, destination);
-                return false;
-            }
-
-            for (uint32_t i = 0; i < source.propertyCount; ++i)
-                new (properties + i) PropertyMetadata{};
-
-            destination.properties = properties;
-            destination.propertyCount = source.propertyCount;
-
-            for (uint32_t i = 0; i < source.propertyCount; ++i)
-            {
-                properties[i] = source.properties[i];
-                properties[i].canonicalName = nullptr;
-                properties[i].canonicalName =
-                    CopyString(allocator, source.properties[i].canonicalName);
-                if (!properties[i].canonicalName)
+                auto* properties = static_cast<PropertyMetadata*>(
+                    allocator.Allocate(
+                        sizeof(PropertyMetadata) * source.propertyCount,
+                        alignof(PropertyMetadata)));
+                if (!properties)
                 {
                     DestroyOwnedMetadata(allocator, destination);
                     return false;
+                }
+
+                for (uint32_t i = 0; i < source.propertyCount; ++i)
+                    new (properties + i) PropertyMetadata{};
+
+                destination.properties = properties;
+                destination.propertyCount = source.propertyCount;
+
+                for (uint32_t i = 0; i < source.propertyCount; ++i)
+                {
+                    properties[i] = source.properties[i];
+                    properties[i].canonicalName = nullptr;
+                    properties[i].canonicalName =
+                        CopyString(allocator, source.properties[i].canonicalName);
+                    if (!properties[i].canonicalName)
+                    {
+                        DestroyOwnedMetadata(allocator, destination);
+                        return false;
+                    }
+                }
+            }
+
+            if (source.enumMetadata)
+            {
+                auto* enumMetadata = static_cast<EnumMetadata*>(
+                    allocator.Allocate(sizeof(EnumMetadata), alignof(EnumMetadata)));
+                if (!enumMetadata)
+                {
+                    DestroyOwnedMetadata(allocator, destination);
+                    return false;
+                }
+
+                new (enumMetadata) EnumMetadata(*source.enumMetadata);
+                enumMetadata->values = nullptr;
+                destination.enumMetadata = enumMetadata;
+
+                auto* values = static_cast<EnumValueMetadata*>(
+                    allocator.Allocate(
+                        sizeof(EnumValueMetadata) * source.enumMetadata->valueCount,
+                        alignof(EnumValueMetadata)));
+                if (!values)
+                {
+                    DestroyOwnedMetadata(allocator, destination);
+                    return false;
+                }
+
+                for (uint32_t i = 0; i < source.enumMetadata->valueCount; ++i)
+                    new (values + i) EnumValueMetadata{};
+
+                enumMetadata->values = values;
+
+                for (uint32_t i = 0; i < source.enumMetadata->valueCount; ++i)
+                {
+                    values[i] = source.enumMetadata->values[i];
+                    values[i].canonicalName = nullptr;
+                    values[i].canonicalName =
+                        CopyString(
+                            allocator,
+                            source.enumMetadata->values[i].canonicalName);
+                    if (!values[i].canonicalName)
+                    {
+                        DestroyOwnedMetadata(allocator, destination);
+                        return false;
+                    }
                 }
             }
 
@@ -185,10 +307,7 @@ namespace noc
 
     struct ReflectionRegistry::Impl
     {
-        struct Entry
-        {
-            TypeMetadata metadata{};
-        };
+        struct Entry { TypeMetadata metadata{}; };
 
         IAllocator* allocator = nullptr;
         Entry* entries = nullptr;
@@ -253,10 +372,7 @@ namespace noc
         }
     };
 
-    ReflectionRegistry::~ReflectionRegistry()
-    {
-        Shutdown();
-    }
+    ReflectionRegistry::~ReflectionRegistry() { Shutdown(); }
 
     bool ReflectionRegistry::Init(
         IAllocator& allocator,
@@ -325,7 +441,6 @@ namespace noc
             lastError_ = ReflectionRegistryError::NotInitialized;
             return false;
         }
-
         if (impl_->state != ReflectionRegistryState::Building)
         {
             lastError_ = ReflectionRegistryError::WrongState;
@@ -336,8 +451,7 @@ namespace noc
         if (lastError_ != ReflectionRegistryError::None)
             return false;
 
-        const uint32_t insertionIndex =
-            impl_->LowerBound(metadata.typeId);
+        const uint32_t insertionIndex = impl_->LowerBound(metadata.typeId);
         if (insertionIndex < impl_->count
             && impl_->entries[insertionIndex].metadata.typeId == metadata.typeId)
         {
@@ -385,7 +499,6 @@ namespace noc
             lastError_ = ReflectionRegistryError::NotInitialized;
             return false;
         }
-
         if (impl_->state != ReflectionRegistryState::Building)
         {
             lastError_ = ReflectionRegistryError::WrongState;
@@ -395,9 +508,7 @@ namespace noc
         for (uint32_t i = 0; i < impl_->count; ++i)
         {
             const TypeMetadata& metadata = impl_->entries[i].metadata;
-            const ReflectionRegistryError intrinsic =
-                ValidateTypeIntrinsic(metadata);
-            if (intrinsic != ReflectionRegistryError::None)
+            if (ValidateTypeIntrinsic(metadata) != ReflectionRegistryError::None)
             {
                 lastError_ = ReflectionRegistryError::ValidationFailure;
                 return false;
@@ -416,6 +527,26 @@ namespace noc
                 {
                     lastError_ =
                         ReflectionRegistryError::UnknownPropertyValueType;
+                    return false;
+                }
+            }
+
+            if (metadata.kind == TypeKind::Enum)
+            {
+                const TypeMetadata* underlying =
+                    FindType(metadata.enumMetadata->underlyingTypeId);
+                if (!underlying)
+                {
+                    lastError_ =
+                        ReflectionRegistryError::UnknownEnumUnderlyingType;
+                    return false;
+                }
+
+                if (underlying->kind != TypeKind::SignedInteger
+                    && underlying->kind != TypeKind::UnsignedInteger)
+                {
+                    lastError_ =
+                        ReflectionRegistryError::InvalidEnumUnderlyingType;
                     return false;
                 }
             }
@@ -457,7 +588,6 @@ namespace noc
         {
             return nullptr;
         }
-
         return &impl_->entries[index].metadata;
     }
 
@@ -524,6 +654,64 @@ namespace noc
             {
                 return &type->properties[i];
             }
+        }
+        return nullptr;
+    }
+
+    const EnumValueMetadata* ReflectionRegistry::FindEnumValue(
+        TypeId enumTypeId,
+        EnumValueId valueId) const noexcept
+    {
+        if (!valueId.IsValid())
+            return nullptr;
+
+        const TypeMetadata* type = FindType(enumTypeId);
+        if (!type || type->kind != TypeKind::Enum || !type->enumMetadata)
+            return nullptr;
+
+        for (uint32_t i = 0; i < type->enumMetadata->valueCount; ++i)
+        {
+            if (type->enumMetadata->values[i].valueId == valueId)
+                return &type->enumMetadata->values[i];
+        }
+        return nullptr;
+    }
+
+    const EnumValueMetadata* ReflectionRegistry::FindEnumValueByName(
+        TypeId enumTypeId,
+        const char* canonicalName) const noexcept
+    {
+        if (!canonicalName || canonicalName[0] == '\0')
+            return nullptr;
+
+        const TypeMetadata* type = FindType(enumTypeId);
+        if (!type || type->kind != TypeKind::Enum || !type->enumMetadata)
+            return nullptr;
+
+        for (uint32_t i = 0; i < type->enumMetadata->valueCount; ++i)
+        {
+            if (std::strcmp(
+                    type->enumMetadata->values[i].canonicalName,
+                    canonicalName) == 0)
+            {
+                return &type->enumMetadata->values[i];
+            }
+        }
+        return nullptr;
+    }
+
+    const EnumValueMetadata* ReflectionRegistry::FindEnumValueByRawValue(
+        TypeId enumTypeId,
+        uint64_t rawValue) const noexcept
+    {
+        const TypeMetadata* type = FindType(enumTypeId);
+        if (!type || type->kind != TypeKind::Enum || !type->enumMetadata)
+            return nullptr;
+
+        for (uint32_t i = 0; i < type->enumMetadata->valueCount; ++i)
+        {
+            if (type->enumMetadata->values[i].rawValue == rawValue)
+                return &type->enumMetadata->values[i];
         }
         return nullptr;
     }
