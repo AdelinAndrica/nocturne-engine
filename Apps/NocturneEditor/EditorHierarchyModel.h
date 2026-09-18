@@ -3,6 +3,7 @@
 #include "Runtime/Entity.h"
 #include "Runtime/World.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <new>
 #include <vector>
@@ -37,9 +38,9 @@ namespace nocturne::editor
     }
 
     // Design choice (not directly from the book): the editor hierarchy is a
-    // transient projection of the authoritative World. Keeping traversal
-    // separate from Win32 presentation gives production code and stress tests
-    // one implementation without introducing a second scene authority.
+    // transient projection of the authoritative World. Scratch buffers persist
+    // across rebuilds so a warmed hierarchy does not allocate per row/refresh.
+    // Capacity growth is observable for performance/allocation tests.
     class EditorHierarchyModel final
     {
     public:
@@ -48,17 +49,12 @@ namespace nocturne::editor
             noc::EntityHandle toolOwnedEntity =
                 noc::EntityHandle::Invalid())
         {
-            std::vector<EditorHierarchyRow> nextRows;
-            std::vector<noc::EntityHandle> roots;
+            lastCapacityGrowthCount_ = 0;
 
-            struct PendingRow
-            {
-                noc::EntityHandle entity{};
-                int depth = 1;
-            };
-
-            std::vector<PendingRow> stack;
-            std::vector<noc::EntityHandle> children;
+            nextRows_.clear();
+            roots_.clear();
+            stack_.clear();
+            children_.clear();
 
             const auto isAuthored =
                 [&](noc::EntityHandle entity) noexcept
@@ -74,10 +70,18 @@ namespace nocturne::editor
                     static_cast<std::size_t>(
                         world.AliveCount());
 
-                nextRows.reserve(expected);
-                roots.reserve(expected);
-                stack.reserve(expected);
-                children.reserve(expected);
+                Reserve_(
+                    nextRows_,
+                    expected);
+                Reserve_(
+                    roots_,
+                    expected);
+                Reserve_(
+                    stack_,
+                    expected);
+                Reserve_(
+                    children_,
+                    expected);
 
                 for (uint32_t i = 0;
                      i < world.EntityCapacity();
@@ -93,26 +97,26 @@ namespace nocturne::editor
                         world.ParentOf(entity);
 
                     if (!isAuthored(parent))
-                        roots.push_back(entity);
+                        roots_.push_back(entity);
                 }
 
-                for (auto it = roots.rbegin();
-                     it != roots.rend();
+                for (auto it = roots_.rbegin();
+                     it != roots_.rend();
                      ++it)
                 {
-                    stack.push_back({
+                    stack_.push_back({
                         *it,
                         1
                     });
                 }
 
-                while (!stack.empty())
+                while (!stack_.empty())
                 {
                     const PendingRow row =
-                        stack.back();
-                    stack.pop_back();
+                        stack_.back();
+                    stack_.pop_back();
 
-                    children.clear();
+                    children_.clear();
 
                     noc::EntityHandle child =
                         world.FirstChildOf(row.entity);
@@ -120,23 +124,23 @@ namespace nocturne::editor
                     while (child.IsValid())
                     {
                         if (isAuthored(child))
-                            children.push_back(child);
+                            children_.push_back(child);
 
                         child =
                             world.NextSiblingOf(child);
                     }
 
-                    nextRows.push_back({
+                    nextRows_.push_back({
                         row.entity,
                         row.depth,
-                        !children.empty()
+                        !children_.empty()
                     });
 
-                    for (auto it = children.rbegin();
-                         it != children.rend();
+                    for (auto it = children_.rbegin();
+                         it != children_.rend();
                          ++it)
                     {
-                        stack.push_back({
+                        stack_.push_back({
                             *it,
                             row.depth + 1
                         });
@@ -145,16 +149,22 @@ namespace nocturne::editor
             }
             catch (const std::bad_alloc&)
             {
+                nextRows_.clear();
                 return false;
             }
 
-            rows_.swap(nextRows);
+            rows_.swap(nextRows_);
             return true;
         }
 
         void Clear() noexcept
         {
             rows_.clear();
+            nextRows_.clear();
+            roots_.clear();
+            stack_.clear();
+            children_.clear();
+            lastCapacityGrowthCount_ = 0;
         }
 
         [[nodiscard]] const std::vector<EditorHierarchyRow>&
@@ -168,7 +178,51 @@ namespace nocturne::editor
             return rows_.size();
         }
 
+        [[nodiscard]] uint32_t
+        LastCapacityGrowthCount() const noexcept
+        {
+            return lastCapacityGrowthCount_;
+        }
+
+        [[nodiscard]] std::size_t
+        EstimatedRetainedBytes() const noexcept
+        {
+            return rows_.capacity()
+                    * sizeof(EditorHierarchyRow)
+                + nextRows_.capacity()
+                    * sizeof(EditorHierarchyRow)
+                + roots_.capacity()
+                    * sizeof(noc::EntityHandle)
+                + stack_.capacity()
+                    * sizeof(PendingRow)
+                + children_.capacity()
+                    * sizeof(noc::EntityHandle);
+        }
+
     private:
+        struct PendingRow
+        {
+            noc::EntityHandle entity{};
+            int depth = 1;
+        };
+
+        template <typename T>
+        void Reserve_(
+            std::vector<T>& storage,
+            std::size_t required)
+        {
+            if (storage.capacity() >= required)
+                return;
+
+            storage.reserve(required);
+            ++lastCapacityGrowthCount_;
+        }
+
         std::vector<EditorHierarchyRow> rows_;
+        std::vector<EditorHierarchyRow> nextRows_;
+        std::vector<noc::EntityHandle> roots_;
+        std::vector<PendingRow> stack_;
+        std::vector<noc::EntityHandle> children_;
+        uint32_t lastCapacityGrowthCount_ = 0;
     };
 }

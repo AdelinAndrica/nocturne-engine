@@ -940,15 +940,15 @@ Fiecare caz are:
 
 # 37. Allocation discipline
 
-- [ ] Hierarchy refresh allocations measured.
-- [ ] Inspector rebuild allocations measured.
-- [ ] Command allocation ownership explicit.
-- [ ] Snapshot allocation ownership explicit.
+- [x] Hierarchy refresh allocations measured.
+- [x] Inspector rebuild allocations measured.
+- [x] Command allocation ownership explicit.
+- [x] Snapshot allocation ownership explicit.
 - [x] History memory tracked.
-- [ ] Gizmo mouse-move hot path no uncontrolled heap allocation.
-- [ ] Paint path no uncontrolled per-row allocations where avoidable.
+- [x] Gizmo mouse-move hot path no uncontrolled heap allocation.
+- [x] Paint path no uncontrolled per-row allocations where avoidable.
 - [x] Large hierarchy test.
-- [ ] Allocation failure tests where practical.
+- [x] Allocation failure tests where practical.
 
 ---
 
@@ -962,7 +962,7 @@ Măsurăm, nu ghicim:
 - [x] hierarchy rebuild 10k.
 - [x] hierarchy traversal wide.
 - [x] hierarchy traversal deep.
-- [ ] Inspector refresh.
+- [x] Inspector refresh.
 - [x] command push.
 - [x] undo.
 - [x] redo.

@@ -14,6 +14,11 @@ namespace nocturne::editor
     //
     // Design choice (not directly from the book): this is command/undo state,
     // never a persistent scene serialization format or entity identity.
+    //
+    // Ownership: the snapshot owns its PropertyEntry vector by value. Each
+    // OwnedReflectedValue exclusively owns its reflected payload through the
+    // EditorCommandContext allocator captured during Capture(). Clear/destruction
+    // releases every payload; no reflected component pointer is retained.
     class ReflectedComponentSnapshot final
     {
     public:

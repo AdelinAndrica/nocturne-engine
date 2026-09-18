@@ -691,6 +691,35 @@ namespace nocturne::editor
         return components_;
     }
 
+    std::size_t
+    EditorInspectorModel::EstimatedRetainedBytes() const noexcept
+    {
+        std::size_t bytes =
+            components_.capacity()
+                * sizeof(InspectorComponentView);
+
+        for (const InspectorComponentView& component :
+             components_)
+        {
+            bytes +=
+                component.displayName.capacity() + 1u;
+            bytes +=
+                component.properties.capacity()
+                    * sizeof(InspectorPropertyView);
+
+            for (const InspectorPropertyView& property :
+                 component.properties)
+            {
+                bytes +=
+                    property.displayName.capacity() + 1u;
+                bytes +=
+                    property.displayValue.capacity() + 1u;
+            }
+        }
+
+        return bytes;
+    }
+
     const InspectorPropertyView*
     EditorInspectorModel::FindProperty(
         noc::TypeId componentTypeId,

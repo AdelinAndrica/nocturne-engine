@@ -1,4 +1,5 @@
 #include "../../NocturneEditor/EditorCommandHistory.h"
+#include "../../NocturneEditor/EditorGizmoTransaction.h"
 #include "../../NocturneEditor/EditorCommands.h"
 #include "../../NocturneEditor/EditorHierarchyModel.h"
 #include "../../NocturneEditor/EditorInspectorModel.h"
@@ -209,11 +210,18 @@ namespace
             allRoots,
             "Hierarchy perf root projection mismatch");
 
+        const uint32_t firstCapacityGrowth =
+            model.LastCapacityGrowthCount();
+        const std::size_t retainedHierarchyBytes =
+            model.EstimatedRetainedBytes();
+
         NOC_LOG_INFO(
             "Phase16EditorPerf",
-            "editor_hierarchy_rebuild: entities=%u time_us=%lld",
+            "editor_hierarchy_rebuild: entities=%u time_us=%lld capacity_growth=%u retained_bytes=%zu",
             count,
-            Micros(begin, end));
+            Micros(begin, end),
+            firstCapacityGrowth,
+            retainedHierarchyBytes);
 
         std::vector<nocturne::editor::EditorHierarchyRow>
             firstBuild = model.Rows();
@@ -223,6 +231,21 @@ namespace
                 && model.Rows().size()
                     == firstBuild.size(),
             "Hierarchy deterministic second rebuild failed");
+
+        // The first swap can leave nextRows_ without capacity. One warm rebuild
+        // fills both alternating row buffers; steady-state rebuild must then
+        // require no further STL capacity growth.
+        ok &= CheckEditorPerf(
+            model.Rebuild(world, toolOwned)
+                && model.LastCapacityGrowthCount() == 0,
+            "Warmed hierarchy rebuild grew STL capacity");
+
+        NOC_LOG_INFO(
+            "Phase16EditorPerf",
+            "editor_hierarchy_allocation: entities=%u steady_capacity_growth=%u retained_bytes=%zu",
+            count,
+            model.LastCapacityGrowthCount(),
+            model.EstimatedRetainedBytes());
 
         if (ok)
         {
@@ -480,7 +503,7 @@ namespace
     }
 
     bool RunInspectorRefreshBaseline(
-        noc::IAllocator& allocator,
+        noc::DebugAlloc& allocator,
         const noc::ReflectionRegistry& reflection)
     {
         constexpr uint32_t kRefreshCount = 1000;
@@ -520,6 +543,8 @@ namespace
             noc::EntityHandle::Invalid()
         };
 
+        const std::size_t allocationsBefore =
+            allocator.AllocationCount();
         const auto begin = Clock::now();
 
         uint32_t refreshHits = 0;
@@ -542,11 +567,17 @@ namespace
                 && !model.Components().empty(),
             "Inspector refresh workload failed");
 
+        const std::size_t allocationCalls =
+            allocator.AllocationCount()
+            - allocationsBefore;
+
         NOC_LOG_INFO(
             "Phase16EditorPerf",
-            "editor_inspector_refresh: refreshes=%u time_us=%lld",
+            "editor_inspector_refresh: refreshes=%u time_us=%lld allocator_calls=%zu retained_model_bytes=%zu",
             kRefreshCount,
-            Micros(begin, end));
+            Micros(begin, end),
+            allocationCalls,
+            model.EstimatedRetainedBytes());
 
         model.Clear();
         world.Shutdown();
@@ -688,7 +719,7 @@ namespace
     }
 
     bool RunReparentAndGizmoCommitBaseline(
-        noc::IAllocator& allocator,
+        noc::DebugAlloc& allocator,
         const noc::ReflectionRegistry& reflection)
     {
         noc::World world;
@@ -785,6 +816,62 @@ namespace
                 reparentEnd));
 
         history.Clear();
+
+        nocturne::editor::EditorGizmoDragTransaction
+            dragTransaction;
+
+        ok &= CheckEditorPerf(
+            dragTransaction.Begin(
+                context,
+                child,
+                nocturne::editor::EditorTool::Move,
+                nocturne::editor::TransformOrientation::World,
+                0),
+            "Gizmo hot-path transaction begin failed");
+
+        const std::size_t allocationsBeforePreview =
+            allocator.AllocationCount();
+
+        constexpr uint32_t kPreviewUpdates = 10000;
+        uint32_t previewHits = 0;
+
+        const auto previewBegin = Clock::now();
+
+        for (uint32_t i = 0;
+             i < kPreviewUpdates;
+             ++i)
+        {
+            const float delta =
+                static_cast<float>(i % 100u)
+                * 0.001f;
+
+            if (dragTransaction.PreviewMove(
+                    context,
+                    delta))
+            {
+                ++previewHits;
+            }
+        }
+
+        const auto previewEnd = Clock::now();
+
+        ok &= CheckEditorPerf(
+            previewHits == kPreviewUpdates
+                && allocator.AllocationCount()
+                    == allocationsBeforePreview,
+            "Gizmo mouse-move preview performed engine allocator calls");
+
+        ok &= CheckEditorPerf(
+            dragTransaction.Cancel(context),
+            "Gizmo hot-path transaction cancel failed");
+
+        NOC_LOG_INFO(
+            "Phase16EditorPerf",
+            "editor_gizmo_preview: updates=%u time_us=%lld allocator_calls=%zu",
+            kPreviewUpdates,
+            Micros(previewBegin, previewEnd),
+            allocator.AllocationCount()
+                - allocationsBeforePreview);
 
         const noc::TransformComponent* transform =
             world.GetTransform(child);

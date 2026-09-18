@@ -15,6 +15,11 @@ namespace nocturne::editor
     // Design choice (not directly from the book): source/current EntityHandles
     // are transient runtime bookkeeping only. Parent relationships inside the
     // snapshot use node indices, so restored handles may differ after Undo/Redo.
+    //
+    // Ownership: commands own this subtree snapshot by value. The snapshot owns
+    // its Node/component vectors, while each ReflectedComponentSnapshot owns its
+    // allocator-backed property payloads. Runtime EntityHandles are references,
+    // never ownership, and no component-storage pointer survives Capture().
     class ReflectedEntitySubtreeSnapshot final
     {
     public:

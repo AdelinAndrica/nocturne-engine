@@ -2,6 +2,8 @@
 
 #include "Core/Log.h"
 
+#include <algorithm>
+
 #include <limits>
 #include <new>
 
@@ -287,17 +289,11 @@ namespace nocturne::editor
         if (cost == 0 || cost > maxBytes_)
             return false;
 
-        // Reserve before mutating runtime state so allocation failure leaves
-        // both history and World untouched.
-        try
-        {
-            if (commands_.capacity() < commands_.size() + 1u)
-                commands_.reserve(commands_.size() + 1u);
-        }
-        catch (const std::bad_alloc&)
-        {
+        // Capacity growth happens before runtime mutation. Geometric growth
+        // avoids the previous reserve(size + 1) O(N^2)-style reallocation
+        // pattern while preserving allocation-failure atomicity.
+        if (!EnsureAppendCapacity_())
             return false;
-        }
 
         if (!command->Execute(context))
             return false;
@@ -331,12 +327,7 @@ namespace nocturne::editor
             return false;
         }
 
-        try
-        {
-            if (commands_.capacity() < commands_.size() + 1u)
-                commands_.reserve(commands_.size() + 1u);
-        }
-        catch (const std::bad_alloc&)
+        if (!EnsureAppendCapacity_())
         {
             (void)command->Undo(context);
             return false;
@@ -431,6 +422,37 @@ namespace nocturne::editor
         return CanRedo()
             ? commands_[cursor_]->Label()
             : nullptr;
+    }
+
+    bool EditorCommandHistory::EnsureAppendCapacity_() noexcept
+    {
+        const std::size_t required =
+            commands_.size() + 1u;
+
+        if (commands_.capacity() >= required)
+            return true;
+
+        std::size_t target =
+            commands_.capacity() == 0
+                ? 16u
+                : commands_.capacity()
+                    + (std::max)(
+                        commands_.capacity() / 2u,
+                        std::size_t{ 8u });
+
+        if (target < required)
+            target = required;
+
+        try
+        {
+            commands_.reserve(target);
+        }
+        catch (const std::bad_alloc&)
+        {
+            return false;
+        }
+
+        return true;
     }
 
     void EditorCommandHistory::DiscardRedoTail_() noexcept

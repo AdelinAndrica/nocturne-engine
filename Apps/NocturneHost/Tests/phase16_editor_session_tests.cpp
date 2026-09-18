@@ -2,6 +2,7 @@
 #include "../../NocturneEditor/EditorGizmoTransaction.h"
 #include "../../NocturneEditor/EditorHierarchyModel.h"
 #include "../../NocturneEditor/EditorInspectorModel.h"
+#include "../../NocturneEditor/EditorReflectionSnapshot.h"
 #include "../../NocturneEditor/EditorSession.h"
 #include "../../NocturneEditor/EditorTransformMath.h"
 
@@ -23,6 +24,41 @@
 
 namespace
 {
+    class FailAfterAllocator final
+        : public noc::IAllocator
+    {
+    public:
+        FailAfterAllocator(
+            noc::IAllocator& backing,
+            std::size_t successfulAllocationsBeforeFailure) noexcept
+            : backing_(backing),
+              remaining_(successfulAllocationsBeforeFailure)
+        {
+        }
+
+        void* Allocate(
+            std::size_t size,
+            std::size_t alignment) override
+        {
+            if (remaining_ == 0)
+                return nullptr;
+
+            --remaining_;
+            return backing_.Allocate(
+                size,
+                alignment);
+        }
+
+        void Deallocate(void* pointer) override
+        {
+            backing_.Deallocate(pointer);
+        }
+
+    private:
+        noc::IAllocator& backing_;
+        std::size_t remaining_ = 0;
+    };
+
     bool CheckEditorSession(bool condition, const char* message)
     {
         if (!condition)
@@ -2433,6 +2469,51 @@ bool RunPhase16EditorSessionTests()
         gizmoSession.History().Clear();
         gizmoSession.Shutdown();
         gizmoWorld.Shutdown();
+    }
+
+    {
+        noc::World allocationWorld;
+
+        ok &= CheckEditorSession(
+            allocationWorld.Init(
+                allocator,
+                reflection),
+            "Allocation-failure World setup failed");
+
+        const noc::EntityHandle entity =
+            allocationWorld.CreateEntity();
+
+        ok &= CheckEditorSession(
+            entity.IsValid()
+                && allocationWorld.AddTransform(entity),
+            "Allocation-failure reflected component setup failed");
+
+        FailAfterAllocator failingAllocator(
+            allocator,
+            0);
+
+        nocturne::editor::EditorCommandContext
+            failingContext{
+                allocationWorld,
+                reflection,
+                failingAllocator,
+                noc::EntityHandle::Invalid()
+            };
+
+        nocturne::editor::ReflectedComponentSnapshot
+            failedSnapshot;
+
+        ok &= CheckEditorSession(
+            !failedSnapshot.Capture(
+                failingContext,
+                entity,
+                noc::TypeId{
+                    noc::kTransformComponentTypeId.value })
+                && !failedSnapshot.IsValid(),
+            "Reflected snapshot allocation failure did not fail cleanly");
+
+        failedSnapshot.Clear();
+        allocationWorld.Shutdown();
     }
 
     const noc::Vec3 first{ 1.0f, 2.0f, 3.0f };

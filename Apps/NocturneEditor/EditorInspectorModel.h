@@ -6,6 +6,7 @@
 #include "Runtime/Reflection/ReflectedValue.h"
 #include "Runtime/Reflection/ReflectionMetadata.h"
 
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -48,6 +49,11 @@ namespace nocturne::editor
         [[nodiscard]] noc::EntityHandle Entity() const noexcept;
         [[nodiscard]] const std::vector<InspectorComponentView>&
         Components() const noexcept;
+
+        // Approximate retained STL capacity owned by the presentation model.
+        // This is diagnostic telemetry, not a hard memory budget.
+        [[nodiscard]] std::size_t
+        EstimatedRetainedBytes() const noexcept;
 
         [[nodiscard]] const InspectorPropertyView* FindProperty(
             noc::TypeId componentTypeId,

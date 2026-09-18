@@ -11,6 +11,7 @@
 #include <cerrno>
 #include <cmath>
 #include <cstdio>
+#include <cstdint>
 #include <cstdlib>
 #include <filesystem>
 #include <memory>
@@ -295,6 +296,15 @@ namespace nocturne::editor
         struct TreeState
         {
             std::vector<TreeItem> items;
+
+            // Design choice (not directly from the book): cache the projected
+            // visible row indices so WM_PAINT / mouse-move / hit-testing do not
+            // allocate temporary vectors on every event. The cache is rebuilt
+            // only after structural or expand/collapse changes.
+            std::vector<int> visibleItems;
+            std::vector<uint8_t> expansionScratch;
+            bool visibleDirty = true;
+
             HFONT font = nullptr;
             int firstRow = 0;
             int selected = -1;
@@ -626,23 +636,89 @@ namespace nocturne::editor
             return DefWindowProcW(hwnd, msg, wParam, lParam);
         }
 
-        std::vector<int> VisibleTree(const TreeState& state)
+        const std::vector<int>& VisibleTree(TreeState& state)
         {
-            std::vector<int> out;
-            std::vector<bool> expanded(16, true);
-            for (int i = 0; i < static_cast<int>(state.items.size()); ++i)
+            if (!state.visibleDirty)
+                return state.visibleItems;
+
+            int maxDepth = 0;
+            for (const TreeItem& item : state.items)
+                maxDepth = (std::max)(maxDepth, item.depth);
+
+            const std::size_t scratchSize =
+                static_cast<std::size_t>(
+                    (std::max)(maxDepth + 1, 1));
+
+            state.expansionScratch.resize(
+                scratchSize,
+                uint8_t{ 1 });
+            std::fill(
+                state.expansionScratch.begin(),
+                state.expansionScratch.end(),
+                uint8_t{ 1 });
+
+            state.visibleItems.clear();
+            if (state.visibleItems.capacity()
+                < state.items.size())
             {
-                const auto& item = state.items[i];
+                state.visibleItems.reserve(
+                    state.items.size());
+            }
+
+            for (int i = 0;
+                 i < static_cast<int>(state.items.size());
+                 ++i)
+            {
+                const TreeItem& item =
+                    state.items[i];
+
                 bool visible = true;
-                for (int d = 0; d < item.depth && d < static_cast<int>(expanded.size()); ++d) if (!expanded[d]) { visible = false; break; }
-                if (visible) out.push_back(i);
-                if (item.depth < static_cast<int>(expanded.size()))
+
+                for (int depth = 0;
+                     depth < item.depth
+                        && depth
+                            < static_cast<int>(
+                                state.expansionScratch.size());
+                     ++depth)
                 {
-                    expanded[item.depth] = !item.expandable || item.expanded;
-                    for (int d = item.depth + 1; d < static_cast<int>(expanded.size()); ++d) expanded[d] = true;
+                    if (!state.expansionScratch[
+                            static_cast<std::size_t>(depth)])
+                    {
+                        visible = false;
+                        break;
+                    }
+                }
+
+                if (visible)
+                    state.visibleItems.push_back(i);
+
+                if (item.depth >= 0
+                    && item.depth
+                        < static_cast<int>(
+                            state.expansionScratch.size()))
+                {
+                    state.expansionScratch[
+                        static_cast<std::size_t>(
+                            item.depth)] =
+                        static_cast<uint8_t>(
+                            !item.expandable
+                            || item.expanded);
+
+                    for (int depth = item.depth + 1;
+                         depth
+                            < static_cast<int>(
+                                state.expansionScratch.size());
+                         ++depth)
+                    {
+                        state.expansionScratch[
+                            static_cast<std::size_t>(
+                                depth)] = 1;
+                    }
                 }
             }
-            return out;
+
+            state.visibleDirty = false;
+            return state.visibleItems;
         }
 
         void DrawSlimThumb(HDC dc, int totalRows, int pageRows, int firstRow, const RECT& rc)
@@ -672,7 +748,7 @@ namespace nocturne::editor
             case WM_MOUSEWHEEL:
                 if (state)
                 {
-                    RECT rc{}; GetClientRect(hwnd, &rc); const auto visible = VisibleTree(*state);
+                    RECT rc{}; GetClientRect(hwnd, &rc); const auto& visible = VisibleTree(*state);
                     const int page = (std::max)(1, static_cast<int>(rc.bottom) / rowH);
                     const int maxFirst = (std::max)(0, static_cast<int>(visible.size()) - page);
                     state->firstRow = (std::clamp)(state->firstRow - GET_WHEEL_DELTA_WPARAM(wParam) / WHEEL_DELTA * 3, 0, maxFirst);
@@ -682,7 +758,7 @@ namespace nocturne::editor
             case WM_MOUSEMOVE:
                 if (state)
                 {
-                    const auto visible = VisibleTree(*state);
+                    const auto& visible = VisibleTree(*state);
                     const int visibleRow =
                         state->firstRow
                         + GET_Y_LPARAM(lParam) / rowH;
@@ -753,7 +829,7 @@ namespace nocturne::editor
                 {
                     SetFocus(hwnd);
 
-                    const auto visible =
+                    const auto& visible =
                         VisibleTree(*state);
                     const int visibleRow =
                         state->firstRow
@@ -808,7 +884,7 @@ namespace nocturne::editor
                 {
                     SetFocus(hwnd);
 
-                    const auto visible =
+                    const auto& visible =
                         VisibleTree(*state);
                     const int visibleRow =
                         state->firstRow
@@ -838,6 +914,7 @@ namespace nocturne::editor
                         {
                             state->items[index].expanded =
                                 !state->items[index].expanded;
+                            state->visibleDirty = true;
                         }
                         else if (state->items[index].entity.IsValid())
                         {
@@ -930,7 +1007,7 @@ namespace nocturne::editor
                 PAINTSTRUCT ps{}; HDC dc = BeginPaint(hwnd, &ps); RECT rc{}; GetClientRect(hwnd, &rc); const auto& c = EditorTheme::Colors(); Fill(dc, rc, c.panelBg);
                 if (state)
                 {
-                    const auto visible = VisibleTree(*state);
+                    const auto& visible = VisibleTree(*state);
                     const int page = (std::max)(1, static_cast<int>(rc.bottom) / rowH);
                     int y = 0;
                     for (int v = state->firstRow; v < static_cast<int>(visible.size()) && y < rc.bottom; ++v, y += rowH)
@@ -1176,6 +1253,8 @@ namespace nocturne::editor
                 ReleaseCapture();
 
             s->items.clear();
+            s->visibleItems.clear();
+            s->visibleDirty = true;
             s->firstRow = 0;
             s->selected = -1;
             s->hover = -1;
@@ -1207,6 +1286,7 @@ namespace nocturne::editor
                 expanded,
                 entity
             });
+            s->visibleDirty = true;
 
             if (s->selected < 0)
                 s->selected = 0;
@@ -1319,7 +1399,7 @@ namespace nocturne::editor
                 return false;
             }
 
-            const auto visible = VisibleTree(*state);
+            const auto& visible = VisibleTree(*state);
             int visibleIndex = -1;
 
             for (int i = 0;

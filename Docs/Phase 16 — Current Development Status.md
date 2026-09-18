@@ -321,7 +321,7 @@ Keyboard shortcuts, Actor menu actions, hierarchy drag/drop and hierarchy contex
 | Nested transaction policy | IMPLEMENTED — nested Begin is rejected |
 | Generic compound rollback semantics | IMPLEMENTED — execute/redo compensate prior children; failed undo restores already-undone suffix when possible |
 | Required-component policy | IMPLEMENTED — Required is opt-in removal protection; foundation components remain non-required by Phase 16 policy; Inspector/RemoveComponentCommand precedence is tested |
-| Full editor performance baseline | IMPLEMENTED for Phase 16 logical authoring workloads — hierarchy 100/1k/10k, wide/deep, selection, create 1k, Inspector refresh, history 10k/memory, subtree 1k, reparent and gizmo commit measured; low-level Win32/STL allocation-call instrumentation remains a separate allocation-discipline gate |
+| Full editor performance baseline | VERIFIED for Phase 16 logical authoring workloads — hierarchy 100/1k/10k, wide/deep, selection, create 1k, Inspector refresh, history 10k/memory, subtree 1k, reparent, gizmo preview/commit and allocation telemetry measured |
 | 10k hierarchy stress gate | IMPLEMENTED |
 | 10k command-history stress | IMPLEMENTED |
 | 1k delete/duplicate subtree stress | IMPLEMENTED |
@@ -383,7 +383,7 @@ When a reflected component is flagged Required and is present:
 
 The synthetic reflected enum component in Phase 16 editor-session tests is also flagged Required, proving Required precedence in both Inspector presentation and RemoveComponentCommand admission.
 
-### 11.3 Editor stress/performance — PARTIAL / ACTIVE
+### 11.3 Editor stress/performance + allocation discipline — VERIFIED
 
 The production World→Hierarchy traversal is now extracted into \`EditorHierarchyModel\`, a transient projection consumed directly by \`EditorShellV3::PopulateScene_()\`. The editor stress suite uses this same implementation rather than duplicating hierarchy logic in tests.
 
@@ -411,11 +411,18 @@ Automated measured workloads now include:
 
 The Phase 16 logical authoring performance matrix is now covered, including select, create 1k, isolated reparent and gizmo commit.
 
-Still open under the separate allocation-discipline gate:
+Allocation-discipline evidence now includes:
 
-- raw allocation-call instrumentation for hierarchy/Inspector Win32 presentation rebuilds;
-- paint-path allocation audit;
-- mouse-move hot-path allocation audit.
+- Hierarchy model capacity-growth telemetry plus retained-capacity estimates;
+- warmed hierarchy rebuilds asserted to perform zero further STL capacity growth;
+- Inspector refresh timing plus engine-allocator call counts and retained presentation-model capacity;
+- geometric command-history growth performed before runtime mutation, replacing the former reserve(size + 1) pattern;
+- explicit command/snapshot ownership contracts;
+- deterministic snapshot allocation-failure coverage;
+- gizmo preview hot path exercised for 10k updates with zero engine-allocator calls;
+- Scene Hierarchy visible-row projection cached across paint/mouse events and invalidated only by structural or expand/collapse changes, eliminating temporary visible-row vectors from the paint/input hot path.
+
+**Design choice (not directly from the book):** STL presentation allocations are evidenced through capacity-growth/retained-capacity telemetry rather than pretending that Nocturne's DebugAlloc intercepts the CRT heap. Win32/GDI draw-object creation remains bounded, immediately released and visually regression-tested separately.
 
 ### 11.4 Completion test matrices
 
@@ -484,7 +491,20 @@ Coverage includes:
 
 Win32 hit-testing and OS delivery of mouse/capture/focus messages remain part of manual UI regression, but production termination routing now resolves those events through the tested policy seam.
 
-### 11.5 Reflection function/performance gate — VERIFIED
+### 11.5 Allocation discipline gate — VERIFIED
+
+The Phase 16 allocation gate now has both corrective changes and evidence:
+
+- `EditorCommandHistory` grows command storage geometrically before mutating runtime state, preserving allocation-failure atomicity while avoiding repeated one-element reserve growth;
+- `EditorHierarchyModel` owns reusable traversal scratch buffers; warmed rebuilds assert zero capacity growth;
+- `EditorShellV3` caches visible hierarchy indices instead of constructing temporary vectors per paint/mouse event;
+- `EditorInspectorModel` reports retained presentation capacity and perf tests report engine-allocator calls during refresh workloads;
+- reflected snapshots document allocator ownership explicitly and have deterministic allocation-failure coverage;
+- `EditorGizmoDragTransaction::PreviewMove` is exercised through a 10k-update hot-path workload with zero Nocturne allocator calls.
+
+This closes the Phase 16 allocation-discipline gate without claiming that `DebugAlloc` observes unrelated CRT or Win32 internal allocations.
+
+### 11.6 Reflection function/performance gate — VERIFIED
 
 **Design choice (not directly from the book):** the first real reflected function set is attached to the engine's \`Vec3\` schema as static math operations matching the existing free functions:
 
@@ -497,13 +517,13 @@ Automated proof covers stable FunctionId lookup, canonical-name lookup, return/p
 
 The reflection performance baseline now measures TypeId lookup, canonical-name lookup, property lookup/read/enumeration, function lookup, raw function invocation, generic validated function invocation and reflected component enumeration. Frozen lookup/enumeration/raw-invoke paths are asserted not to call the reflection allocator. Generic invocation reports its OwnedReflectedValue allocation cost separately.
 
-### 11.6 Prefab prototype seam
+### 11.7 Prefab prototype seam
 
 ReflectedEntitySubtreeSnapshot already supplies much of the transient capture/instantiate mechanism.
 
 Phase 16 should make the prototype seam explicit without introducing prefab persistence, prefab files, persistent IDs or serialized references. Durable representation belongs to the appropriate later persistence/prefab phase.
 
-### 11.7 Manual regression and soak
+### 11.8 Manual regression and soak
 
 Before completion, validate the preserved editor baseline plus new authoring operations:
 
@@ -563,16 +583,14 @@ e7144560 — phase16: cover editor history failure and budget semantics
 
 ## 13. Recommended next implementation order
 
-1. Add real-engine function reflection proof and remaining reflection performance measurements.
-3. Close remaining allocation-discipline evidence for editor presentation/hot paths.
-4. Clarify the transient prefab-prototype seam without Phase 17 persistence.
-5. Run full manual Phase 13/14/15 regression plus 15+ minute edit-session soak.
-6. Resolve remaining in-scope repository/build hygiene.
-7. Update the Implementation Checklist with verified evidence.
-8. Produce Phase 16 Implementation Report.
-9. Produce Phase 16 Test and CI Validation Report.
-10. Produce Phase 16 Completion Report only after all completion gates pass.
-11. Write Phase 17 handoff and update roadmap.
+1. Clarify the transient prefab-prototype seam without Phase 17 persistence.
+2. Run full manual Phase 13/14/15 regression plus 15+ minute edit-session soak.
+3. Resolve remaining in-scope repository/build hygiene.
+4. Reconcile every remaining unchecked checklist gate with evidence or an explicit defer.
+5. Produce Phase 16 Implementation Report.
+6. Produce Phase 16 Test and CI Validation Report.
+7. Produce Phase 16 Completion Report only after all completion gates pass.
+8. Write Phase 17 handoff and update roadmap.
 
 ---
 

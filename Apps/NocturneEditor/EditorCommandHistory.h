@@ -92,8 +92,11 @@ namespace nocturne::editor
     };
 
     // Design choice (not directly from the book): editor history owns commands
-    // with a count + approximate-byte budget. New successful commands after an
-    // undo discard the redo tail; failed operations never move the cursor.
+    // exclusively after successful adoption through Execute/RecordExecuted.
+    // Callers transfer std::unique_ptr ownership; rejected/failed commands are
+    // destroyed without entering history. History uses a count + approximate
+    // command-byte budget. New successful commands after an undo discard the
+    // redo tail; failed operations never move the cursor.
     class EditorCommandHistory final
     {
     public:
@@ -133,6 +136,7 @@ namespace nocturne::editor
         [[nodiscard]] const char* RedoLabel() const noexcept;
 
     private:
+        [[nodiscard]] bool EnsureAppendCapacity_() noexcept;
         void DiscardRedoTail_() noexcept;
         void EnforceBudget_() noexcept;
 
