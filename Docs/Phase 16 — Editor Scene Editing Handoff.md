@@ -1,5 +1,11 @@
 # Handoff — Phase 16: Editor Scene Editing + Runtime Reflection
 
+> **Current implementation note — 2026-09-18**
+>
+> Phase 16 este deja în dezvoltare avansată. Înainte de continuare citește `Docs/Phase 16 — Current Development Status.md`.
+>
+> Acest handoff păstrează contractul și ordinea inițială a fazei. Documentul de status consemnează ce este deja implementat, ce este parțial și ce completion gates rămân deschise. **Nu relua foundation work deja implementat și nu considera Phase 16 COMPLETE înainte de închiderea gate-urilor rămase.**
+
 **Phase 15 — Entity / Component System este COMPLETE.**
 
 Începem **Phase 16 — Editor Scene Editing + Runtime Reflection**.

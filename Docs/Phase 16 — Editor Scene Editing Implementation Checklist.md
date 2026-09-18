@@ -1,6 +1,8 @@
 # Phase 16 — Editor Scene Editing — Implementation Checklist complet
 
-> **Status: PLANNED — PRODUCTION-GRADE CONTRACT LOCKED**
+> **Status: IN DEVELOPMENT — AUTHORING CORE IMPLEMENTED; COMPLETION HARDENING ACTIVE**
+>
+> **Current development status:** `Docs/Phase 16 — Current Development Status.md`
 >
 > **Standard global:** `Docs/Production Engineering Standard.md`
 >
@@ -11,6 +13,8 @@
 > **Handoff:** `Docs/Phase 16 — Editor Scene Editing Handoff.md`
 >
 > **Obiectiv:** transformăm editorul Phase 13/14/15 dintr-un validation shell cu obiecte fixe într-un scene-authoring editor real peste World/ECS Phase 15, fără a implementa prematur persistence Phase 17.
+>
+> **Important:** checkbox-urile acestui document rămân completion gates contractuale. Ele nu reprezintă singure statusul curent doar pentru că sunt încă `[ ]`. Pentru starea reală implementată/parțială/deschisă, consultă `Docs/Phase 16 — Current Development Status.md`. Phase 16 nu este încă COMPLETE.
 
 ## 1. Grounding și reguli de sursă
 
