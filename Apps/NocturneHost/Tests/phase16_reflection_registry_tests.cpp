@@ -599,7 +599,7 @@ bool RunPhase16ReflectionRegistryTests()
         noc::RegisterBuiltinReflectionTypes(builtinRegistry),
         "Builtin reflection registration failed");
     ok &= CheckReflectionRegistry(
-        builtinRegistry.TypeCount() == 20,
+        builtinRegistry.TypeCount() == 21,
         "Unexpected builtin reflected type count");
 
     char mutableEnumValueName[] = "Read";
@@ -995,6 +995,22 @@ bool RunPhase16ReflectionRegistryTests()
             componentRegistry.FindPropertyByName(
                 renderableType->typeId,
                 "mesh");
+        const noc::AttributeMetadata* meshConstraint =
+            componentRegistry.FindPropertyAttribute(
+                renderableType->typeId,
+                meshProperty->propertyId,
+                noc::AttributeKind::ResourceTypeConstraint);
+
+        ok &= CheckReflectionRegistry(
+            meshConstraint
+                && meshConstraint->valueKind
+                    == noc::AttributeValueKind::TypeId
+                && meshConstraint->typeIdValue
+                    == noc::BuiltinTypeIds::MeshResource
+                && componentRegistry.FindType(
+                    meshConstraint->typeIdValue) != nullptr,
+            "Renderable mesh resource constraint mismatch");
+
         const noc::ResourceHandle reflectedMesh{ 77u, 9u };
         ok &= CheckReflectionRegistry(
             meshProperty

@@ -640,6 +640,12 @@ namespace noc
 
         [[nodiscard]] bool RegisterRenderable(ReflectionRegistry& registry)
         {
+            const AttributeMetadata meshAttributes[] = {
+                MakeTypeIdAttribute(
+                    AttributeKind::ResourceTypeConstraint,
+                    BuiltinTypeIds::MeshResource)
+            };
+
             PropertyMetadata properties[] = {
                 {
                     MakePropertyId("Nocturne.Renderable.mesh"),
@@ -648,7 +654,13 @@ namespace noc
                     BuiltinTypeIds::ResourceHandle,
                     kAuthorable | PropertyFlags::ResourceReference,
                     &ReadRenderableMesh,
-                    &WriteRenderableMesh
+                    &WriteRenderableMesh,
+                    nullptr,
+                    nullptr,
+                    nullptr,
+                    nullptr,
+                    meshAttributes,
+                    1
                 },
                 {
                     MakePropertyId("Nocturne.Renderable.localBounds"),

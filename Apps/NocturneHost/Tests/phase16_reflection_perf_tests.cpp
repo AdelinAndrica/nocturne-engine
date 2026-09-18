@@ -141,7 +141,7 @@ namespace
             allocator.TotalAllocatedBytes() - bytesBeforeRegistration);
 
         ok &= CheckPerf(
-            registry.TypeCount() == typeCount + 20u,
+            registry.TypeCount() == typeCount + 21u,
             "Reflection perf frozen type count mismatch");
 
         if (!freezeOk)

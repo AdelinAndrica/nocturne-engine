@@ -39,10 +39,24 @@ namespace noc
             { 0x1000000000000201ull };
         inline constexpr TypeId ResourceHandle
             { 0x1000000000000202ull };
+
+        // Design choice (not directly from the book): resource constraints use
+        // reflected marker types rather than ResourceManager implementation
+        // enums so reflection remains independent of resource-system internals.
+        inline constexpr TypeId MeshResource
+            { 0x1000000000000203ull };
     }
 
     namespace builtin_reflection_detail
     {
+        struct MeshResourceMarker
+        {
+            uint8_t reserved = 0;
+
+            [[nodiscard]] bool operator==(
+                const MeshResourceMarker&) const = default;
+        };
+
         inline constexpr PropertyFlags kMathPropertyFlags =
             PropertyFlags::EditorVisible
             | PropertyFlags::Serializable
@@ -304,7 +318,14 @@ namespace noc
                     TypeKind::ResourceReference,
                     1,
                     TypeFlags::Serializable
-                        | TypeFlags::ScriptVisible)))
+                        | TypeFlags::ScriptVisible))
+            || !registry.RegisterType(
+                MakeTypeMetadata<
+                    builtin_reflection_detail::MeshResourceMarker>(
+                        BuiltinTypeIds::MeshResource,
+                        "Nocturne.Resource.Mesh",
+                        TypeKind::Opaque,
+                        1)))
         {
             return false;
         }
