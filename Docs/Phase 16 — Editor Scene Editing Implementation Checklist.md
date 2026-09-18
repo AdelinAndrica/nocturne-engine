@@ -470,7 +470,7 @@ Reflection milestone:
 - [ ] Tool-owned entity delete rejected.
 - [ ] Invalid/stale selection no-op + diagnostic.
 - [ ] Keyboard Delete respectă text-edit focus.
-- [ ] Context menu Delete folosește aceeași command.
+- [x] Context menu Delete folosește aceeași command.
 
 ---
 
@@ -644,7 +644,7 @@ Reflection schema este autoritatea; editor metadata este doar presentation exten
 - [ ] integer drawer.
 - [ ] float drawer.
 - [ ] Vec/struct drawer.
-- [ ] enum drawer.
+- [x] enum drawer.
 - [ ] string drawer.
 - [ ] resource reference drawer.
 - [ ] readonly display.
@@ -848,7 +848,7 @@ Dacă nu este implementat:
 
 - [ ] Ctrl+Z.
 - [ ] Ctrl+Y / Ctrl+Shift+Z policy.
-- [ ] Delete.
+- [x] Delete.
 - [ ] Ctrl+D.
 - [ ] F2 rename if adopted.
 - [ ] Escape cancel current edit/drag.
@@ -864,16 +864,16 @@ Dacă nu este implementat:
 
 # 33. Context menus
 
-- [ ] Hierarchy context menu.
-- [ ] Create.
-- [ ] Rename.
-- [ ] Duplicate.
+- [x] Hierarchy context menu.
+- [x] Create.
+- [x] Rename.
+- [x] Duplicate.
 - [ ] Delete.
-- [ ] Reparent/unparent where appropriate.
-- [ ] Add Component location policy.
-- [ ] Disabled states.
-- [ ] Same commands as keyboard/toolbar.
-- [ ] No duplicate mutation implementation.
+- [x] Reparent/unparent where appropriate.
+- [x] Add Component location policy.
+- [x] Disabled states.
+- [x] Same commands as keyboard/toolbar.
+- [x] No duplicate mutation implementation.
 
 ---
 

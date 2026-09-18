@@ -270,7 +270,49 @@ Green CI is necessary but does not satisfy the full completion contract by itsel
 
 ---
 
-## 9. What is still open
+## 9. Milestone closure — generic Enum drawer + Hierarchy context menu
+
+**Status: VERIFIED / CLOSED**
+
+The generic non-flags Enum Inspector path is implemented from reflection metadata rather than a component-specific switch. The Win32 enum popup resolves reflected enum values and commits the selected canonical value through:
+
+~~~text
+Enum drawer
+→ EditorInspectorModel::CommitTextEdit()
+→ SetReflectedPropertyCommand
+→ EditorCommandHistory
+→ reflected semantic property write
+~~~
+
+Phase 16 editor-session tests now include a synthetic reflected enum component and verify:
+
+- generic enum property discovery;
+- canonical enum presentation;
+- enum edit through the generic reflected command path;
+- exactly one history entry for the edit;
+- undo;
+- redo;
+- invalid enum value rejection without state mutation or history insertion.
+
+The Scene Hierarchy context menu also reuses the existing authoring entry points:
+
+~~~text
+Create      → ExecuteCreateEntity_()      → CreateEntityCommand
+Rename      → BeginRenameSelection_()
+               → CommitRename_()          → RenameEntityCommand
+Duplicate   → ExecuteDuplicateSelection_()→ DuplicateEntityCommand
+Delete      → ExecuteDeleteSelection_()   → DeleteEntityCommand
+Reparent    → ExecuteReparentEntity_()    → ReparentEntityCommand
+Unparent    → ExecuteReparentEntity_()    → ReparentEntityCommand
+AddComponent→ ShowAddComponentPopup_()
+               → ExecuteAddComponent_()   → AddComponentCommand
+~~~
+
+Keyboard shortcuts, Actor menu actions, hierarchy drag/drop and hierarchy context-menu actions converge on the same command-backed execution helpers. No parallel direct World mutation path is introduced for these authoring operations.
+
+---
+
+## 10. What is still open
 
 | Completion requirement | Current status |
 |---|---|
@@ -299,7 +341,7 @@ Green CI is necessary but does not satisfy the full completion contract by itsel
 
 ---
 
-## 10. Remaining structural work in detail
+## 11. Remaining structural work in detail
 
 ### 10.1 Transaction / CompoundCommand
 
@@ -375,7 +417,7 @@ Before completion, validate the preserved editor baseline plus new authoring ope
 
 ---
 
-## 11. Current development sequence
+## 12. Current development sequence
 
 The implementation sequence completed so far is:
 
@@ -412,7 +454,7 @@ e7144560 — phase16: cover editor history failure and budget semantics
 
 ---
 
-## 12. Recommended next implementation order
+## 13. Recommended next implementation order
 
 1. Implement reusable Transaction / CompoundCommand.
 2. Add EditorSession transaction ownership and formal cancel/rollback/nested policy.
@@ -431,7 +473,7 @@ e7144560 — phase16: cover editor history failure and budget semantics
 
 ---
 
-## 13. Completion rule
+## 14. Completion rule
 
 Phase 16 may be marked **COMPLETE** only after its contract/checklist gates have been satisfied and documented.
 

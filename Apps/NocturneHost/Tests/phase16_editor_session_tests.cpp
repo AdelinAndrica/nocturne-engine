@@ -55,6 +55,180 @@ namespace
         return command;
     }
 
+    enum class EnumDrawerTestMode : uint32_t
+    {
+        Translate = 0,
+        Rotate = 1,
+        Scale = 2
+    };
+
+    struct EnumDrawerTestComponent
+    {
+        EnumDrawerTestMode mode = EnumDrawerTestMode::Translate;
+
+        [[nodiscard]] bool operator==(
+            const EnumDrawerTestComponent&) const = default;
+    };
+
+    constexpr noc::TypeId kEnumDrawerModeTypeId{
+        0xE160000000000001ull
+    };
+    constexpr noc::TypeId kEnumDrawerComponentTypeId{
+        0xE160000000000002ull
+    };
+
+    struct EnumDrawerTestStore
+    {
+        noc::EntityHandle entity{};
+        EnumDrawerTestComponent component{};
+        bool has = false;
+    };
+
+    EnumDrawerTestStore gEnumDrawerStore;
+
+    bool HasEnumDrawerTestComponent(
+        const noc::World& world,
+        noc::EntityHandle entity)
+    {
+        return world.IsAlive(entity)
+            && gEnumDrawerStore.has
+            && gEnumDrawerStore.entity == entity;
+    }
+
+    bool AddEnumDrawerTestComponent(
+        noc::World& world,
+        noc::EntityHandle entity)
+    {
+        if (!world.IsAlive(entity)
+            || (gEnumDrawerStore.has
+                && gEnumDrawerStore.entity == entity))
+        {
+            return false;
+        }
+
+        gEnumDrawerStore.entity = entity;
+        gEnumDrawerStore.component = {};
+        gEnumDrawerStore.has = true;
+        return true;
+    }
+
+    bool RemoveEnumDrawerTestComponent(
+        noc::World& world,
+        noc::EntityHandle entity)
+    {
+        if (!world.IsAlive(entity)
+            || !gEnumDrawerStore.has
+            || gEnumDrawerStore.entity != entity)
+        {
+            return false;
+        }
+
+        gEnumDrawerStore = {};
+        return true;
+    }
+
+    const void* GetEnumDrawerTestComponent(
+        const noc::World& world,
+        noc::EntityHandle entity)
+    {
+        return HasEnumDrawerTestComponent(world, entity)
+            ? &gEnumDrawerStore.component
+            : nullptr;
+    }
+
+    void* GetMutableEnumDrawerTestComponent(
+        noc::World& world,
+        noc::EntityHandle entity)
+    {
+        return HasEnumDrawerTestComponent(world, entity)
+            ? &gEnumDrawerStore.component
+            : nullptr;
+    }
+
+    bool RegisterEnumDrawerTestReflection(
+        noc::ReflectionRegistry& registry)
+    {
+        constexpr noc::PropertyFlags kAuthorable =
+            noc::PropertyFlags::EditorVisible
+            | noc::PropertyFlags::Serializable
+            | noc::PropertyFlags::ScriptVisible;
+
+        const noc::EnumValueMetadata enumValues[] = {
+            noc::MakeEnumValueMetadata<EnumDrawerTestMode>(
+                noc::MakeEnumValueId(
+                    "Nocturne.Tests.EnumDrawerMode.Translate"),
+                "Translate",
+                EnumDrawerTestMode::Translate),
+            noc::MakeEnumValueMetadata<EnumDrawerTestMode>(
+                noc::MakeEnumValueId(
+                    "Nocturne.Tests.EnumDrawerMode.Rotate"),
+                "Rotate",
+                EnumDrawerTestMode::Rotate),
+            noc::MakeEnumValueMetadata<EnumDrawerTestMode>(
+                noc::MakeEnumValueId(
+                    "Nocturne.Tests.EnumDrawerMode.Scale"),
+                "Scale",
+                EnumDrawerTestMode::Scale)
+        };
+
+        const noc::EnumMetadata enumMetadata{
+            noc::BuiltinTypeIds::UInt32,
+            enumValues,
+            3,
+            false
+        };
+
+        noc::TypeMetadata enumType =
+            noc::MakeTypeMetadata<EnumDrawerTestMode>(
+                kEnumDrawerModeTypeId,
+                "Nocturne.Tests.EnumDrawerMode",
+                noc::TypeKind::Enum,
+                1,
+                noc::TypeFlags::EditorVisible
+                    | noc::TypeFlags::Serializable);
+        enumType.enumMetadata = &enumMetadata;
+
+        if (!registry.RegisterType(enumType))
+            return false;
+
+        const noc::PropertyMetadata properties[] = {
+            noc::MakeMemberPropertyMetadata<
+                EnumDrawerTestComponent,
+                EnumDrawerTestMode,
+                &EnumDrawerTestComponent::mode>(
+                    noc::MakePropertyId(
+                        "Nocturne.Tests.EnumDrawerComponent.mode"),
+                    "mode",
+                    kEnumDrawerComponentTypeId,
+                    kEnumDrawerModeTypeId,
+                    kAuthorable)
+        };
+
+        const noc::ComponentMetadata componentOps{
+            noc::ComponentReflectionFlags::EditorAddable
+                | noc::ComponentReflectionFlags::EditorRemovable,
+            &HasEnumDrawerTestComponent,
+            &AddEnumDrawerTestComponent,
+            &RemoveEnumDrawerTestComponent,
+            &GetEnumDrawerTestComponent,
+            &GetMutableEnumDrawerTestComponent
+        };
+
+        noc::TypeMetadata componentType =
+            noc::MakeTypeMetadata<EnumDrawerTestComponent>(
+                kEnumDrawerComponentTypeId,
+                "Nocturne.Tests.EnumDrawerComponent",
+                noc::TypeKind::Component,
+                1,
+                noc::TypeFlags::EditorVisible
+                    | noc::TypeFlags::Serializable);
+        componentType.properties = properties;
+        componentType.propertyCount = 1;
+        componentType.componentMetadata = &componentOps;
+
+        return registry.RegisterType(componentType);
+    }
+
     class HistoryProbeCommand final
         : public nocturne::editor::IEditorCommand
     {
@@ -213,6 +387,7 @@ bool RunPhase16EditorSessionTests()
         reflection.Init(allocator, 32)
             && noc::RegisterBuiltinReflectionTypes(reflection)
             && noc::RegisterFoundationComponentReflectionTypes(reflection)
+            && RegisterEnumDrawerTestReflection(reflection)
             && reflection.Freeze(),
         "Editor-session reflected schema setup failed");
 
@@ -695,6 +870,110 @@ bool RunPhase16EditorSessionTests()
         ok &= CheckEditorSession(
             session.History().Undo(context),
             "Generic Inspector Vec3 undo failed");
+
+        session.History().Clear();
+
+        const noc::TypeMetadata* enumDrawerComponentType =
+            reflection.FindType(
+                kEnumDrawerComponentTypeId);
+        const noc::PropertyId enumModePropertyId =
+            noc::MakePropertyId(
+                "Nocturne.Tests.EnumDrawerComponent.mode");
+
+        ok &= CheckEditorSession(
+            enumDrawerComponentType
+                && enumDrawerComponentType->componentMetadata
+                && enumDrawerComponentType->componentMetadata->add(
+                    world,
+                    authored)
+                && inspectorModel.Refresh(
+                    context,
+                    authored),
+            "Generic enum Inspector setup failed");
+
+        const auto* enumModeProperty =
+            inspectorModel.FindProperty(
+                kEnumDrawerComponentTypeId,
+                enumModePropertyId);
+
+        ok &= CheckEditorSession(
+            enumModeProperty
+                && enumModeProperty->editable
+                && enumModeProperty->valueKind
+                    == noc::TypeKind::Enum
+                && enumModeProperty->valueTypeId
+                    == kEnumDrawerModeTypeId
+                && enumModeProperty->displayValue
+                    == "Translate",
+            "Generic enum Inspector property presentation failed");
+
+        session.History().Clear();
+
+        ok &= CheckEditorSession(
+            inspectorModel.CommitTextEdit(
+                context,
+                session.History(),
+                authored,
+                kEnumDrawerComponentTypeId,
+                enumModePropertyId,
+                "Rotate")
+                && gEnumDrawerStore.has
+                && gEnumDrawerStore.component.mode
+                    == EnumDrawerTestMode::Rotate
+                && session.History().CommandCount() == 1
+                && session.History().Cursor() == 1,
+            "Generic enum Inspector edit did not route through reflected command history");
+
+        ok &= CheckEditorSession(
+            inspectorModel.Refresh(
+                context,
+                authored)
+                && inspectorModel.FindProperty(
+                    kEnumDrawerComponentTypeId,
+                    enumModePropertyId)
+                && inspectorModel.FindProperty(
+                    kEnumDrawerComponentTypeId,
+                    enumModePropertyId)->displayValue
+                    == "Rotate",
+            "Generic enum Inspector refresh did not format canonical enum value");
+
+        ok &= CheckEditorSession(
+            session.History().Undo(context)
+                && gEnumDrawerStore.component.mode
+                    == EnumDrawerTestMode::Translate,
+            "Generic enum Inspector undo failed");
+
+        ok &= CheckEditorSession(
+            session.History().Redo(context)
+                && gEnumDrawerStore.component.mode
+                    == EnumDrawerTestMode::Rotate,
+            "Generic enum Inspector redo failed");
+
+        session.History().Clear();
+
+        ok &= CheckEditorSession(
+            !inspectorModel.CommitTextEdit(
+                context,
+                session.History(),
+                authored,
+                kEnumDrawerComponentTypeId,
+                enumModePropertyId,
+                "MissingEnumValue")
+                && gEnumDrawerStore.component.mode
+                    == EnumDrawerTestMode::Rotate
+                && session.History().CommandCount() == 0
+                && session.History().Cursor() == 0,
+            "Invalid generic enum Inspector value mutated state or entered history");
+
+        ok &= CheckEditorSession(
+            enumDrawerComponentType->componentMetadata->remove(
+                world,
+                authored)
+                && inspectorModel.Refresh(
+                    context,
+                    authored)
+                && !gEnumDrawerStore.has,
+            "Generic enum Inspector cleanup failed");
 
         session.History().Clear();
     }
@@ -1622,6 +1901,7 @@ bool RunPhase16EditorSessionTests()
         world.DestroyEntity(camera),
         "Tool-camera cleanup failed");
 
+    gEnumDrawerStore = {};
     session.Shutdown();
     world.Shutdown();
     reflection.Shutdown();
