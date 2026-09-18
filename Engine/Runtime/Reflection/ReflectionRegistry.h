@@ -23,6 +23,9 @@ namespace noc
         InvalidMetadata,
         DuplicateTypeId,
         DuplicateCanonicalName,
+        DuplicatePropertyId,
+        DuplicatePropertyCanonicalName,
+        UnknownPropertyValueType,
         AllocationFailure,
         ValidationFailure
     };
@@ -32,37 +35,21 @@ namespace noc
     {
         switch (error)
         {
-        case ReflectionRegistryError::None:
-            return "None";
-        case ReflectionRegistryError::NotInitialized:
-            return "NotInitialized";
-        case ReflectionRegistryError::WrongState:
-            return "WrongState";
-        case ReflectionRegistryError::InvalidMetadata:
-            return "InvalidMetadata";
-        case ReflectionRegistryError::DuplicateTypeId:
-            return "DuplicateTypeId";
-        case ReflectionRegistryError::DuplicateCanonicalName:
-            return "DuplicateCanonicalName";
-        case ReflectionRegistryError::AllocationFailure:
-            return "AllocationFailure";
-        case ReflectionRegistryError::ValidationFailure:
-            return "ValidationFailure";
+        case ReflectionRegistryError::None: return "None";
+        case ReflectionRegistryError::NotInitialized: return "NotInitialized";
+        case ReflectionRegistryError::WrongState: return "WrongState";
+        case ReflectionRegistryError::InvalidMetadata: return "InvalidMetadata";
+        case ReflectionRegistryError::DuplicateTypeId: return "DuplicateTypeId";
+        case ReflectionRegistryError::DuplicateCanonicalName: return "DuplicateCanonicalName";
+        case ReflectionRegistryError::DuplicatePropertyId: return "DuplicatePropertyId";
+        case ReflectionRegistryError::DuplicatePropertyCanonicalName: return "DuplicatePropertyCanonicalName";
+        case ReflectionRegistryError::UnknownPropertyValueType: return "UnknownPropertyValueType";
+        case ReflectionRegistryError::AllocationFailure: return "AllocationFailure";
+        case ReflectionRegistryError::ValidationFailure: return "ValidationFailure";
         }
-
         return "Unknown";
     }
 
-    // Engine-wide reflection schema registry.
-    //
-    // Book grounding:
-    // Gregory, Game Engine Architecture 3rd ed., sections 16.2.1.6 and
-    // 16.2.2 ground component/property-centric runtime object models.
-    //
-    // Design choice (not directly from the book):
-    // Nocturne owns one explicit allocator-backed registry with a controlled
-    // Building -> Freeze -> Frozen lifecycle. Engine startup controls
-    // registration order; no translation-unit static initialization is used.
     class ReflectionRegistry
     {
     public:
@@ -79,27 +66,30 @@ namespace noc
             uint32_t initialTypeCapacity = 32);
         void Shutdown();
 
-        // Building-only. The registry copies canonical-name storage.
+        // Building-only. Registry owns copied type/property descriptors and
+        // strings, so temporary registration arrays are safe.
         [[nodiscard]] bool RegisterType(const TypeMetadata& metadata);
 
-        // Re-validates the complete schema and makes metadata immutable.
-        // No allocation is performed by Freeze().
+        // Cross-type references are validated here so registration order does
+        // not define schema correctness.
         [[nodiscard]] bool Freeze();
 
         [[nodiscard]] ReflectionRegistryState State() const noexcept;
         [[nodiscard]] ReflectionRegistryError LastError() const noexcept;
         [[nodiscard]] bool IsFrozen() const noexcept;
-
         [[nodiscard]] uint32_t TypeCount() const noexcept;
 
-        // Deterministic lookup/enumeration. After Freeze these operations do
-        // not allocate and returned metadata addresses remain stable until
-        // Shutdown().
         [[nodiscard]] const TypeMetadata* FindType(TypeId typeId) const noexcept;
         [[nodiscard]] const TypeMetadata* FindTypeByName(
             const char* canonicalName) const noexcept;
-        [[nodiscard]] const TypeMetadata* TypeAt(
-            uint32_t index) const noexcept;
+        [[nodiscard]] const TypeMetadata* TypeAt(uint32_t index) const noexcept;
+
+        [[nodiscard]] const PropertyMetadata* FindProperty(
+            TypeId ownerTypeId,
+            PropertyId propertyId) const noexcept;
+        [[nodiscard]] const PropertyMetadata* FindPropertyByName(
+            TypeId ownerTypeId,
+            const char* canonicalName) const noexcept;
 
     private:
         struct Impl;

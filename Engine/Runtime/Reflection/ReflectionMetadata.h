@@ -119,6 +119,50 @@ namespace noc
         void (*reset)(void* object) = nullptr;
     };
 
+    struct PropertyAccessContext
+    {
+        const void* object = nullptr;
+        void* mutableObject = nullptr;
+
+        // Design choice (not directly from the book): semantic property
+        // adapters may carry an opaque runtime context (for example World +
+        // Entity) without making reflection depend on ECS/editor types.
+        void* userContext = nullptr;
+    };
+
+    using PropertyReadFn =
+        bool (*)(const PropertyAccessContext& context, void* destination);
+    using PropertyWriteFn =
+        bool (*)(PropertyAccessContext& context, const void* source);
+    using PropertyConstAddressFn =
+        const void* (*)(const PropertyAccessContext& context);
+    using PropertyMutableAddressFn =
+        void* (*)(PropertyAccessContext& context);
+    using PropertyValidateFn =
+        bool (*)(const PropertyAccessContext& context, const void* candidate);
+    using PropertyDefaultValueFn =
+        bool (*)(void* destination);
+
+    struct PropertyMetadata
+    {
+        PropertyId propertyId{};
+        const char* canonicalName = nullptr;
+        TypeId ownerTypeId{};
+        TypeId valueTypeId{};
+        PropertyFlags flags = PropertyFlags::None;
+
+        // read/write use already-constructed value storage.
+        PropertyReadFn read = nullptr;
+        PropertyWriteFn write = nullptr;
+
+        // Optional safe fast path for plain data only.
+        PropertyConstAddressFn constAddress = nullptr;
+        PropertyMutableAddressFn mutableAddress = nullptr;
+
+        PropertyValidateFn validate = nullptr;
+        PropertyDefaultValueFn defaultValue = nullptr;
+    };
+
     namespace reflection_detail
     {
         template <typename T>
@@ -174,6 +218,58 @@ namespace noc
         void Reset(void* object)
         {
             *static_cast<T*>(object) = T{};
+        }
+
+        template <typename Owner, typename Value, Value Owner::*Member>
+        bool ReadMember(
+            const PropertyAccessContext& context,
+            void* destination)
+        {
+            if (!destination)
+                return false;
+
+            const void* sourceObject =
+                context.object ? context.object : context.mutableObject;
+            if (!sourceObject)
+                return false;
+
+            *static_cast<Value*>(destination) =
+                static_cast<const Owner*>(sourceObject)->*Member;
+            return true;
+        }
+
+        template <typename Owner, typename Value, Value Owner::*Member>
+        bool WriteMember(
+            PropertyAccessContext& context,
+            const void* source)
+        {
+            if (!context.mutableObject || !source)
+                return false;
+
+            static_cast<Owner*>(context.mutableObject)->*Member =
+                *static_cast<const Value*>(source);
+            return true;
+        }
+
+        template <typename Owner, typename Value, Value Owner::*Member>
+        const void* ConstAddressMember(
+            const PropertyAccessContext& context)
+        {
+            const void* sourceObject =
+                context.object ? context.object : context.mutableObject;
+            if (!sourceObject)
+                return nullptr;
+
+            return &(static_cast<const Owner*>(sourceObject)->*Member);
+        }
+
+        template <typename Owner, typename Value, Value Owner::*Member>
+        void* MutableAddressMember(PropertyAccessContext& context)
+        {
+            if (!context.mutableObject)
+                return nullptr;
+
+            return &(static_cast<Owner*>(context.mutableObject)->*Member);
         }
     }
 
@@ -236,6 +332,9 @@ namespace noc
         uint32_t alignment = 0;
         TypeFlags flags = TypeFlags::None;
         TypeLifecycleOperations lifecycle{};
+
+        const PropertyMetadata* properties = nullptr;
+        uint32_t propertyCount = 0;
     };
 
     template <typename T>
@@ -254,7 +353,44 @@ namespace noc
             static_cast<uint32_t>(sizeof(T)),
             static_cast<uint32_t>(alignof(T)),
             flags,
-            MakeTypeLifecycleOperations<T>()
+            MakeTypeLifecycleOperations<T>(),
+            nullptr,
+            0
+        };
+    }
+
+    // Plain member-property helper. Semantic properties use explicit callbacks
+    // rather than this direct-address adapter.
+    template <typename Owner, typename Value, Value Owner::*Member>
+    [[nodiscard]] constexpr PropertyMetadata MakeMemberPropertyMetadata(
+        PropertyId propertyId,
+        const char* canonicalName,
+        TypeId ownerTypeId,
+        TypeId valueTypeId,
+        PropertyFlags flags = PropertyFlags::None) noexcept
+    {
+        static_assert(
+            std::is_copy_assignable_v<Value>,
+            "Plain reflected member values must be copy assignable.");
+
+        const bool readOnly = HasFlag(flags, PropertyFlags::ReadOnly);
+
+        return PropertyMetadata{
+            propertyId,
+            canonicalName,
+            ownerTypeId,
+            valueTypeId,
+            flags,
+            &reflection_detail::ReadMember<Owner, Value, Member>,
+            readOnly
+                ? nullptr
+                : &reflection_detail::WriteMember<Owner, Value, Member>,
+            &reflection_detail::ConstAddressMember<Owner, Value, Member>,
+            readOnly
+                ? nullptr
+                : &reflection_detail::MutableAddressMember<Owner, Value, Member>,
+            nullptr,
+            nullptr
         };
     }
 }

@@ -12,21 +12,174 @@ namespace noc
     {
         [[nodiscard]] bool IsPowerOfTwo(uint32_t value) noexcept
         {
-            return value != 0
-                && (value & (value - 1u)) == 0;
+            return value != 0 && (value & (value - 1u)) == 0;
         }
 
-        [[nodiscard]] bool IsTypeMetadataIntrinsicallyValid(
+        [[nodiscard]] bool IsPropertyValid(
+            const PropertyMetadata& property,
+            TypeId expectedOwner) noexcept
+        {
+            if (!property.propertyId.IsValid()
+                || !property.canonicalName
+                || property.canonicalName[0] == '\0'
+                || property.ownerTypeId != expectedOwner
+                || !property.valueTypeId.IsValid()
+                || !property.read)
+            {
+                return false;
+            }
+
+            const bool readOnly =
+                HasFlag(property.flags, PropertyFlags::ReadOnly);
+            if (readOnly)
+            {
+                return property.write == nullptr
+                    && property.mutableAddress == nullptr;
+            }
+
+            return property.write != nullptr;
+        }
+
+        [[nodiscard]] ReflectionRegistryError ValidateTypeIntrinsic(
             const TypeMetadata& metadata) noexcept
         {
-            return metadata.typeId.IsValid()
-                && metadata.canonicalName != nullptr
-                && metadata.canonicalName[0] != '\0'
-                && metadata.kind != TypeKind::Invalid
-                && metadata.version != 0
-                && metadata.size != 0
-                && IsPowerOfTwo(metadata.alignment)
-                && metadata.lifecycle.destruct != nullptr;
+            if (!metadata.typeId.IsValid()
+                || !metadata.canonicalName
+                || metadata.canonicalName[0] == '\0'
+                || metadata.kind == TypeKind::Invalid
+                || metadata.version == 0
+                || metadata.size == 0
+                || !IsPowerOfTwo(metadata.alignment)
+                || !metadata.lifecycle.destruct)
+            {
+                return ReflectionRegistryError::InvalidMetadata;
+            }
+
+            if (metadata.propertyCount == 0)
+            {
+                return metadata.properties == nullptr
+                    ? ReflectionRegistryError::None
+                    : ReflectionRegistryError::InvalidMetadata;
+            }
+
+            if (!metadata.properties)
+                return ReflectionRegistryError::InvalidMetadata;
+
+            for (uint32_t i = 0; i < metadata.propertyCount; ++i)
+            {
+                const PropertyMetadata& property = metadata.properties[i];
+                if (!IsPropertyValid(property, metadata.typeId))
+                    return ReflectionRegistryError::InvalidMetadata;
+
+                for (uint32_t j = 0; j < i; ++j)
+                {
+                    const PropertyMetadata& previous = metadata.properties[j];
+                    if (previous.propertyId == property.propertyId)
+                        return ReflectionRegistryError::DuplicatePropertyId;
+                    if (std::strcmp(
+                            previous.canonicalName,
+                            property.canonicalName) == 0)
+                    {
+                        return ReflectionRegistryError::
+                            DuplicatePropertyCanonicalName;
+                    }
+                }
+            }
+
+            return ReflectionRegistryError::None;
+        }
+
+        [[nodiscard]] char* CopyString(
+            IAllocator& allocator,
+            const char* source)
+        {
+            const std::size_t length = std::strlen(source);
+            auto* copy = static_cast<char*>(
+                allocator.Allocate(length + 1u, alignof(char)));
+            if (!copy)
+                return nullptr;
+
+            std::memcpy(copy, source, length + 1u);
+            return copy;
+        }
+
+        void DestroyOwnedMetadata(
+            IAllocator& allocator,
+            TypeMetadata& metadata)
+        {
+            if (metadata.properties)
+            {
+                auto* properties =
+                    const_cast<PropertyMetadata*>(metadata.properties);
+                for (uint32_t i = 0; i < metadata.propertyCount; ++i)
+                {
+                    if (properties[i].canonicalName)
+                    {
+                        allocator.Deallocate(
+                            const_cast<char*>(properties[i].canonicalName));
+                    }
+                }
+                allocator.Deallocate(properties);
+                metadata.properties = nullptr;
+                metadata.propertyCount = 0;
+            }
+
+            if (metadata.canonicalName)
+            {
+                allocator.Deallocate(
+                    const_cast<char*>(metadata.canonicalName));
+                metadata.canonicalName = nullptr;
+            }
+        }
+
+        [[nodiscard]] bool DeepCopyMetadata(
+            IAllocator& allocator,
+            const TypeMetadata& source,
+            TypeMetadata& destination)
+        {
+            destination = source;
+            destination.canonicalName = nullptr;
+            destination.properties = nullptr;
+            destination.propertyCount = 0;
+
+            destination.canonicalName =
+                CopyString(allocator, source.canonicalName);
+            if (!destination.canonicalName)
+                return false;
+
+            if (source.propertyCount == 0)
+                return true;
+
+            auto* properties = static_cast<PropertyMetadata*>(
+                allocator.Allocate(
+                    sizeof(PropertyMetadata) * source.propertyCount,
+                    alignof(PropertyMetadata)));
+            if (!properties)
+            {
+                DestroyOwnedMetadata(allocator, destination);
+                return false;
+            }
+
+            for (uint32_t i = 0; i < source.propertyCount; ++i)
+                new (properties + i) PropertyMetadata{};
+
+            destination.properties = properties;
+            destination.propertyCount = source.propertyCount;
+
+            for (uint32_t i = 0; i < source.propertyCount; ++i)
+            {
+                properties[i] = source.properties[i];
+                properties[i].canonicalName = nullptr;
+                properties[i].canonicalName =
+                    CopyString(allocator, source.properties[i].canonicalName);
+                if (!properties[i].canonicalName)
+                {
+                    DestroyOwnedMetadata(allocator, destination);
+                    return false;
+                }
+            }
+
+            return true;
         }
     }
 
@@ -35,7 +188,6 @@ namespace noc
         struct Entry
         {
             TypeMetadata metadata{};
-            char* ownedName = nullptr;
         };
 
         IAllocator* allocator = nullptr;
@@ -52,15 +204,7 @@ namespace noc
 
             uint32_t target = capacity == 0 ? 32u : capacity;
             while (target < required)
-            {
-                if (target > 0x7FFFFFFFu)
-                {
-                    target = required;
-                    break;
-                }
-
                 target *= 2u;
-            }
 
             auto* newEntries = static_cast<Entry*>(
                 allocator->Allocate(
@@ -79,7 +223,6 @@ namespace noc
             {
                 for (uint32_t i = 0; i < capacity; ++i)
                     entries[i].~Entry();
-
                 allocator->Deallocate(entries);
             }
 
@@ -92,12 +235,10 @@ namespace noc
         {
             uint32_t first = 0;
             uint32_t length = count;
-
             while (length > 0)
             {
                 const uint32_t half = length / 2u;
                 const uint32_t middle = first + half;
-
                 if (entries[middle].metadata.typeId < typeId)
                 {
                     first = middle + 1u;
@@ -108,7 +249,6 @@ namespace noc
                     length = half;
                 }
             }
-
             return first;
         }
     };
@@ -128,12 +268,10 @@ namespace noc
             return false;
         }
 
-        void* memory =
-            allocator.Allocate(sizeof(Impl), alignof(Impl));
+        void* memory = allocator.Allocate(sizeof(Impl), alignof(Impl));
         if (!memory)
         {
-            lastError_ =
-                ReflectionRegistryError::AllocationFailure;
+            lastError_ = ReflectionRegistryError::AllocationFailure;
             return false;
         }
 
@@ -147,8 +285,7 @@ namespace noc
             impl_->~Impl();
             allocator.Deallocate(impl_);
             impl_ = nullptr;
-            lastError_ =
-                ReflectionRegistryError::AllocationFailure;
+            lastError_ = ReflectionRegistryError::AllocationFailure;
             return false;
         }
 
@@ -165,125 +302,77 @@ namespace noc
         }
 
         IAllocator* allocator = impl_->allocator;
-
         for (uint32_t i = 0; i < impl_->count; ++i)
-        {
-            if (impl_->entries[i].ownedName)
-                allocator->Deallocate(
-                    impl_->entries[i].ownedName);
-        }
+            DestroyOwnedMetadata(*allocator, impl_->entries[i].metadata);
 
         if (impl_->entries)
         {
-            for (uint32_t i = 0;
-                 i < impl_->capacity;
-                 ++i)
-            {
+            for (uint32_t i = 0; i < impl_->capacity; ++i)
                 impl_->entries[i].~Entry();
-            }
-
             allocator->Deallocate(impl_->entries);
         }
 
-        impl_->state =
-            ReflectionRegistryState::Uninitialized;
         impl_->~Impl();
         allocator->Deallocate(impl_);
         impl_ = nullptr;
         lastError_ = ReflectionRegistryError::None;
     }
 
-    bool ReflectionRegistry::RegisterType(
-        const TypeMetadata& metadata)
+    bool ReflectionRegistry::RegisterType(const TypeMetadata& metadata)
     {
         if (!impl_)
         {
-            lastError_ =
-                ReflectionRegistryError::NotInitialized;
+            lastError_ = ReflectionRegistryError::NotInitialized;
             return false;
         }
 
         if (impl_->state != ReflectionRegistryState::Building)
         {
-            lastError_ =
-                ReflectionRegistryError::WrongState;
+            lastError_ = ReflectionRegistryError::WrongState;
             return false;
         }
 
-        if (!IsTypeMetadataIntrinsicallyValid(metadata))
-        {
-            lastError_ =
-                ReflectionRegistryError::InvalidMetadata;
+        lastError_ = ValidateTypeIntrinsic(metadata);
+        if (lastError_ != ReflectionRegistryError::None)
             return false;
-        }
 
         const uint32_t insertionIndex =
             impl_->LowerBound(metadata.typeId);
-
         if (insertionIndex < impl_->count
-            && impl_->entries[insertionIndex]
-                    .metadata.typeId == metadata.typeId)
+            && impl_->entries[insertionIndex].metadata.typeId == metadata.typeId)
         {
-            lastError_ =
-                ReflectionRegistryError::DuplicateTypeId;
+            lastError_ = ReflectionRegistryError::DuplicateTypeId;
             return false;
         }
 
         for (uint32_t i = 0; i < impl_->count; ++i)
         {
             if (std::strcmp(
-                    impl_->entries[i]
-                        .metadata.canonicalName,
+                    impl_->entries[i].metadata.canonicalName,
                     metadata.canonicalName) == 0)
             {
-                lastError_ =
-                    ReflectionRegistryError::
-                        DuplicateCanonicalName;
+                lastError_ = ReflectionRegistryError::DuplicateCanonicalName;
                 return false;
             }
         }
 
         if (!impl_->EnsureCapacity(impl_->count + 1u))
         {
-            lastError_ =
-                ReflectionRegistryError::AllocationFailure;
+            lastError_ = ReflectionRegistryError::AllocationFailure;
             return false;
         }
 
-        const std::size_t nameLength =
-            std::strlen(metadata.canonicalName);
-
-        auto* ownedName = static_cast<char*>(
-            impl_->allocator->Allocate(
-                nameLength + 1u,
-                alignof(char)));
-        if (!ownedName)
+        TypeMetadata owned{};
+        if (!DeepCopyMetadata(*impl_->allocator, metadata, owned))
         {
-            lastError_ =
-                ReflectionRegistryError::AllocationFailure;
+            lastError_ = ReflectionRegistryError::AllocationFailure;
             return false;
         }
 
-        std::memcpy(
-            ownedName,
-            metadata.canonicalName,
-            nameLength + 1u);
+        for (uint32_t i = impl_->count; i > insertionIndex; --i)
+            impl_->entries[i] = impl_->entries[i - 1u];
 
-        for (uint32_t i = impl_->count;
-             i > insertionIndex;
-             --i)
-        {
-            impl_->entries[i] =
-                impl_->entries[i - 1u];
-        }
-
-        auto& entry =
-            impl_->entries[insertionIndex];
-
-        entry.metadata = metadata;
-        entry.ownedName = ownedName;
-        entry.metadata.canonicalName = ownedName;
-
+        impl_->entries[insertionIndex].metadata = owned;
         ++impl_->count;
         lastError_ = ReflectionRegistryError::None;
         return true;
@@ -293,38 +382,42 @@ namespace noc
     {
         if (!impl_)
         {
-            lastError_ =
-                ReflectionRegistryError::NotInitialized;
+            lastError_ = ReflectionRegistryError::NotInitialized;
             return false;
         }
 
         if (impl_->state != ReflectionRegistryState::Building)
         {
-            lastError_ =
-                ReflectionRegistryError::WrongState;
+            lastError_ = ReflectionRegistryError::WrongState;
             return false;
         }
 
         for (uint32_t i = 0; i < impl_->count; ++i)
         {
-            const TypeMetadata& metadata =
-                impl_->entries[i].metadata;
-
-            if (!IsTypeMetadataIntrinsicallyValid(metadata))
+            const TypeMetadata& metadata = impl_->entries[i].metadata;
+            const ReflectionRegistryError intrinsic =
+                ValidateTypeIntrinsic(metadata);
+            if (intrinsic != ReflectionRegistryError::None)
             {
-                lastError_ =
-                    ReflectionRegistryError::ValidationFailure;
+                lastError_ = ReflectionRegistryError::ValidationFailure;
                 return false;
             }
 
             if (i > 0
-                && !(impl_->entries[i - 1u]
-                         .metadata.typeId
-                     < metadata.typeId))
+                && !(impl_->entries[i - 1u].metadata.typeId < metadata.typeId))
             {
-                lastError_ =
-                    ReflectionRegistryError::ValidationFailure;
+                lastError_ = ReflectionRegistryError::ValidationFailure;
                 return false;
+            }
+
+            for (uint32_t p = 0; p < metadata.propertyCount; ++p)
+            {
+                if (!FindType(metadata.properties[p].valueTypeId))
+                {
+                    lastError_ =
+                        ReflectionRegistryError::UnknownPropertyValueType;
+                    return false;
+                }
             }
         }
 
@@ -333,16 +426,12 @@ namespace noc
         return true;
     }
 
-    ReflectionRegistryState
-    ReflectionRegistry::State() const noexcept
+    ReflectionRegistryState ReflectionRegistry::State() const noexcept
     {
-        return impl_
-            ? impl_->state
-            : ReflectionRegistryState::Uninitialized;
+        return impl_ ? impl_->state : ReflectionRegistryState::Uninitialized;
     }
 
-    ReflectionRegistryError
-    ReflectionRegistry::LastError() const noexcept
+    ReflectionRegistryError ReflectionRegistry::LastError() const noexcept
     {
         return lastError_;
     }
@@ -357,22 +446,14 @@ namespace noc
         return impl_ ? impl_->count : 0u;
     }
 
-    const TypeMetadata* ReflectionRegistry::FindType(
-        TypeId typeId) const noexcept
+    const TypeMetadata* ReflectionRegistry::FindType(TypeId typeId) const noexcept
     {
-        if (!impl_
-            || !typeId.IsValid()
-            || impl_->count == 0)
-        {
+        if (!impl_ || !typeId.IsValid() || impl_->count == 0)
             return nullptr;
-        }
 
-        const uint32_t index =
-            impl_->LowerBound(typeId);
-
+        const uint32_t index = impl_->LowerBound(typeId);
         if (index >= impl_->count
-            || impl_->entries[index]
-                   .metadata.typeId != typeId)
+            || impl_->entries[index].metadata.typeId != typeId)
         {
             return nullptr;
         }
@@ -380,37 +461,70 @@ namespace noc
         return &impl_->entries[index].metadata;
     }
 
-    const TypeMetadata*
-    ReflectionRegistry::FindTypeByName(
+    const TypeMetadata* ReflectionRegistry::FindTypeByName(
         const char* canonicalName) const noexcept
     {
-        if (!impl_
-            || !canonicalName
-            || canonicalName[0] == '\0')
-        {
+        if (!impl_ || !canonicalName || canonicalName[0] == '\0')
             return nullptr;
-        }
 
         for (uint32_t i = 0; i < impl_->count; ++i)
         {
             if (std::strcmp(
-                    impl_->entries[i]
-                        .metadata.canonicalName,
+                    impl_->entries[i].metadata.canonicalName,
                     canonicalName) == 0)
             {
                 return &impl_->entries[i].metadata;
             }
         }
-
         return nullptr;
     }
 
-    const TypeMetadata* ReflectionRegistry::TypeAt(
-        uint32_t index) const noexcept
+    const TypeMetadata* ReflectionRegistry::TypeAt(uint32_t index) const noexcept
     {
         if (!impl_ || index >= impl_->count)
             return nullptr;
-
         return &impl_->entries[index].metadata;
+    }
+
+    const PropertyMetadata* ReflectionRegistry::FindProperty(
+        TypeId ownerTypeId,
+        PropertyId propertyId) const noexcept
+    {
+        if (!propertyId.IsValid())
+            return nullptr;
+
+        const TypeMetadata* type = FindType(ownerTypeId);
+        if (!type)
+            return nullptr;
+
+        for (uint32_t i = 0; i < type->propertyCount; ++i)
+        {
+            if (type->properties[i].propertyId == propertyId)
+                return &type->properties[i];
+        }
+        return nullptr;
+    }
+
+    const PropertyMetadata* ReflectionRegistry::FindPropertyByName(
+        TypeId ownerTypeId,
+        const char* canonicalName) const noexcept
+    {
+        if (!canonicalName || canonicalName[0] == '\0')
+            return nullptr;
+
+        const TypeMetadata* type = FindType(ownerTypeId);
+        if (!type)
+            return nullptr;
+
+        for (uint32_t i = 0; i < type->propertyCount; ++i)
+        {
+            if (std::strcmp(
+                    type->properties[i].canonicalName,
+                    canonicalName) == 0)
+            {
+                return &type->properties[i];
+            }
+        }
+        return nullptr;
     }
 }
