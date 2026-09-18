@@ -176,6 +176,8 @@
     <ProjectGuid>{35e1aeba-66a3-4950-9c19-2658b2a30af1}</ProjectGuid>
     <RootNamespace>NocturneEngine</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <RepoRoot>$(MSBuildProjectDirectory)\..\..\..\</RepoRoot>
+    <SolutionDir>$(RepoRoot)</SolutionDir>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -194,7 +196,10 @@
     <PlatformToolset>v145</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Development|x64'">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Ship|Win32'">
     <PlatformToolset>v145</PlatformToolset>
@@ -215,8 +220,12 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <OutDir>$(SolutionDir)Build\bin\$(ConfigurationName)\</OutDir>
-    <IntDir>$(SolutionDir)Build\obj\$(ProjectName)\$(ConfigurationName)\</IntDir>
+    <OutDir>$(RepoRoot)Build\bin\$(ConfigurationName)\</OutDir>
+    <IntDir>$(RepoRoot)Build\obj\$(ProjectName)\$(ConfigurationName)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'">
+    <OutDir>$(RepoRoot)Build\bin\$(ConfigurationName)\</OutDir>
+    <IntDir>$(RepoRoot)Build\obj\$(ProjectName)\$(ConfigurationName)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -243,8 +252,7 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(SolutionDir)Engine
-</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(RepoRoot)Engine;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -254,7 +262,13 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'">
     <ClCompile>
-      <PreprocessorDefinitions>NOC_DEV;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NOC_DEV;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalIncludeDirectories>$(RepoRoot)Engine;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Ship|x64'">

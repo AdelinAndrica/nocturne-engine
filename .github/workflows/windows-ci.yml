@@ -9,6 +9,7 @@ on:
       - "Ide/VS2026/NocturneEngine/**"
       - "Ide/VS2026/NocturneHost/**"
       - "Ide/VS2026/NocturneEditor/**"
+      - "Nocturne.slnx"
       - ".github/workflows/windows-ci.yml"
   pull_request:
     paths:
@@ -18,6 +19,7 @@ on:
       - "Ide/VS2026/NocturneEngine/**"
       - "Ide/VS2026/NocturneHost/**"
       - "Ide/VS2026/NocturneEditor/**"
+      - "Nocturne.slnx"
       - ".github/workflows/windows-ci.yml"
 
 permissions:
@@ -68,6 +70,43 @@ jobs:
             /p:Configuration=Debug `
             /p:Platform=x64 `
             /p:PlatformToolset=v143
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Build Development x64 projects
+        shell: pwsh
+        run: |
+          $projects = @(
+            "Ide\VS2026\NocturneEngine\NocturneEngine.vcxproj",
+            "Ide\VS2026\NocturneHost\NocturneHost.vcxproj",
+            "Ide\VS2026\NocturneEditor\NocturneEditor.vcxproj"
+          )
+
+          foreach ($project in $projects) {
+            msbuild $project `
+              /m `
+              /p:Configuration=Development `
+              /p:Platform=x64 `
+              /p:PlatformToolset=v143
+
+            if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+            }
+          }
+
+      - name: Build solution regression (Debug x64)
+        shell: pwsh
+        run: |
+          $root = "$env:GITHUB_WORKSPACE\"
+
+          msbuild "Nocturne.slnx" `
+            /m `
+            /p:Configuration=Debug `
+            /p:Platform=x64 `
+            /p:PlatformToolset=v143 `
+            "/p:SolutionDir=$root"
 
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE

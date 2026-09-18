@@ -84,7 +84,10 @@
     <PlatformToolset>v145</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Development|x64'">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Ship|Win32'">
     <PlatformToolset>v145</PlatformToolset>
@@ -105,6 +108,10 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <OutDir>$(RepoRoot)Build\bin\$(ConfigurationName)\</OutDir>
+    <IntDir>$(RepoRoot)Build\obj\$(ProjectName)\$(ConfigurationName)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'">
     <OutDir>$(RepoRoot)Build\bin\$(ConfigurationName)\</OutDir>
     <IntDir>$(RepoRoot)Build\obj\$(ProjectName)\$(ConfigurationName)\</IntDir>
   </PropertyGroup>
@@ -130,6 +137,20 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(RepoRoot)Engine;$(RepoRoot)Engine\Core;$(RepoRoot)Engine\Core\Memory;$(RepoRoot)Engine\Core\Subsystems;$(RepoRoot)Engine\Core\Resources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <ShowIncludes>true</ShowIncludes>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NOC_DEV;_CONSOLE;NOC_CONTENT_ROOT="Data";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(RepoRoot)Engine;$(RepoRoot)Engine\Core;$(RepoRoot)Engine\Core\Memory;$(RepoRoot)Engine\Core\Subsystems;$(RepoRoot)Engine\Core\Resources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
