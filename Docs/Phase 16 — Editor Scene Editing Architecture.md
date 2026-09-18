@@ -1,6 +1,6 @@
 # Nocturne Engine — Phase 16 Editor Scene Editing + Runtime Reflection Architecture
 
-> **Status:** ACTIVE IMPLEMENTATION CONTRACT  
+> **Status:** IMPLEMENTED ARCHITECTURE — COMPLETION HARDENING  
 > **Phase:** 16 — Editor Scene Editing + Runtime Reflection  
 > **Branch:** `phase-16-editor-scene-editing`  
 > **Applies with:** `Docs/Production Engineering Standard.md`  
@@ -55,9 +55,9 @@ All Nocturne-specific policies below that go beyond these concepts are explicitl
 
 ---
 
-## 3. Repository audit — current code state
+## 3. Repository audit — initial pre-implementation state
 
-This section records the real branch state inspected before Phase 16 implementation.
+This section intentionally preserves the branch audit captured before Phase 16 implementation. It is historical input, **not the current implementation state**. Current resolved architecture is summarized in §3.11 and the later target/implementation sections.
 
 ### 3.1 Runtime foundation that remains authoritative
 
@@ -223,7 +223,26 @@ including object/build-list files. `.gitignore` already ignores generic build ar
 
 A tracked `Ide/VS2026/NocturneHost/DerivedDataCache/AssetGraph.json` also exists despite `DerivedDataCache/` being ignored. Its intentional/test status must be verified before removal.
 
-The Host Debug x64 project contains a machine-specific `NOC_CONTENT_ROOT="D:/Projects/Nocturne/Data"`. This is a repository portability defect, but it is not allowed to derail the bounded Reflection milestone. It should be corrected in a dedicated build-hygiene change when Phase 16 project files are touched.
+The Host Debug x64 project contained a machine-specific \`NOC_CONTENT_ROOT="D:/Projects/Nocturne/Data"\`. This was identified as a repository portability defect by the initial audit.
+
+### 3.11 Current implemented architecture — 2026-09-18
+
+The Phase 16 implementation has resolved the major audit findings above:
+
+- \`Engine\` owns one authoritative \`ReflectionRegistry\` before \`World\` lifetime; \`ComponentRegistry\` is a compatibility facade, not a parallel schema authority.
+- reflected primitive/math coverage includes Vec2/Vec3/Vec4, Quat, Mat4 policy and AABB.
+- \`EditorSession\` owns selection, tool camera classification, active tool/orientation, history, transactions and dirty state.
+- Scene Hierarchy is projected from \`World\`; row identity is \`EntityHandle\`; validation arrays and selected row indices are not authoring identity.
+- \`EditorShellV3\` is the sole active shell authority. Historical \`EditorShell\` / \`EditorControls\` sources remain for provenance but are removed from the active project compilation set by the Phase 16 hygiene gate.
+- generic reflected Inspector, create/rename/delete/duplicate/reparent, add/remove component and reflected property commands are implemented.
+- gizmo drag uses \`EditorGizmoDragTransaction\`, produces one history entry per committed drag, supports Local/World Move/Rotate and explicit Local Scale policy, and has tested commit/cancel lifecycle semantics.
+- transient subtree snapshots are reflection-driven and allocator-aware; \`TransientEntityPrototype\` reuses the same snapshot/instantiate representation without defining persistent prefab identity or files.
+- editor stress/performance and allocation-discipline baselines cover hierarchy 100/1k/10k, history 10k, Inspector refresh, subtree 1k, selection, reparent and gizmo preview/commit.
+- Scene Hierarchy visible-row projection is cached across paint/input events; warmed hierarchy model rebuilds reuse traversal capacity.
+- tracked MSVC/DerivedDataCache residue identified by the audit is removed by the hygiene gate.
+- Host Debug \`NOC_CONTENT_ROOT\` is normalized to repository-relative \`Data\`, matching the portable project policy.
+
+**Design choice (not directly from the book):** transient prototype semantics, Local-only scale policy, cache-growth policy and editor-specific history/transaction budgets are Nocturne policies layered on the book-grounded editor/command/property architecture.
 
 ---
 

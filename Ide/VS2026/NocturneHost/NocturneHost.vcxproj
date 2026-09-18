@@ -146,7 +146,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;NOC_DEBUG;NOC_CONTENT_ROOT="D:/Projects/Nocturne/Data";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;NOC_DEBUG;NOC_CONTENT_ROOT="Data";%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(RepoRoot)Engine;$(RepoRoot)Engine\Core;$(RepoRoot)Engine\Core\Memory;$(RepoRoot)Engine\Core\Subsystems;$(RepoRoot)Engine\Core\Resources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>

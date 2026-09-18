@@ -535,7 +535,22 @@ Automated coverage verifies:
 
 The reusable seam for Phase 17 is therefore the reflected schema plus subtree capture/instantiate mechanics, not the transient runtime handles.
 
-### 11.8 Manual regression and soak
+### 11.8 Build/project hygiene — IMPLEMENTED; CI VALIDATION PENDING
+
+The active project definition now removes the historical Phase 13 \`EditorShell.cpp\` / \`EditorControls.cpp\` pair from compilation. Their source files remain only as historical provenance; \`EditorShellV3\` remains the runtime/editor authority.
+
+Tracked generated leftovers are removed from the repository:
+
+- four MSVC \`.obj\` files under \`Ide/VS2026/NocturneEngine/x64/Development\`;
+- \`NocturneEngine.vcxproj.FileListAbsolute.txt\`;
+- \`Ide/VS2026/NocturneHost/DerivedDataCache/AssetGraph.json\`.
+
+The existing \`.gitignore\` already ignores \`DerivedDataCache/\`, object/intermediate outputs and common MSVC artifacts, so this gate removes historical tracked residue instead of adding a second ignore policy.
+
+Direct project and solution build checkboxes remain tied to CI validation of the cleanup commit.
+
+
+### 11.9 Manual regression and soak
 
 Before completion, validate the preserved editor baseline plus new authoring operations:
 
@@ -596,12 +611,11 @@ e7144560 — phase16: cover editor history failure and budget semantics
 ## 13. Recommended next implementation order
 
 1. Run full manual Phase 13/14/15 regression plus 15+ minute edit-session soak.
-2. Resolve remaining in-scope repository/build hygiene.
-3. Reconcile every remaining unchecked checklist gate with evidence or an explicit defer.
-4. Produce Phase 16 Implementation Report.
-5. Produce Phase 16 Test and CI Validation Report.
-6. Produce Phase 16 Completion Report only after all completion gates pass.
-7. Finalize the Phase 17 handoff draft and update roadmap.
+2. Reconcile every remaining unchecked checklist gate with evidence or an explicit defer.
+3. Produce Phase 16 Implementation Report.
+4. Produce Phase 16 Test and CI Validation Report.
+5. Produce Phase 16 Completion Report only after all completion gates pass.
+6. Finalize the Phase 17 handoff draft and update roadmap.
 
 ---
 

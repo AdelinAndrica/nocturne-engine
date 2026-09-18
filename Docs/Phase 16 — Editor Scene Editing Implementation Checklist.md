@@ -1156,15 +1156,18 @@ Phase 16 adds:
 
 # 46. Build/project hygiene
 
-- [ ] New source files in `.vcxproj`.
-- [ ] New source files in `.filters`.
+- [x] New source files in `.vcxproj`.
+- [x] New source files in `.filters`.
 - [ ] Direct project build remains functional.
 - [ ] Solution build remains functional.
-- [ ] No stale historical editor source becomes authority.
-- [ ] No duplicate Scene Hierarchy implementation remains active.
-- [ ] No validation-array authority remains.
-- [ ] Generated editor cache dirs ignored.
-- [ ] No committed build artifacts.
+- [x] No stale historical editor source becomes authority.
+- [x] No duplicate Scene Hierarchy implementation remains active.
+- [x] No validation-array authority remains.
+- [x] Generated editor cache dirs ignored.
+- [x] No committed build artifacts.
+
+
+Evidence note: `NocturneHost.vcxproj.filters` tracks the shared Phase 16 headers used by tests; the active Editor project has no `.filters` file. Historical `EditorShell` / `EditorControls` files remain in the repository for Phase 13 provenance but are no longer compiled by `NocturneEditor.vcxproj`; `EditorShellV3` is the sole active shell authority. Generated `DerivedDataCache/` and MSVC artifacts are ignored and tracked leftovers are removed by this gate. Host Debug `NOC_CONTENT_ROOT` is normalized from the historical machine-specific path to repository-relative `Data`.
 
 ---
 
