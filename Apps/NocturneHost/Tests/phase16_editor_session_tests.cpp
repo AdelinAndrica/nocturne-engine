@@ -54,6 +54,81 @@ namespace
 
         return command;
     }
+
+    class HistoryProbeCommand final
+        : public nocturne::editor::IEditorCommand
+    {
+    public:
+        HistoryProbeCommand(
+            int& value,
+            int delta,
+            std::size_t memoryCost,
+            int& destructionCount,
+            bool failExecute = false,
+            bool failUndo = false,
+            bool failRedo = false) noexcept
+            : value_(&value)
+            , delta_(delta)
+            , memoryCost_(memoryCost)
+            , destructionCount_(&destructionCount)
+            , failExecute_(failExecute)
+            , failUndo_(failUndo)
+            , failRedo_(failRedo)
+        {
+        }
+
+        ~HistoryProbeCommand() override
+        {
+            if (destructionCount_)
+                ++(*destructionCount_);
+        }
+
+        [[nodiscard]] const char* Label() const noexcept override
+        {
+            return "History Probe";
+        }
+
+        [[nodiscard]] std::size_t MemoryCostBytes() const noexcept override
+        {
+            return memoryCost_;
+        }
+
+        [[nodiscard]] bool Execute(
+            nocturne::editor::EditorCommandContext&) override
+        {
+            if (failExecute_ || !value_)
+                return false;
+            *value_ += delta_;
+            return true;
+        }
+
+        [[nodiscard]] bool Undo(
+            nocturne::editor::EditorCommandContext&) override
+        {
+            if (failUndo_ || !value_)
+                return false;
+            *value_ -= delta_;
+            return true;
+        }
+
+        [[nodiscard]] bool Redo(
+            nocturne::editor::EditorCommandContext&) override
+        {
+            if (failRedo_ || !value_)
+                return false;
+            *value_ += delta_;
+            return true;
+        }
+
+    private:
+        int* value_ = nullptr;
+        int delta_ = 0;
+        std::size_t memoryCost_ = 0;
+        int* destructionCount_ = nullptr;
+        bool failExecute_ = false;
+        bool failUndo_ = false;
+        bool failRedo_ = false;
+    };
 }
 
 bool RunPhase16EditorSessionTests()
@@ -175,6 +250,190 @@ bool RunPhase16EditorSessionTests()
 
     nocturne::editor::EditorCommandContext context =
         session.CommandContext();
+
+    {
+        int probeValue = 0;
+        int destructionCount = 0;
+
+        nocturne::editor::EditorCommandHistory history;
+        history.Configure(2, 1024);
+
+        ok &= CheckEditorSession(
+            !history.CanUndo()
+                && !history.CanRedo()
+                && !history.Undo(context)
+                && !history.Redo(context)
+                && history.CommandCount() == 0
+                && history.Cursor() == 0,
+            "Empty history undo/redo contract failed");
+
+        ok &= CheckEditorSession(
+            history.Execute(
+                context,
+                std::make_unique<HistoryProbeCommand>(
+                    probeValue,
+                    1,
+                    64,
+                    destructionCount))
+                && history.Execute(
+                    context,
+                    std::make_unique<HistoryProbeCommand>(
+                        probeValue,
+                        2,
+                        64,
+                        destructionCount))
+                && history.Execute(
+                    context,
+                    std::make_unique<HistoryProbeCommand>(
+                        probeValue,
+                        4,
+                        64,
+                        destructionCount))
+                && probeValue == 7
+                && history.CommandCount() == 2
+                && history.Cursor() == 2
+                && destructionCount == 1,
+            "History count-budget eviction failed");
+
+        ok &= CheckEditorSession(
+            history.Undo(context)
+                && probeValue == 3
+                && history.Undo(context)
+                && probeValue == 1
+                && !history.CanUndo()
+                && history.Redo(context)
+                && probeValue == 3
+                && history.Redo(context)
+                && probeValue == 7,
+            "History eviction baseline undo/redo semantics failed");
+
+        history.Clear();
+
+        ok &= CheckEditorSession(
+            history.CommandCount() == 0
+                && history.Cursor() == 0
+                && history.UsedBytes() == 0
+                && destructionCount == 3,
+            "History clear/destruction accounting failed");
+
+        history.Configure(10, 128);
+
+        ok &= CheckEditorSession(
+            history.Execute(
+                context,
+                std::make_unique<HistoryProbeCommand>(
+                    probeValue,
+                    8,
+                    64,
+                    destructionCount))
+                && history.Execute(
+                    context,
+                    std::make_unique<HistoryProbeCommand>(
+                        probeValue,
+                        16,
+                        64,
+                        destructionCount))
+                && history.Execute(
+                    context,
+                    std::make_unique<HistoryProbeCommand>(
+                        probeValue,
+                        32,
+                        64,
+                        destructionCount))
+                && history.CommandCount() == 2
+                && history.Cursor() == 2
+                && history.UsedBytes() == 128,
+            "History byte-budget eviction failed");
+
+        history.Clear();
+
+        const int baselineAfterBudgetTests =
+            probeValue;
+
+        history.Configure(8, 1024);
+
+        ok &= CheckEditorSession(
+            history.Execute(
+                context,
+                std::make_unique<HistoryProbeCommand>(
+                    probeValue,
+                    5,
+                    64,
+                    destructionCount,
+                    false,
+                    true,
+                    false))
+                && probeValue
+                    == baselineAfterBudgetTests + 5,
+            "Failed-undo history setup failed");
+
+        const uint32_t cursorBeforeFailedUndo =
+            history.Cursor();
+
+        ok &= CheckEditorSession(
+            !history.Undo(context)
+                && history.Cursor()
+                    == cursorBeforeFailedUndo
+                && probeValue
+                    == baselineAfterBudgetTests + 5,
+            "Failed undo moved history cursor or runtime state");
+
+        history.Clear();
+
+        auto failRedo =
+            std::make_unique<HistoryProbeCommand>(
+                probeValue,
+                7,
+                64,
+                destructionCount,
+                false,
+                false,
+                true);
+
+        ok &= CheckEditorSession(
+            history.Execute(
+                context,
+                std::move(failRedo))
+                && history.Undo(context),
+            "Failed-redo history setup failed");
+
+        const uint32_t cursorBeforeFailedRedo =
+            history.Cursor();
+        const int valueBeforeFailedRedo =
+            probeValue;
+
+        ok &= CheckEditorSession(
+            !history.Redo(context)
+                && history.Cursor()
+                    == cursorBeforeFailedRedo
+                && probeValue
+                    == valueBeforeFailedRedo,
+            "Failed redo moved history cursor or runtime state");
+
+        history.Clear();
+
+        const uint32_t countBeforeFailedExecute =
+            history.CommandCount();
+        const int valueBeforeFailedExecute =
+            probeValue;
+
+        ok &= CheckEditorSession(
+            !history.Execute(
+                context,
+                std::make_unique<HistoryProbeCommand>(
+                    probeValue,
+                    99,
+                    64,
+                    destructionCount,
+                    true,
+                    false,
+                    false))
+                && history.CommandCount()
+                    == countBeforeFailedExecute
+                && history.Cursor() == 0
+                && probeValue == valueBeforeFailedExecute,
+            "Failed execute entered history or changed runtime state");
+    }
 
     {
         nocturne::editor::EditorInspectorModel inspectorModel;
