@@ -1,4 +1,5 @@
 #include "Runtime/EntityRegistry.h"
+#include "Runtime/NameSystem.h"
 #include "Runtime/TransformSystem.h"
 #include "Runtime/World.h"
 
@@ -161,6 +162,148 @@ namespace
         ok &= CheckPerf(
             allocator.OutstandingBytes() == 0,
             "EntityRegistry baseline leaked allocator memory");
+
+        return ok;
+    }
+
+    bool RunComponentStorageBaseline()
+    {
+        constexpr uint32_t kEntityCount = 10000;
+
+        noc::MallocAllocator backing;
+        noc::DebugAlloc allocator(backing);
+        noc::EntityRegistry entities;
+        noc::NameSystem names;
+
+        bool ok = true;
+        ok &= CheckPerf(
+            entities.Init(allocator, 64),
+            "Component baseline EntityRegistry init failed");
+        ok &= CheckPerf(
+            names.Init(entities, allocator, 64),
+            "Component baseline NameSystem init failed");
+
+        std::vector<noc::EntityHandle> handles;
+        handles.reserve(kEntityCount);
+
+        for (uint32_t i = 0; i < kEntityCount; ++i)
+        {
+            const noc::EntityHandle entity = entities.Create();
+            if (!entity.IsValid())
+            {
+                ok &= CheckPerf(false, "Component baseline entity creation failed");
+                break;
+            }
+            handles.push_back(entity);
+        }
+
+        ok &= CheckPerf(
+            handles.size() == kEntityCount,
+            "Component baseline did not create 10k entities");
+
+        const std::size_t allocBeforeAdd = allocator.AllocationCount();
+        const std::size_t bytesBeforeAdd = allocator.TotalAllocatedBytes();
+        const auto addBegin = Clock::now();
+
+        uint32_t added = 0;
+        for (const noc::EntityHandle entity : handles)
+        {
+            if (names.Add(entity, "PerfEntity"))
+                ++added;
+        }
+
+        const auto addEnd = Clock::now();
+        LogBaseline(
+            "component_add_name_10k",
+            added,
+            Micros(addBegin, addEnd),
+            allocator.AllocationCount() - allocBeforeAdd,
+            allocator.TotalAllocatedBytes() - bytesBeforeAdd);
+
+        ok &= CheckPerf(
+            added == kEntityCount,
+            "Component baseline failed to add 10k NameComponents");
+
+        const auto lookupBegin = Clock::now();
+        uint32_t lookupHits = 0;
+        for (const noc::EntityHandle entity : handles)
+        {
+            if (names.Has(entity) && names.Get(entity))
+                ++lookupHits;
+        }
+        const auto lookupEnd = Clock::now();
+
+        LogBaseline(
+            "component_has_get_name_10k",
+            kEntityCount,
+            Micros(lookupBegin, lookupEnd),
+            0,
+            0);
+
+        ok &= CheckPerf(
+            lookupHits == kEntityCount,
+            "Component Has/Get baseline missed live components");
+
+        const auto iterationBegin = Clock::now();
+        uint32_t denseVisited = 0;
+        for (uint32_t i = 0; i < names.DenseCount(); ++i)
+        {
+            const noc::EntityHandle owner = names.OwnerAtDenseIndex(i);
+            const noc::NameComponent* component = names.ComponentAtDenseIndex(i);
+            if (owner.IsValid() && component)
+                ++denseVisited;
+        }
+        const auto iterationEnd = Clock::now();
+
+        LogBaseline(
+            "component_dense_iteration_name_10k",
+            denseVisited,
+            Micros(iterationBegin, iterationEnd),
+            0,
+            0);
+
+        ok &= CheckPerf(
+            denseVisited == kEntityCount,
+            "Dense component iteration baseline missed components");
+
+        const std::size_t allocBeforeRemove = allocator.AllocationCount();
+        const std::size_t bytesBeforeRemove = allocator.TotalAllocatedBytes();
+        const auto removeBegin = Clock::now();
+
+        uint32_t removed = 0;
+        for (uint32_t i = 0; i < kEntityCount; i += 2u)
+        {
+            if (names.Remove(handles[i]))
+                ++removed;
+        }
+
+        const auto removeEnd = Clock::now();
+        LogBaseline(
+            "component_remove_name_5k",
+            removed,
+            Micros(removeBegin, removeEnd),
+            allocator.AllocationCount() - allocBeforeRemove,
+            allocator.TotalAllocatedBytes() - bytesBeforeRemove);
+
+        ok &= CheckPerf(
+            removed == kEntityCount / 2u,
+            "Component baseline failed to remove 5k NameComponents");
+        ok &= CheckPerf(
+            names.Count() == kEntityCount / 2u,
+            "Component count mismatch after remove baseline");
+        ok &= CheckPerf(
+            allocator.AllocationCount() == allocBeforeRemove,
+            "Component remove performed allocator calls");
+        ok &= CheckPerf(
+            allocator.TotalAllocatedBytes() == bytesBeforeRemove,
+            "Component remove allocated bytes");
+
+        names.Shutdown();
+        entities.Shutdown();
+
+        ok &= CheckPerf(
+            allocator.OutstandingBytes() == 0,
+            "Component storage baseline leaked allocator memory");
 
         return ok;
     }
@@ -526,6 +669,7 @@ bool RunPhase15StressPerfTests()
     bool ok = true;
 
     ok &= RunEntityRegistryBaseline();
+    ok &= RunComponentStorageBaseline();
     ok &= RunTransformRootAndWideBaseline();
     ok &= RunTransformDeepBaseline();
     ok &= RunRenderExtractionBaseline();
