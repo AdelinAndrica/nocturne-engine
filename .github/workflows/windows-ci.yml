@@ -5,15 +5,19 @@ on:
     paths:
       - "Engine/**"
       - "Apps/NocturneHost/**"
+      - "Apps/NocturneEditor/**"
       - "Ide/VS2026/NocturneEngine/**"
       - "Ide/VS2026/NocturneHost/**"
+      - "Ide/VS2026/NocturneEditor/**"
       - ".github/workflows/windows-ci.yml"
   pull_request:
     paths:
       - "Engine/**"
       - "Apps/NocturneHost/**"
+      - "Apps/NocturneEditor/**"
       - "Ide/VS2026/NocturneEngine/**"
       - "Ide/VS2026/NocturneHost/**"
+      - "Ide/VS2026/NocturneEditor/**"
       - ".github/workflows/windows-ci.yml"
 
 permissions:
@@ -55,3 +59,16 @@ jobs:
         run: |
           & "$env:GITHUB_WORKSPACE\Build\CI\bin\NocturneHost.exe" --phase15-tests
           exit $LASTEXITCODE
+
+      - name: Build NocturneEditor regression target (Debug x64)
+        shell: pwsh
+        run: |
+          msbuild "Ide\VS2026\NocturneEditor\NocturneEditor.vcxproj" `
+            /m `
+            /p:Configuration=Debug `
+            /p:Platform=x64 `
+            /p:PlatformToolset=v143
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }

@@ -1,79 +1,145 @@
-﻿#pragma once
+#pragma once
+
 #include <cstdint>
 
-#include "Runtime/SceneObject.h"
-#include "Runtime/Bounds.h"
-#include "Runtime/Camera.h"
-#include "Runtime/Frustum.h"
-
 #include "Core/Math/MathTypes.h"
-
 #include "Resources/ResourceHandle.h"
+#include "Runtime/Bounds.h"
+#include "Runtime/ComponentType.h"
+#include "Runtime/Components/CameraComponent.h"
+#include "Runtime/Components/NameComponent.h"
+#include "Runtime/Components/RenderableComponent.h"
+#include "Runtime/Components/TransformComponent.h"
+#include "Runtime/Entity.h"
+#include "Runtime/SceneObject.h"
 
 namespace noc
 {
-	class IAllocator;
-	class LinearArena;
+    class IAllocator;
+    class LinearArena;
 
-	struct RenderQueue;
+    struct RenderQueue;
 
-	struct WorldStats
-	{
-		uint32_t visible = 0;
-		uint32_t total = 0;
-	};
+    struct WorldStats
+    {
+        uint32_t visible = 0;
+        uint32_t total = 0;
+    };
 
-	class World
-	{
-	public:
-		World() = default;
+    // Runtime world owner/orchestrator.
+    //
+    // Phase 15 removes the old parallel-array object model from World. Entity
+    // identity is owned by EntityRegistry; each component domain owns its dense
+    // storage. Renderer consumption remains an extracted frame-data boundary.
+    class World
+    {
+    public:
+        World() = default;
+        ~World();
 
-		bool Init(IAllocator& persistentAlloc);
-		void Shutdown();
+        World(const World&) = delete;
+        World& operator=(const World&) = delete;
+        World(World&&) = delete;
+        World& operator=(World&&) = delete;
 
-		// Frame update (transform propagation + bounds)
-		void Update();
+        bool Init(IAllocator& persistentAlloc);
+        void Shutdown();
 
-		// --- Object model ---
-		SceneObjectHandle CreateObject();
-		void DestroyObject(SceneObjectHandle h);
+        // Updates transform propagation and derived renderable bounds.
+        void Update();
 
-		// Deterministic iteration order for debugging: indices are stable in creation order
-		uint32_t AliveCount() const;
+        // --- Entity model ---
+        [[nodiscard]] EntityHandle CreateEntity();
+        [[nodiscard]] bool DestroyEntity(EntityHandle entity);
+        [[nodiscard]] bool IsAlive(EntityHandle entity) const;
+        [[nodiscard]] uint32_t AliveCount() const;
+        [[nodiscard]] uint32_t EntityCapacity() const;
+        [[nodiscard]] EntityHandle EntityAtIndex(uint32_t index) const;
 
-		// --- Transform ---
-		void SetLocalTRS(SceneObjectHandle h, const Vec3& t, const Quat& r, const Vec3& s);
-		void SetParent(SceneObjectHandle child, SceneObjectHandle parent);
-		Mat4 GetWorldMatrix(SceneObjectHandle h);
+        // Phase 14 compatibility: CreateObject creates an entity with Transform.
+        [[nodiscard]] SceneObjectHandle CreateObject();
+        void DestroyObject(SceneObjectHandle entity);
 
-		// --- Renderable binding ---
-		// localBounds is in object-local space.
-		void SetRenderable(SceneObjectHandle h, ResourceHandle mesh, const AABB& localBounds);
+        // --- Transform component ---
+        [[nodiscard]] bool AddTransform(EntityHandle entity);
+        [[nodiscard]] bool RemoveTransform(EntityHandle entity);
+        [[nodiscard]] const TransformComponent* GetTransform(EntityHandle entity) const;
 
-		// --- Camera ---
-		// Minimal: one active camera stored in the World (can be extended later).
-		void SetCameraParams(float fovYRadians, float aspect, float nearZ, float farZ);
-		void SetCameraFromObject(SceneObjectHandle h); // camera follows this object's transform
-		void SetCullingEnabled(bool enabled) { cullingEnabled_ = enabled; }
-		bool IsCullingEnabled() const { return cullingEnabled_; }
-		void SetCullingMaxDistance(float meters); // 0 = disabled
+        [[nodiscard]] bool SetLocalTRS(
+            SceneObjectHandle entity,
+            const Vec3& translation,
+            const Quat& rotation,
+            const Vec3& scale);
 
-		// --- Runtime → Render handoff (allocates from FrameArena) ---
-		// Returns a RenderQueue whose instance array is allocated from frameArena.
-		RenderQueue BuildRenderQueue(LinearArena& frameArena, uint32_t viewportW, uint32_t viewportH);
+        [[nodiscard]] bool SetParent(
+            SceneObjectHandle child,
+            SceneObjectHandle parent);
 
+        [[nodiscard]] Mat4 GetWorldMatrix(SceneObjectHandle entity);
 
+        // --- Renderable component ---
+        [[nodiscard]] bool AddRenderable(
+            EntityHandle entity,
+            ResourceHandle mesh,
+            const AABB& localBounds);
 
-		const WorldStats& GetLastStats() const;
-		void DebugRequestCullDump();
+        [[nodiscard]] bool RemoveRenderable(EntityHandle entity);
+        [[nodiscard]] const RenderableComponent* GetRenderable(EntityHandle entity) const;
 
-	private:
-		struct Impl;
-		Impl* impl_ = nullptr;
-		float cullingMaxDistance_ = 0.0f; // 0 = disabled (Design choice)
-		WorldStats lastStats_;
+        [[nodiscard]] bool SetRenderable(
+            SceneObjectHandle entity,
+            ResourceHandle mesh,
+            const AABB& localBounds);
 
-		bool cullingEnabled_ = true;
-		bool debugCullDump_ = false;
-	};
+        [[nodiscard]] bool SetRenderableEnabled(EntityHandle entity, bool enabled);
+
+        // --- Camera component ---
+        [[nodiscard]] bool AddCamera(EntityHandle entity);
+        [[nodiscard]] bool RemoveCamera(EntityHandle entity);
+        [[nodiscard]] const CameraComponent* GetCamera(EntityHandle entity) const;
+
+        // Compatibility policy used by Phase 14: lens settings are retained as
+        // defaults and applied to the active camera selected by SetCameraFromObject.
+        [[nodiscard]] bool SetCameraParams(
+            float fovYRadians,
+            float aspect,
+            float nearZ,
+            float farZ);
+
+        [[nodiscard]] bool SetCameraFromObject(SceneObjectHandle entity);
+        [[nodiscard]] EntityHandle ActiveCamera() const;
+
+        // --- Name component ---
+        [[nodiscard]] bool AddName(EntityHandle entity, const char* name = "");
+        [[nodiscard]] bool RemoveName(EntityHandle entity);
+        [[nodiscard]] bool SetName(EntityHandle entity, const char* name);
+        [[nodiscard]] const NameComponent* GetName(EntityHandle entity) const;
+
+        // --- Component metadata ---
+        [[nodiscard]] const ComponentTypeMetadata* FindComponentType(
+            ComponentTypeId typeId) const;
+
+        // --- Visibility / render extraction ---
+        void SetCullingEnabled(bool enabled) { cullingEnabled_ = enabled; }
+        [[nodiscard]] bool IsCullingEnabled() const { return cullingEnabled_; }
+        void SetCullingMaxDistance(float meters);
+
+        RenderQueue BuildRenderQueue(
+            LinearArena& frameArena,
+            uint32_t viewportW,
+            uint32_t viewportH);
+
+        [[nodiscard]] const WorldStats& GetLastStats() const;
+        void DebugRequestCullDump();
+
+    private:
+        struct Impl;
+        Impl* impl_ = nullptr;
+
+        float cullingMaxDistance_ = 0.0f;
+        WorldStats lastStats_{};
+
+        bool cullingEnabled_ = true;
+        bool debugCullDump_ = false;
+    };
 }

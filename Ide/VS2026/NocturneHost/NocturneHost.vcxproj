@@ -43,6 +43,7 @@
     <ClCompile Include="..\..\..\Apps\NocturneHost\Tests\phase15_name_tests.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneHost\Tests\phase15_renderable_tests.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneHost\Tests\phase15_transform_tests.cpp" />
+    <ClCompile Include="..\..\..\Apps\NocturneHost\Tests\phase15_world_tests.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneHost\ZipWriter.cpp" />
   </ItemGroup>
   <ItemGroup>

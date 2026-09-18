@@ -18,6 +18,7 @@ bool RunPhase15TransformTests();
 bool RunPhase15RenderableTests();
 bool RunPhase15CameraTests();
 bool RunPhase15NameTests();
+bool RunPhase15WorldTests();
 
 // Phase 12 tooling
 #include "Phase12CookPack.h"
@@ -55,6 +56,7 @@ int main(int argc, char** argv)
         ok &= RunPhase15RenderableTests();
         ok &= RunPhase15CameraTests();
         ok &= RunPhase15NameTests();
+        ok &= RunPhase15WorldTests();
         return ok ? 0 : 1;
     }
 
@@ -85,6 +87,10 @@ int main(int argc, char** argv)
 
     if (HasArg(args, "--phase15-name-tests")) {
         return RunPhase15NameTests() ? 0 : 1;
+    }
+
+    if (HasArg(args, "--phase15-world-tests")) {
+        return RunPhase15WorldTests() ? 0 : 1;
     }
 
     noc::Engine engine;

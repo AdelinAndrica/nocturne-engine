@@ -1,18 +1,12 @@
 #pragma once
-#include <cstdint>
+
+#include "Runtime/Entity.h"
 
 namespace noc
 {
-	struct SceneObjectHandle
-	{
-		uint32_t index = 0xFFFFFFFFu;
-		uint32_t generation = 0;
-
-		bool IsValid() const { return index != 0xFFFFFFFFu; }
-	};
-
-	inline bool operator==(const SceneObjectHandle& a, const SceneObjectHandle& b)
-	{
-		return a.index == b.index && a.generation == b.generation;
-	}
+    // Compatibility alias for Phase 14/editor call sites.
+    //
+    // Phase 15 establishes EntityHandle as the single runtime identity type.
+    // SceneObjectHandle must not become a second handle authority again.
+    using SceneObjectHandle = EntityHandle;
 }

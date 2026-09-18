@@ -1,548 +1,819 @@
-#include "World.h"
+#include "Runtime/World.h"
 
 #include "Core/Log.h"
 #include "Core/Memory/Allocator.h"
 #include "Core/Memory/LinearArena.h"
-
 #include "Render/RenderQueue.h"
-#include "Core/Math/MathTypes.h"
-#include <cstring>
+#include "Runtime/CameraSystem.h"
+#include "Runtime/ComponentRegistry.h"
+#include "Runtime/EntityRegistry.h"
+#include "Runtime/Frustum.h"
+#include "Runtime/NameSystem.h"
+#include "Runtime/RenderableSystem.h"
+#include "Runtime/TransformSystem.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <cmath>
+#include <new>
 
 namespace noc
 {
-	static constexpr uint32_t kInvalidIndex = 0xFFFFFFFFu;
-
-
-	struct TransformData
-	{
-		Vec3 localT = Vec3::Zero();
-		Quat localR = Quat::Identity();
-		Vec3 localS = Vec3::One();
-
-		uint32_t parent = kInvalidIndex;
-		uint32_t firstChild = kInvalidIndex;
-		uint32_t nextSibling = kInvalidIndex;
-
-		Mat4 world = Mat4::Identity();
-		uint8_t dirty = 1;
-	};
-
-	struct RenderableData
-	{
-		uint8_t has = 0;
-		ResourceHandle mesh{};
-		AABB localBounds{};
-		AABB worldBounds{};
-	};
-
-	struct World::Impl
-	{
-		IAllocator* alloc = nullptr;
-
-		// Handle table
-		uint32_t capacity = 0;
-		uint32_t countAlive = 0;
-
-		uint32_t* generations = nullptr;
-		uint8_t* alive = nullptr;
-
-		// deterministic creation order (indices)
-		uint32_t* order = nullptr;
-		uint32_t orderCount = 0;
-		uint32_t orderCap = 0;
-
-		// free list (stack)
-		uint32_t* freeList = nullptr;
-		uint32_t freeCount = 0;
-		uint32_t freeCap = 0;
-
-		TransformData* xform = nullptr;
-		RenderableData* rend = nullptr;
-
-		// camera follows an object (optional)
-		uint32_t cameraFollowIndex = kInvalidIndex;
-		Camera camera{};
-		Frustum frustum{};
-
-		bool EnsureCapacity(uint32_t newCap)
-		{
-			if (newCap <= capacity) return true;
-
-			// grow to power-of-two-ish
-			uint32_t target = (capacity == 0) ? 64u : capacity;
-			while (target < newCap) target *= 2;
-
-			auto reallocArr = [&](void*& ptr, size_t elemSize, size_t oldCount, size_t newCount) -> bool
-				{
-					void* n = alloc->Allocate(elemSize * newCount, 64);
-					if (!n) return false;
-					if (ptr && oldCount)
-						memcpy(n, ptr, elemSize * oldCount);
-					if (ptr)
-						alloc->Deallocate(ptr);
-					ptr = n;
-					return true;
-				};
-
-			const uint32_t oldCap = capacity;
-			if (!reallocArr((void*&)generations, sizeof(uint32_t), oldCap, target)) return false;
-			if (!reallocArr((void*&)alive, sizeof(uint8_t), oldCap, target)) return false;
-			if (!reallocArr((void*&)xform, sizeof(TransformData), oldCap, target)) return false;
-			if (!reallocArr((void*&)rend, sizeof(RenderableData), oldCap, target)) return false;
-
-			// init new slots
-			for (uint32_t i = oldCap; i < target; ++i)
-			{
-				generations[i] = 1;
-				alive[i] = 0;
-				xform[i] = TransformData{};
-				rend[i] = RenderableData{};
-			}
-
-			capacity = target;
-			return true;
-		}
-
-		void PushOrder(uint32_t idx)
-		{
-			if (orderCount == orderCap)
-			{
-				const uint32_t newCap = (orderCap == 0) ? 64u : orderCap * 2;
-				void* n = alloc->Allocate(sizeof(uint32_t) * newCap, 64);
-				if (order && orderCount)
-					memcpy(n, order, sizeof(uint32_t) * orderCount);
-				if (order) alloc->Deallocate(order);
-				order = (uint32_t*)n;
-				orderCap = newCap;
-			}
-			order[orderCount++] = idx;
-		}
-
-		void PushFree(uint32_t idx)
-		{
-			if (freeCount == freeCap)
-			{
-				const uint32_t newCap = (freeCap == 0) ? 64u : freeCap * 2;
-				void* n = alloc->Allocate(sizeof(uint32_t) * newCap, 64);
-				if (freeList && freeCount)
-					memcpy(n, freeList, sizeof(uint32_t) * freeCount);
-				if (freeList) alloc->Deallocate(freeList);
-				freeList = (uint32_t*)n;
-				freeCap = newCap;
-			}
-			freeList[freeCount++] = idx;
-		}
-
-		bool IsAliveHandle(SceneObjectHandle h) const
-		{
-			if (!h.IsValid() || h.index >= capacity) return false;
-			return alive[h.index] != 0 && generations[h.index] == h.generation;
-		}
-
-		void MarkDirtySubtree(uint32_t idx)
-		{
-			// No heap allocations: DFS using sibling pointers.
-			xform[idx].dirty = 1;
-			for (uint32_t c = xform[idx].firstChild; c != kInvalidIndex; c = xform[c].nextSibling)
-				MarkDirtySubtree(c);
-		}
-
-		void DetachFromParent(uint32_t child)
-		{
-			const uint32_t p = xform[child].parent;
-			if (p == kInvalidIndex) return;
-
-			uint32_t* link = &xform[p].firstChild;
-			while (*link != kInvalidIndex)
-			{
-				if (*link == child)
-				{
-					*link = xform[child].nextSibling;
-					break;
-				}
-				link = &xform[*link].nextSibling;
-			}
-
-			xform[child].parent = kInvalidIndex;
-			xform[child].nextSibling = kInvalidIndex;
-		}
-
-		void AttachToParent(uint32_t child, uint32_t parent)
-		{
-			xform[child].parent = parent;
-			xform[child].nextSibling = xform[parent].firstChild;
-			xform[parent].firstChild = child;
-		}
-
-		void UpdateWorldRecursive(uint32_t idx)
-		{
-			TransformData& t = xform[idx];
-
-			Mat4 local = TRS(t.localT, t.localR, t.localS);
-			if (t.parent != kInvalidIndex)
-				t.world = Mul(xform[t.parent].world, local);
-			else
-				t.world = local;
-
-			// bounds update (if renderable)
-			if (rend[idx].has)
-				rend[idx].worldBounds = TransformAabb(rend[idx].localBounds, t.world);
-
-			t.dirty = 0;
-
-			for (uint32_t c = t.firstChild; c != kInvalidIndex; c = xform[c].nextSibling)
-			{
-				if (xform[c].dirty)
-					UpdateWorldRecursive(c);
-				else
-				{
-					// parent changed implies child should have been marked; keep strict:
-					// we still recompute if parent just recomputed, to avoid stale data.
-					UpdateWorldRecursive(c);
-				}
-			}
-		}
-
-		void UpdateAllDirty()
-		{
-			// For determinism: traverse creation order.
-			for (uint32_t i = 0; i < orderCount; ++i)
-			{
-				const uint32_t idx = order[i];
-				if (idx >= capacity || alive[idx] == 0) continue;
-				if (xform[idx].dirty)
-					UpdateWorldRecursive(idx);
-			}
-		}
-
-		void RebuildCamera(uint32_t viewportW, uint32_t viewportH)
-		{
-			if (viewportW == 0 || viewportH == 0)
-				return;
-
-			camera.aspect = (float)viewportW / (float)viewportH;
-
-			Vec3 eye = Vec3(0, 0, -5);
-			Quat rot = Quat::Identity();
-
-			if (cameraFollowIndex != kInvalidIndex && cameraFollowIndex < capacity && alive[cameraFollowIndex])
-			{
-				const TransformData& tf = xform[cameraFollowIndex];
-				eye = tf.localT; // camera object local position is used; world already handled by tf.world if parented
-				// Prefer world position if parented:
-				eye = Vec3(tf.world.m[12], tf.world.m[13], tf.world.m[14]);
-				rot = tf.localR;
-			}
-
-			const Vec3 forward = Rotate(rot, Vec3(0, 0, 1)); // LH forward
-			const Vec3 up = Rotate(rot, Vec3(0, 1, 0));
-
-			camera.Rebuild(eye, forward, up);
-			frustum = FrustumFromViewProj(camera.viewProj);
-		}
-	};
-
-
-	bool World::Init(IAllocator& persistentAlloc)
-	{
-		if (impl_) return true;
-
-		impl_ = (Impl*)persistentAlloc.Allocate(sizeof(Impl), 64);
-		if (!impl_) return false;
-		memset(impl_, 0, sizeof(Impl));
-		impl_->alloc = &persistentAlloc;
-
-		impl_->camera.proj = PerspectiveFovLH(impl_->camera.fovYRadians, impl_->camera.aspect, impl_->camera.nearZ, impl_->camera.farZ);
-
-		NOC_LOG_INFO("World", "World initialized");
-		return true;
-	}
-
-	void World::Shutdown()
-	{
-		if (!impl_) return;
-
-		IAllocator* a = impl_->alloc;
-
-		if (impl_->generations) a->Deallocate(impl_->generations);
-		if (impl_->alive) a->Deallocate(impl_->alive);
-		if (impl_->xform) a->Deallocate(impl_->xform);
-		if (impl_->rend) a->Deallocate(impl_->rend);
-		if (impl_->order) a->Deallocate(impl_->order);
-		if (impl_->freeList) a->Deallocate(impl_->freeList);
-
-		a->Deallocate(impl_);
-		impl_ = nullptr;
-
-		NOC_LOG_INFO("World", "World shutdown");
-	}
-
-	void World::Update()
-	{
-		if (!impl_) return;
-		impl_->UpdateAllDirty();
-	}
-
-	SceneObjectHandle World::CreateObject()
-	{
-		if (!impl_) return {};
-
-		uint32_t idx = kInvalidIndex;
-
-		if (impl_->freeCount > 0)
-		{
-			idx = impl_->freeList[--impl_->freeCount];
-		}
-		else
-		{
-			idx = impl_->capacity;
-			if (!impl_->EnsureCapacity(idx + 1))
-				return {};
-		}
-
-		impl_->alive[idx] = 1;
-		impl_->countAlive++;
-
-		impl_->xform[idx] = TransformData{};
-		impl_->rend[idx] = RenderableData{};
-
-		impl_->PushOrder(idx);
-
-		SceneObjectHandle h;
-		h.index = idx;
-		h.generation = impl_->generations[idx];
-		return h;
-	}
-
-	void World::DestroyObject(SceneObjectHandle h)
-	{
-		if (!impl_ || !impl_->IsAliveHandle(h)) return;
-
-		const uint32_t idx = h.index;
-
-		// detach children (promote to roots)
-		uint32_t child = impl_->xform[idx].firstChild;
-		while (child != kInvalidIndex)
-		{
-			uint32_t next = impl_->xform[child].nextSibling;
-			impl_->xform[child].parent = kInvalidIndex;
-			impl_->xform[child].nextSibling = kInvalidIndex;
-			child = next;
-		}
-		impl_->xform[idx].firstChild = kInvalidIndex;
-
-		// detach from parent
-		impl_->DetachFromParent(idx);
-
-		// invalidate camera follow if needed
-		if (impl_->cameraFollowIndex == idx)
-			impl_->cameraFollowIndex = kInvalidIndex;
-
-		impl_->alive[idx] = 0;
-		impl_->countAlive--;
-
-		impl_->generations[idx]++; // bump generation
-		impl_->PushFree(idx);
-	}
-
-	uint32_t World::AliveCount() const
-	{
-		return impl_ ? impl_->countAlive : 0;
-	}
-
-	void World::SetLocalTRS(SceneObjectHandle h, const Vec3& t, const Quat& r, const Vec3& s)
-	{
-		if (!impl_ || !impl_->IsAliveHandle(h)) return;
-
-		TransformData& tf = impl_->xform[h.index];
-		tf.localT = t;
-		tf.localR = r;
-		tf.localS = s;
-
-		impl_->MarkDirtySubtree(h.index);
-	}
-
-	void World::SetParent(SceneObjectHandle child, SceneObjectHandle parent)
-	{
-		if (!impl_) return;
-		if (!impl_->IsAliveHandle(child)) return;
-
-		const uint32_t c = child.index;
-		const uint32_t p = (impl_->IsAliveHandle(parent)) ? parent.index : kInvalidIndex;
-
-		if (impl_->xform[c].parent == p)
-			return;
-
-		impl_->DetachFromParent(c);
-		if (p != kInvalidIndex)
-			impl_->AttachToParent(c, p);
-
-		impl_->MarkDirtySubtree(c);
-	}
-
-	Mat4 World::GetWorldMatrix(SceneObjectHandle h)
-	{
-		if (!impl_ || !impl_->IsAliveHandle(h)) return Mat4::Identity();
-
-		if (impl_->xform[h.index].dirty)
-			impl_->UpdateWorldRecursive(h.index);
-
-		return impl_->xform[h.index].world;
-	}
-
-	void World::SetRenderable(SceneObjectHandle h, ResourceHandle mesh, const AABB& localBounds)
-	{
-		if (!impl_ || !impl_->IsAliveHandle(h)) return;
-
-		RenderableData& rd = impl_->rend[h.index];
-		rd.has = 1;
-		rd.mesh = mesh;
-		rd.localBounds = localBounds;
-
-		// force bounds update
-		impl_->MarkDirtySubtree(h.index);
-	}
-
-	void World::SetCameraParams(float fovYRadians, float aspect, float nearZ, float farZ)
-	{
-		if (!impl_) return;
-		impl_->camera.fovYRadians = fovYRadians;
-		impl_->camera.aspect = aspect;
-		impl_->camera.nearZ = nearZ;
-		impl_->camera.farZ = farZ;
-	}
-
-	void World::SetCameraFromObject(SceneObjectHandle h)
-	{
-		if (!impl_ || !impl_->IsAliveHandle(h)) return;
-		impl_->cameraFollowIndex = h.index;
-	}
-
-	void World::SetCullingMaxDistance(float meters)
-	{
-		cullingMaxDistance_ = (meters < 0.0f) ? 0.0f : meters;
-	}
-
-
-	RenderQueue World::BuildRenderQueue(LinearArena& frameArena, uint32_t viewportW, uint32_t viewportH)
-	{
-		RenderQueue q{};
-
-		if (!impl_)
-			return q;
-
-		// Ensure transforms/bounds are up to date.
-		impl_->UpdateAllDirty();
-		impl_->RebuildCamera(viewportW, viewportH);
-
-		q.view.viewProj = impl_->camera.viewProj;
-		q.view.viewportWidth = viewportW;
-		q.view.viewportHeight = viewportH;
-
-		// Count visible instances first (deterministic order).
-		uint32_t visible = 0;
-		uint32_t total = 0;
-		for (uint32_t i = 0; i < impl_->orderCount; ++i)
-		{
-			const uint32_t idx = impl_->order[i];
-			if (idx >= impl_->capacity || impl_->alive[idx] == 0) continue;
-			if (!impl_->rend[idx].has) continue;
-			total++;
-			if (!cullingEnabled_)
-			{
-				visible++;
-				continue;
-			}
-			if (debugCullDump_)
-			{
-				const auto& wb = impl_->rend[idx].worldBounds;
-
-				const bool hit = AabbIntersectsFrustum(wb, impl_->frustum);
-
-				NOC_LOG_INFO("World",
-					"CullDump idx=%u hit=%s bounds min(%.2f %.2f %.2f) max(%.2f %.2f %.2f)",
-					idx,
-					hit ? "YES" : "NO",
-					wb.min.x, wb.min.y, wb.min.z,
-					wb.max.x, wb.max.y, wb.max.z);
-			}
-
-
-
-			if (AabbIntersectsFrustum(impl_->rend[idx].worldBounds, impl_->frustum))
-				visible++;
-		}
-
-		if (visible == 0)
-		{
-			lastStats_.visible = 0;
-			lastStats_.total = total;
-
-			if (debugCullDump_)
-			{
-				NOC_LOG_INFO("World",
-					"CullDump summary: visible=%u total=%u (culling=%s)",
-					lastStats_.visible, lastStats_.total, cullingEnabled_ ? "ON" : "OFF");
-
-				debugCullDump_ = false; // one-shot
-			}
-
-
-			return q;
-		}
-
-		void* mem = frameArena.Allocate(sizeof(RenderInstance) * visible, 16);
-
-
-
-		if (!mem)
-			return q;
-
-		RenderInstance* out = (RenderInstance*)mem;
-
-		uint32_t w = 0;
-		for (uint32_t i = 0; i < impl_->orderCount; ++i)
-		{
-			const uint32_t idx = impl_->order[i];
-			if (idx >= impl_->capacity || impl_->alive[idx] == 0) continue;
-			if (!impl_->rend[idx].has) continue;
-
-			bool keep = true;
-			if (cullingEnabled_)
-				keep = AabbIntersectsFrustum(impl_->rend[idx].worldBounds, impl_->frustum);
-
-			if (!keep) continue;
-
-			out[w].mesh = impl_->rend[idx].mesh;
-			out[w].world = impl_->xform[idx].world;
-			w++;
-		}
-
-		lastStats_.visible = w;
-		lastStats_.total = total;
-
-		if (debugCullDump_)
-		{
-			NOC_LOG_INFO("World",
-				"CullDump summary: visible=%u total=%u (culling=%s)",
-				lastStats_.visible, lastStats_.total, cullingEnabled_ ? "ON" : "OFF");
-
-			debugCullDump_ = false; // one-shot
-		}
-
-
-		q.instances = out;
-		q.instanceCount = w;
-		return q;
-	}
-
-	const WorldStats& World::GetLastStats() const
-	{
-		return lastStats_;
-	}
-
-	void World::DebugRequestCullDump()
-	{
-		debugCullDump_ = true;
-	}
+    namespace
+    {
+        constexpr float kDefaultFovY = 1.04719755f;
+        constexpr float kDefaultAspect = 16.0f / 9.0f;
+        constexpr float kDefaultNearZ = 0.1f;
+        constexpr float kDefaultFarZ = 500.0f;
+        constexpr float kPi = 3.14159265358979323846f;
+
+        [[nodiscard]] bool IsValidPerspective(
+            float fovYRadians,
+            float aspect,
+            float nearZ,
+            float farZ)
+        {
+            return fovYRadians > 0.0f
+                && fovYRadians < kPi
+                && aspect > 0.0f
+                && nearZ > 0.0f
+                && farZ > nearZ;
+        }
+
+        [[nodiscard]] bool AabbBeyondDistance(
+            const AABB& bounds,
+            const Vec3& eye,
+            float maxDistance)
+        {
+            if (maxDistance <= 0.0f)
+                return false;
+
+            const float closestX =
+                (std::max)(bounds.min.x, (std::min)(eye.x, bounds.max.x));
+            const float closestY =
+                (std::max)(bounds.min.y, (std::min)(eye.y, bounds.max.y));
+            const float closestZ =
+                (std::max)(bounds.min.z, (std::min)(eye.z, bounds.max.z));
+
+            const float dx = closestX - eye.x;
+            const float dy = closestY - eye.y;
+            const float dz = closestZ - eye.z;
+
+            return dx * dx + dy * dy + dz * dz
+                > maxDistance * maxDistance;
+        }
+    }
+
+    struct World::Impl
+    {
+        IAllocator* allocator = nullptr;
+
+        EntityRegistry entities;
+        ComponentRegistry componentTypes;
+
+        TransformSystem transforms;
+        RenderableSystem renderables;
+        CameraSystem cameras;
+        NameSystem names;
+
+        float defaultFovY = kDefaultFovY;
+        float defaultAspect = kDefaultAspect;
+        float defaultNearZ = kDefaultNearZ;
+        float defaultFarZ = kDefaultFarZ;
+
+        [[nodiscard]] bool Init(IAllocator& inAllocator)
+        {
+            allocator = &inAllocator;
+
+            if (!entities.Init(inAllocator, 64))
+                return false;
+
+            if (!componentTypes.Init(inAllocator, 8))
+                return false;
+
+            if (!componentTypes.Register(TransformComponentMetadata())
+                || !componentTypes.Register(RenderableComponentMetadata())
+                || !componentTypes.Register(CameraComponentMetadata())
+                || !componentTypes.Register(NameComponentMetadata()))
+            {
+                return false;
+            }
+
+            if (!transforms.Init(entities, inAllocator, 64))
+                return false;
+
+            if (!renderables.Init(entities, inAllocator, 64))
+                return false;
+
+            if (!cameras.Init(entities, transforms, inAllocator, 8))
+                return false;
+
+            if (!names.Init(entities, inAllocator, 64))
+                return false;
+
+            return true;
+        }
+
+        void Shutdown()
+        {
+            names.Shutdown();
+            cameras.Shutdown();
+            renderables.Shutdown();
+            transforms.Shutdown();
+            componentTypes.Shutdown();
+            entities.Shutdown();
+            allocator = nullptr;
+        }
+
+        void UpdateDerivedState()
+        {
+            // TransformSystem marks full descendant subtrees dirty. Mirror that
+            // fact into renderable bounds before transform dirty flags are cleared.
+            const uint32_t denseRenderableCount = renderables.DenseCount();
+            for (uint32_t i = 0; i < denseRenderableCount; ++i)
+            {
+                const EntityHandle entity = renderables.OwnerAtDenseIndex(i);
+                if (entity.IsValid()
+                    && transforms.Has(entity)
+                    && transforms.IsDirty(entity))
+                {
+                    (void)renderables.MarkWorldBoundsDirty(entity);
+                }
+            }
+
+            transforms.Update();
+
+            // Rebuild only bounds caches that are dirty. Entities with a
+            // Renderable but no Transform are legal but not render-extractable.
+            for (uint32_t i = 0; i < denseRenderableCount; ++i)
+            {
+                const EntityHandle entity = renderables.OwnerAtDenseIndex(i);
+                if (!entity.IsValid() || !transforms.Has(entity))
+                    continue;
+
+                Mat4 world{};
+                if (transforms.GetWorldMatrix(entity, world))
+                    (void)renderables.UpdateWorldBounds(entity, world);
+            }
+        }
+
+        [[nodiscard]] Mat4 BuildViewProjection(
+            uint32_t viewportW,
+            uint32_t viewportH,
+            Vec3& outEye)
+        {
+            const float aspect =
+                viewportW > 0 && viewportH > 0
+                    ? static_cast<float>(viewportW) / static_cast<float>(viewportH)
+                    : defaultAspect;
+
+            const EntityHandle active = cameras.ActiveCamera();
+            if (active.IsValid())
+            {
+                (void)cameras.SetAspect(active, aspect);
+
+                Mat4 view{};
+                Mat4 projection{};
+                Mat4 viewProjection{};
+
+                if (cameras.RebuildActive(view, projection, viewProjection))
+                {
+                    Mat4 world{};
+                    if (transforms.GetWorldMatrix(active, world))
+                    {
+                        outEye = Vec3{
+                            world.m[12],
+                            world.m[13],
+                            world.m[14]
+                        };
+                    }
+
+                    return viewProjection;
+                }
+            }
+
+            // Compatibility fallback for runtime paths that have not selected a
+            // CameraComponent yet. This matches the old World default eye.
+            outEye = Vec3{ 0.0f, 0.0f, -5.0f };
+
+            const Mat4 view = LookToLH(
+                outEye,
+                Vec3{ 0.0f, 0.0f, 1.0f },
+                Vec3{ 0.0f, 1.0f, 0.0f });
+
+            const Mat4 projection = PerspectiveFovLH(
+                defaultFovY,
+                aspect,
+                defaultNearZ,
+                defaultFarZ);
+
+            return Mul(projection, view);
+        }
+    };
+
+    World::~World()
+    {
+        Shutdown();
+    }
+
+    bool World::Init(IAllocator& persistentAlloc)
+    {
+        if (impl_)
+            return true;
+
+        void* memory =
+            persistentAlloc.Allocate(sizeof(Impl), alignof(Impl));
+        if (!memory)
+            return false;
+
+        impl_ = new (memory) Impl{};
+
+        if (!impl_->Init(persistentAlloc))
+        {
+            impl_->Shutdown();
+            impl_->~Impl();
+            persistentAlloc.Deallocate(impl_);
+            impl_ = nullptr;
+
+            NOC_LOG_ERROR("World", "%s", "World ECS initialization failed");
+            return false;
+        }
+
+        lastStats_ = {};
+        cullingMaxDistance_ = 0.0f;
+        cullingEnabled_ = true;
+        debugCullDump_ = false;
+
+        NOC_LOG_INFO(
+            "World",
+            "%s",
+            "World initialized with Phase 15 entity/component runtime");
+        return true;
+    }
+
+    void World::Shutdown()
+    {
+        if (!impl_)
+            return;
+
+        IAllocator* allocator = impl_->allocator;
+        impl_->Shutdown();
+        impl_->~Impl();
+        allocator->Deallocate(impl_);
+        impl_ = nullptr;
+
+        lastStats_ = {};
+        debugCullDump_ = false;
+
+        NOC_LOG_INFO("World", "%s", "World shutdown");
+    }
+
+    void World::Update()
+    {
+        if (!impl_)
+            return;
+
+        impl_->UpdateDerivedState();
+    }
+
+    EntityHandle World::CreateEntity()
+    {
+        if (!impl_)
+            return EntityHandle::Invalid();
+
+        return impl_->entities.Create();
+    }
+
+    bool World::DestroyEntity(EntityHandle entity)
+    {
+        if (!impl_ || !impl_->entities.IsAlive(entity))
+            return false;
+
+        // Component teardown occurs while entity identity is still alive because
+        // individual systems validate EntityRegistry before structural mutation.
+        if (impl_->cameras.Has(entity))
+            (void)impl_->cameras.Remove(entity);
+
+        if (impl_->renderables.Has(entity))
+            (void)impl_->renderables.Remove(entity);
+
+        if (impl_->names.Has(entity))
+            (void)impl_->names.Remove(entity);
+
+        if (impl_->transforms.Has(entity))
+            (void)impl_->transforms.Remove(entity);
+
+        return impl_->entities.Destroy(entity);
+    }
+
+    bool World::IsAlive(EntityHandle entity) const
+    {
+        return impl_ && impl_->entities.IsAlive(entity);
+    }
+
+    uint32_t World::AliveCount() const
+    {
+        return impl_ ? impl_->entities.AliveCount() : 0u;
+    }
+
+    uint32_t World::EntityCapacity() const
+    {
+        return impl_ ? impl_->entities.Capacity() : 0u;
+    }
+
+    EntityHandle World::EntityAtIndex(uint32_t index) const
+    {
+        return impl_
+            ? impl_->entities.EntityAtIndex(index)
+            : EntityHandle::Invalid();
+    }
+
+    SceneObjectHandle World::CreateObject()
+    {
+        const EntityHandle entity = CreateEntity();
+        if (!entity.IsValid())
+            return EntityHandle::Invalid();
+
+        if (!AddTransform(entity))
+        {
+            (void)DestroyEntity(entity);
+            return EntityHandle::Invalid();
+        }
+
+        return entity;
+    }
+
+    void World::DestroyObject(SceneObjectHandle entity)
+    {
+        (void)DestroyEntity(entity);
+    }
+
+    bool World::AddTransform(EntityHandle entity)
+    {
+        return impl_
+            && impl_->entities.IsAlive(entity)
+            && impl_->transforms.Add(entity) != nullptr;
+    }
+
+    bool World::RemoveTransform(EntityHandle entity)
+    {
+        if (!impl_ || !impl_->entities.IsAlive(entity))
+            return false;
+
+        if (impl_->cameras.ActiveCamera() == entity)
+            impl_->cameras.ClearActive();
+
+        return impl_->transforms.Remove(entity);
+    }
+
+    const TransformComponent* World::GetTransform(EntityHandle entity) const
+    {
+        if (!impl_ || !impl_->entities.IsAlive(entity))
+            return nullptr;
+
+        return impl_->transforms.Get(entity);
+    }
+
+    bool World::SetLocalTRS(
+        SceneObjectHandle entity,
+        const Vec3& translation,
+        const Quat& rotation,
+        const Vec3& scale)
+    {
+        if (!impl_)
+            return false;
+
+        return impl_->transforms.SetLocalTRS(
+            entity,
+            translation,
+            rotation,
+            scale);
+    }
+
+    bool World::SetParent(
+        SceneObjectHandle child,
+        SceneObjectHandle parent)
+    {
+        if (!impl_ || !impl_->entities.IsAlive(child))
+            return false;
+
+        // Compatibility with Phase 14: any invalid/dead parent means detach.
+        const EntityHandle targetParent =
+            impl_->entities.IsAlive(parent)
+                ? parent
+                : EntityHandle::Invalid();
+
+        return impl_->transforms.SetParent(child, targetParent);
+    }
+
+    Mat4 World::GetWorldMatrix(SceneObjectHandle entity)
+    {
+        Mat4 world = Mat4::Identity();
+
+        if (!impl_)
+            return world;
+
+        if (!impl_->transforms.GetWorldMatrix(entity, world))
+            return Mat4::Identity();
+
+        return world;
+    }
+
+    bool World::AddRenderable(
+        EntityHandle entity,
+        ResourceHandle mesh,
+        const AABB& localBounds)
+    {
+        if (!impl_ || !impl_->entities.IsAlive(entity))
+            return false;
+
+        if (!impl_->renderables.Add(entity))
+            return false;
+
+        if (!impl_->renderables.SetMesh(entity, mesh)
+            || !impl_->renderables.SetLocalBounds(entity, localBounds))
+        {
+            (void)impl_->renderables.Remove(entity);
+            return false;
+        }
+
+        return true;
+    }
+
+    bool World::RemoveRenderable(EntityHandle entity)
+    {
+        return impl_
+            && impl_->entities.IsAlive(entity)
+            && impl_->renderables.Remove(entity);
+    }
+
+    const RenderableComponent* World::GetRenderable(EntityHandle entity) const
+    {
+        if (!impl_)
+            return nullptr;
+
+        return impl_->renderables.Get(entity);
+    }
+
+    bool World::SetRenderable(
+        SceneObjectHandle entity,
+        ResourceHandle mesh,
+        const AABB& localBounds)
+    {
+        if (!impl_ || !impl_->entities.IsAlive(entity))
+            return false;
+
+        if (!impl_->renderables.Has(entity))
+            return AddRenderable(entity, mesh, localBounds);
+
+        return impl_->renderables.SetMesh(entity, mesh)
+            && impl_->renderables.SetLocalBounds(entity, localBounds);
+    }
+
+    bool World::SetRenderableEnabled(EntityHandle entity, bool enabled)
+    {
+        return impl_
+            && impl_->renderables.SetEnabled(entity, enabled);
+    }
+
+    bool World::AddCamera(EntityHandle entity)
+    {
+        return impl_
+            && impl_->entities.IsAlive(entity)
+            && impl_->cameras.Add(entity) != nullptr;
+    }
+
+    bool World::RemoveCamera(EntityHandle entity)
+    {
+        return impl_
+            && impl_->entities.IsAlive(entity)
+            && impl_->cameras.Remove(entity);
+    }
+
+    const CameraComponent* World::GetCamera(EntityHandle entity) const
+    {
+        if (!impl_)
+            return nullptr;
+
+        return impl_->cameras.Get(entity);
+    }
+
+    bool World::SetCameraParams(
+        float fovYRadians,
+        float aspect,
+        float nearZ,
+        float farZ)
+    {
+        if (!impl_
+            || !IsValidPerspective(
+                fovYRadians,
+                aspect,
+                nearZ,
+                farZ))
+        {
+            return false;
+        }
+
+        impl_->defaultFovY = fovYRadians;
+        impl_->defaultAspect = aspect;
+        impl_->defaultNearZ = nearZ;
+        impl_->defaultFarZ = farZ;
+
+        const EntityHandle active = impl_->cameras.ActiveCamera();
+        if (!active.IsValid())
+            return true;
+
+        return impl_->cameras.SetPerspective(
+            active,
+            fovYRadians,
+            aspect,
+            nearZ,
+            farZ);
+    }
+
+    bool World::SetCameraFromObject(SceneObjectHandle entity)
+    {
+        if (!impl_
+            || !impl_->entities.IsAlive(entity)
+            || !impl_->transforms.Has(entity))
+        {
+            return false;
+        }
+
+        if (!impl_->cameras.Has(entity))
+        {
+            if (!impl_->cameras.Add(entity))
+                return false;
+        }
+
+        if (!impl_->cameras.SetPerspective(
+                entity,
+                impl_->defaultFovY,
+                impl_->defaultAspect,
+                impl_->defaultNearZ,
+                impl_->defaultFarZ))
+        {
+            return false;
+        }
+
+        return impl_->cameras.SetActive(entity);
+    }
+
+    EntityHandle World::ActiveCamera() const
+    {
+        return impl_
+            ? impl_->cameras.ActiveCamera()
+            : EntityHandle::Invalid();
+    }
+
+    bool World::AddName(EntityHandle entity, const char* name)
+    {
+        return impl_
+            && impl_->entities.IsAlive(entity)
+            && impl_->names.Add(entity, name) != nullptr;
+    }
+
+    bool World::RemoveName(EntityHandle entity)
+    {
+        return impl_
+            && impl_->entities.IsAlive(entity)
+            && impl_->names.Remove(entity);
+    }
+
+    bool World::SetName(EntityHandle entity, const char* name)
+    {
+        return impl_ && impl_->names.SetName(entity, name);
+    }
+
+    const NameComponent* World::GetName(EntityHandle entity) const
+    {
+        if (!impl_)
+            return nullptr;
+
+        return impl_->names.Get(entity);
+    }
+
+    const ComponentTypeMetadata* World::FindComponentType(
+        ComponentTypeId typeId) const
+    {
+        return impl_
+            ? impl_->componentTypes.Find(typeId)
+            : nullptr;
+    }
+
+    void World::SetCullingMaxDistance(float meters)
+    {
+        cullingMaxDistance_ = meters < 0.0f ? 0.0f : meters;
+    }
+
+    RenderQueue World::BuildRenderQueue(
+        LinearArena& frameArena,
+        uint32_t viewportW,
+        uint32_t viewportH)
+    {
+        RenderQueue queue{};
+
+        if (!impl_)
+            return queue;
+
+        impl_->UpdateDerivedState();
+
+        Vec3 eye{};
+        const Mat4 viewProjection =
+            impl_->BuildViewProjection(viewportW, viewportH, eye);
+        const Frustum frustum = FrustumFromViewProj(viewProjection);
+
+        queue.view.viewProj = viewProjection;
+        queue.view.viewportWidth = viewportW;
+        queue.view.viewportHeight = viewportH;
+
+        uint32_t visibleCount = 0;
+        uint32_t totalCount = 0;
+
+        const uint32_t capacity = impl_->entities.Capacity();
+
+        for (uint32_t index = 0; index < capacity; ++index)
+        {
+            const EntityHandle entity =
+                impl_->entities.EntityAtIndex(index);
+            if (!entity.IsValid())
+                continue;
+
+            const RenderableComponent* renderable =
+                impl_->renderables.Get(entity);
+            const TransformComponent* transform =
+                impl_->transforms.Get(entity);
+
+            if (!renderable
+                || !transform
+                || !renderable->enabled)
+            {
+                continue;
+            }
+
+            ++totalCount;
+
+            bool keep = true;
+            bool frustumHit = true;
+            bool distanceHit = true;
+
+            if (cullingEnabled_)
+            {
+                frustumHit =
+                    AabbIntersectsFrustum(
+                        renderable->worldBounds,
+                        frustum);
+
+                distanceHit =
+                    !AabbBeyondDistance(
+                        renderable->worldBounds,
+                        eye,
+                        cullingMaxDistance_);
+
+                keep = frustumHit && distanceHit;
+            }
+
+            if (debugCullDump_)
+            {
+                const AABB& bounds = renderable->worldBounds;
+
+                NOC_LOG_INFO(
+                    "World",
+                    "CullDump entity=%u:%u keep=%s frustum=%s distance=%s "
+                    "bounds min(%.2f %.2f %.2f) max(%.2f %.2f %.2f)",
+                    entity.index,
+                    entity.generation,
+                    keep ? "YES" : "NO",
+                    frustumHit ? "YES" : "NO",
+                    distanceHit ? "YES" : "NO",
+                    bounds.min.x,
+                    bounds.min.y,
+                    bounds.min.z,
+                    bounds.max.x,
+                    bounds.max.y,
+                    bounds.max.z);
+            }
+
+            if (keep)
+                ++visibleCount;
+        }
+
+        queue.totalRenderables = totalCount;
+
+        if (visibleCount == 0)
+        {
+            lastStats_.visible = 0;
+            lastStats_.total = totalCount;
+
+            if (debugCullDump_)
+            {
+                NOC_LOG_INFO(
+                    "World",
+                    "CullDump summary: visible=%u total=%u (culling=%s)",
+                    lastStats_.visible,
+                    lastStats_.total,
+                    cullingEnabled_ ? "ON" : "OFF");
+                debugCullDump_ = false;
+            }
+
+            return queue;
+        }
+
+        void* memory =
+            frameArena.Allocate(
+                sizeof(RenderInstance) * visibleCount,
+                alignof(RenderInstance));
+
+        if (!memory)
+        {
+            lastStats_.visible = 0;
+            lastStats_.total = totalCount;
+
+            NOC_LOG_ERROR(
+                "World",
+                "Render extraction failed: FrameArena could not allocate %zu bytes",
+                sizeof(RenderInstance)
+                    * static_cast<std::size_t>(visibleCount));
+
+            debugCullDump_ = false;
+            return queue;
+        }
+
+        auto* instances =
+            static_cast<RenderInstance*>(memory);
+
+        uint32_t writeIndex = 0;
+
+        // Deterministic entity-index order. Dense component swap-remove does not
+        // affect renderer submission order.
+        for (uint32_t index = 0; index < capacity; ++index)
+        {
+            const EntityHandle entity =
+                impl_->entities.EntityAtIndex(index);
+            if (!entity.IsValid())
+                continue;
+
+            const RenderableComponent* renderable =
+                impl_->renderables.Get(entity);
+            const TransformComponent* transform =
+                impl_->transforms.Get(entity);
+
+            if (!renderable
+                || !transform
+                || !renderable->enabled)
+            {
+                continue;
+            }
+
+            bool keep = true;
+
+            if (cullingEnabled_)
+            {
+                keep =
+                    AabbIntersectsFrustum(
+                        renderable->worldBounds,
+                        frustum)
+                    && !AabbBeyondDistance(
+                        renderable->worldBounds,
+                        eye,
+                        cullingMaxDistance_);
+            }
+
+            if (!keep)
+                continue;
+
+            instances[writeIndex].mesh = renderable->mesh;
+            instances[writeIndex].world = transform->world;
+            ++writeIndex;
+        }
+
+        queue.instances = instances;
+        queue.instanceCount = writeIndex;
+
+        lastStats_.visible = writeIndex;
+        lastStats_.total = totalCount;
+
+        if (debugCullDump_)
+        {
+            NOC_LOG_INFO(
+                "World",
+                "CullDump summary: visible=%u total=%u (culling=%s)",
+                lastStats_.visible,
+                lastStats_.total,
+                cullingEnabled_ ? "ON" : "OFF");
+            debugCullDump_ = false;
+        }
+
+        return queue;
+    }
+
+    const WorldStats& World::GetLastStats() const
+    {
+        return lastStats_;
+    }
+
+    void World::DebugRequestCullDump()
+    {
+        debugCullDump_ = true;
+    }
 }
