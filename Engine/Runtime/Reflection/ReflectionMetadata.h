@@ -205,6 +205,33 @@ namespace noc
         return result;
     }
 
+    struct ReflectedConstValueView
+    {
+        TypeId typeId{};
+        const void* data = nullptr;
+
+        [[nodiscard]] bool IsValid() const noexcept
+        {
+            return typeId.IsValid() && data != nullptr;
+        }
+    };
+
+    struct ReflectedValueView
+    {
+        TypeId typeId{};
+        void* data = nullptr;
+
+        [[nodiscard]] bool IsValid() const noexcept
+        {
+            return typeId.IsValid() && data != nullptr;
+        }
+
+        [[nodiscard]] ReflectedConstValueView Const() const noexcept
+        {
+            return ReflectedConstValueView{ typeId, data };
+        }
+    };
+
     struct TypeLifecycleOperations
     {
         void (*defaultConstruct)(void* destination) = nullptr;
@@ -313,6 +340,40 @@ namespace noc
         ContainerResizeFn resize = nullptr;
         ContainerInsertDefaultFn insertDefault = nullptr;
         ContainerRemoveFn remove = nullptr;
+    };
+
+    struct FunctionInvocationContext
+    {
+        const void* object = nullptr;
+        void* mutableObject = nullptr;
+        void* userContext = nullptr;
+    };
+
+    struct FunctionParameterMetadata
+    {
+        const char* canonicalName = nullptr;
+        TypeId typeId{};
+    };
+
+    using FunctionInvokeFn = bool (*)(
+        FunctionInvocationContext& context,
+        const ReflectedConstValueView* arguments,
+        uint32_t argumentCount,
+        ReflectedValueView returnValue);
+
+    struct FunctionMetadata
+    {
+        FunctionId functionId{};
+        const char* canonicalName = nullptr;
+        TypeId ownerTypeId{};
+
+        // Invalid TypeId means void return.
+        TypeId returnTypeId{};
+
+        FunctionFlags flags = FunctionFlags::None;
+        const FunctionParameterMetadata* parameters = nullptr;
+        uint32_t parameterCount = 0;
+        FunctionInvokeFn invoke = nullptr;
     };
 
     template <typename Enum>
@@ -511,6 +572,9 @@ namespace noc
         const AttributeMetadata* attributes = nullptr;
         uint32_t attributeCount = 0;
 
+        const FunctionMetadata* functions = nullptr;
+        uint32_t functionCount = 0;
+
         const EnumMetadata* enumMetadata = nullptr;
         const ContainerMetadata* containerMetadata = nullptr;
     };
@@ -532,6 +596,8 @@ namespace noc
             static_cast<uint32_t>(alignof(T)),
             flags,
             MakeTypeLifecycleOperations<T>(),
+            nullptr,
+            0,
             nullptr,
             0,
             nullptr,

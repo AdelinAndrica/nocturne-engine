@@ -240,6 +240,90 @@ namespace noc
             return ReflectionRegistryError::None;
         }
 
+        [[nodiscard]] ReflectionRegistryError ValidateFunctions(
+            const TypeMetadata& metadata) noexcept
+        {
+            if (metadata.functionCount == 0)
+            {
+                return metadata.functions == nullptr
+                    ? ReflectionRegistryError::None
+                    : ReflectionRegistryError::InvalidFunctionMetadata;
+            }
+
+            if (!metadata.functions)
+                return ReflectionRegistryError::InvalidFunctionMetadata;
+
+            for (uint32_t i = 0; i < metadata.functionCount; ++i)
+            {
+                const FunctionMetadata& function = metadata.functions[i];
+                const bool isStatic =
+                    HasFlag(function.flags, FunctionFlags::Static);
+                const bool isMember =
+                    HasFlag(function.flags, FunctionFlags::Member);
+
+                if (!function.functionId.IsValid()
+                    || !function.canonicalName
+                    || function.canonicalName[0] == '\0'
+                    || function.ownerTypeId != metadata.typeId
+                    || !function.invoke
+                    || isStatic == isMember
+                    || (isStatic
+                        && HasFlag(function.flags, FunctionFlags::Const)))
+                {
+                    return ReflectionRegistryError::InvalidFunctionMetadata;
+                }
+
+                if (function.parameterCount == 0)
+                {
+                    if (function.parameters)
+                        return ReflectionRegistryError::InvalidFunctionMetadata;
+                }
+                else
+                {
+                    if (!function.parameters)
+                        return ReflectionRegistryError::InvalidFunctionMetadata;
+
+                    for (uint32_t p = 0; p < function.parameterCount; ++p)
+                    {
+                        const FunctionParameterMetadata& parameter =
+                            function.parameters[p];
+                        if (!parameter.canonicalName
+                            || parameter.canonicalName[0] == '\0'
+                            || !parameter.typeId.IsValid())
+                        {
+                            return ReflectionRegistryError::InvalidFunctionMetadata;
+                        }
+
+                        for (uint32_t q = 0; q < p; ++q)
+                        {
+                            if (std::strcmp(
+                                    function.parameters[q].canonicalName,
+                                    parameter.canonicalName) == 0)
+                            {
+                                return ReflectionRegistryError::
+                                    DuplicateFunctionParameterName;
+                            }
+                        }
+                    }
+                }
+
+                for (uint32_t j = 0; j < i; ++j)
+                {
+                    if (metadata.functions[j].functionId == function.functionId)
+                        return ReflectionRegistryError::DuplicateFunctionId;
+                    if (std::strcmp(
+                            metadata.functions[j].canonicalName,
+                            function.canonicalName) == 0)
+                    {
+                        return ReflectionRegistryError::
+                            DuplicateFunctionCanonicalName;
+                    }
+                }
+            }
+
+            return ReflectionRegistryError::None;
+        }
+
         [[nodiscard]] ReflectionRegistryError ValidateTypeIntrinsic(
             const TypeMetadata& metadata) noexcept
         {
@@ -297,6 +381,11 @@ namespace noc
                     }
                 }
             }
+
+            const ReflectionRegistryError functionError =
+                ValidateFunctions(metadata);
+            if (functionError != ReflectionRegistryError::None)
+                return functionError;
 
             const ReflectionRegistryError enumError =
                 ValidateEnumIntrinsic(metadata);
@@ -396,6 +485,42 @@ namespace noc
             IAllocator& allocator,
             TypeMetadata& metadata)
         {
+            if (metadata.functions)
+            {
+                auto* functions =
+                    const_cast<FunctionMetadata*>(metadata.functions);
+                for (uint32_t i = 0; i < metadata.functionCount; ++i)
+                {
+                    if (functions[i].parameters)
+                    {
+                        auto* parameters =
+                            const_cast<FunctionParameterMetadata*>(
+                                functions[i].parameters);
+                        for (uint32_t p = 0;
+                             p < functions[i].parameterCount;
+                             ++p)
+                        {
+                            if (parameters[p].canonicalName)
+                            {
+                                allocator.Deallocate(
+                                    const_cast<char*>(
+                                        parameters[p].canonicalName));
+                            }
+                        }
+                        allocator.Deallocate(parameters);
+                    }
+
+                    if (functions[i].canonicalName)
+                    {
+                        allocator.Deallocate(
+                            const_cast<char*>(functions[i].canonicalName));
+                    }
+                }
+                allocator.Deallocate(functions);
+                metadata.functions = nullptr;
+                metadata.functionCount = 0;
+            }
+
             if (metadata.containerMetadata)
             {
                 auto* containerMetadata =
@@ -473,6 +598,8 @@ namespace noc
             destination.propertyCount = 0;
             destination.attributes = nullptr;
             destination.attributeCount = 0;
+            destination.functions = nullptr;
+            destination.functionCount = 0;
             destination.enumMetadata = nullptr;
             destination.containerMetadata = nullptr;
 
@@ -529,6 +656,79 @@ namespace noc
                     {
                         DestroyOwnedMetadata(allocator, destination);
                         return false;
+                    }
+                }
+            }
+
+            if (source.functionCount > 0)
+            {
+                auto* functions = static_cast<FunctionMetadata*>(
+                    allocator.Allocate(
+                        sizeof(FunctionMetadata) * source.functionCount,
+                        alignof(FunctionMetadata)));
+                if (!functions)
+                {
+                    DestroyOwnedMetadata(allocator, destination);
+                    return false;
+                }
+
+                for (uint32_t i = 0; i < source.functionCount; ++i)
+                    new (functions + i) FunctionMetadata{};
+
+                destination.functions = functions;
+                destination.functionCount = source.functionCount;
+
+                for (uint32_t i = 0; i < source.functionCount; ++i)
+                {
+                    functions[i] = source.functions[i];
+                    functions[i].canonicalName = nullptr;
+                    functions[i].parameters = nullptr;
+
+                    functions[i].canonicalName =
+                        CopyString(allocator, source.functions[i].canonicalName);
+                    if (!functions[i].canonicalName)
+                    {
+                        DestroyOwnedMetadata(allocator, destination);
+                        return false;
+                    }
+
+                    if (source.functions[i].parameterCount > 0)
+                    {
+                        auto* parameters =
+                            static_cast<FunctionParameterMetadata*>(
+                                allocator.Allocate(
+                                    sizeof(FunctionParameterMetadata)
+                                        * source.functions[i].parameterCount,
+                                    alignof(FunctionParameterMetadata)));
+                        if (!parameters)
+                        {
+                            DestroyOwnedMetadata(allocator, destination);
+                            return false;
+                        }
+
+                        for (uint32_t p = 0;
+                             p < source.functions[i].parameterCount;
+                             ++p)
+                        {
+                            new (parameters + p)
+                                FunctionParameterMetadata(
+                                    source.functions[i].parameters[p]);
+                            parameters[p].canonicalName = nullptr;
+                            parameters[p].canonicalName =
+                                CopyString(
+                                    allocator,
+                                    source.functions[i]
+                                        .parameters[p]
+                                        .canonicalName);
+                            if (!parameters[p].canonicalName)
+                            {
+                                functions[i].parameters = parameters;
+                                DestroyOwnedMetadata(allocator, destination);
+                                return false;
+                            }
+                        }
+
+                        functions[i].parameters = parameters;
                     }
                 }
             }
@@ -823,6 +1023,29 @@ namespace noc
                 }
             }
 
+            for (uint32_t f = 0; f < metadata.functionCount; ++f)
+            {
+                const FunctionMetadata& function = metadata.functions[f];
+
+                if (function.returnTypeId.IsValid()
+                    && !FindType(function.returnTypeId))
+                {
+                    lastError_ =
+                        ReflectionRegistryError::UnknownFunctionReturnType;
+                    return false;
+                }
+
+                for (uint32_t p = 0; p < function.parameterCount; ++p)
+                {
+                    if (!FindType(function.parameters[p].typeId))
+                    {
+                        lastError_ =
+                            ReflectionRegistryError::UnknownFunctionParameterType;
+                        return false;
+                    }
+                }
+            }
+
             if (metadata.containerMetadata)
             {
                 if (!FindType(metadata.containerMetadata->elementTypeId))
@@ -1043,5 +1266,47 @@ namespace noc
     {
         const TypeMetadata* type = FindType(typeId);
         return type ? type->containerMetadata : nullptr;
+    }
+
+    const FunctionMetadata* ReflectionRegistry::FindFunction(
+        TypeId ownerTypeId,
+        FunctionId functionId) const noexcept
+    {
+        if (!functionId.IsValid())
+            return nullptr;
+
+        const TypeMetadata* type = FindType(ownerTypeId);
+        if (!type)
+            return nullptr;
+
+        for (uint32_t i = 0; i < type->functionCount; ++i)
+        {
+            if (type->functions[i].functionId == functionId)
+                return &type->functions[i];
+        }
+        return nullptr;
+    }
+
+    const FunctionMetadata* ReflectionRegistry::FindFunctionByName(
+        TypeId ownerTypeId,
+        const char* canonicalName) const noexcept
+    {
+        if (!canonicalName || canonicalName[0] == '\0')
+            return nullptr;
+
+        const TypeMetadata* type = FindType(ownerTypeId);
+        if (!type)
+            return nullptr;
+
+        for (uint32_t i = 0; i < type->functionCount; ++i)
+        {
+            if (std::strcmp(
+                    type->functions[i].canonicalName,
+                    canonicalName) == 0)
+            {
+                return &type->functions[i];
+            }
+        }
+        return nullptr;
     }
 }

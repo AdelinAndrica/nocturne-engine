@@ -35,6 +35,12 @@ namespace noc
         DuplicateAttributeKind,
         InvalidContainerMetadata,
         UnknownContainerElementType,
+        InvalidFunctionMetadata,
+        DuplicateFunctionId,
+        DuplicateFunctionCanonicalName,
+        DuplicateFunctionParameterName,
+        UnknownFunctionParameterType,
+        UnknownFunctionReturnType,
         AllocationFailure,
         ValidationFailure
     };
@@ -62,6 +68,12 @@ namespace noc
         case ReflectionRegistryError::DuplicateAttributeKind: return "DuplicateAttributeKind";
         case ReflectionRegistryError::InvalidContainerMetadata: return "InvalidContainerMetadata";
         case ReflectionRegistryError::UnknownContainerElementType: return "UnknownContainerElementType";
+        case ReflectionRegistryError::InvalidFunctionMetadata: return "InvalidFunctionMetadata";
+        case ReflectionRegistryError::DuplicateFunctionId: return "DuplicateFunctionId";
+        case ReflectionRegistryError::DuplicateFunctionCanonicalName: return "DuplicateFunctionCanonicalName";
+        case ReflectionRegistryError::DuplicateFunctionParameterName: return "DuplicateFunctionParameterName";
+        case ReflectionRegistryError::UnknownFunctionParameterType: return "UnknownFunctionParameterType";
+        case ReflectionRegistryError::UnknownFunctionReturnType: return "UnknownFunctionReturnType";
         case ReflectionRegistryError::AllocationFailure: return "AllocationFailure";
         case ReflectionRegistryError::ValidationFailure: return "ValidationFailure";
         }
@@ -129,6 +141,13 @@ namespace noc
 
         [[nodiscard]] const ContainerMetadata* FindContainer(
             TypeId typeId) const noexcept;
+
+        [[nodiscard]] const FunctionMetadata* FindFunction(
+            TypeId ownerTypeId,
+            FunctionId functionId) const noexcept;
+        [[nodiscard]] const FunctionMetadata* FindFunctionByName(
+            TypeId ownerTypeId,
+            const char* canonicalName) const noexcept;
 
     private:
         struct Impl;

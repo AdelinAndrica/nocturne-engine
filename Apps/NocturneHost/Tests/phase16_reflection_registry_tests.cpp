@@ -2,6 +2,7 @@
 #include "Runtime/Reflection/ReflectionRegistry.h"
 #include "Runtime/Reflection/ReflectedValue.h"
 #include "Runtime/Reflection/PropertyAccess.h"
+#include "Runtime/Reflection/FunctionInvocation.h"
 
 #include "Core/Math/MathTypes.h"
 #include "Runtime/Bounds.h"
@@ -196,6 +197,53 @@ namespace
         for (uint32_t i = index; i + 1u < sequence->count; ++i)
             sequence->values[i] = sequence->values[i + 1u];
         --sequence->count;
+        return true;
+    }
+
+    struct FunctionOwner
+    {
+        int base = 0;
+    };
+
+    bool InvokeAddWithBase(
+        noc::FunctionInvocationContext& context,
+        const noc::ReflectedConstValueView* arguments,
+        uint32_t argumentCount,
+        noc::ReflectedValueView returnValue)
+    {
+        const void* object =
+            context.object ? context.object : context.mutableObject;
+        if (!object
+            || !arguments
+            || argumentCount != 2
+            || !returnValue.IsValid())
+        {
+            return false;
+        }
+
+        const auto* owner = static_cast<const FunctionOwner*>(object);
+        const int a = *static_cast<const int*>(arguments[0].data);
+        const int b = *static_cast<const int*>(arguments[1].data);
+        *static_cast<int*>(returnValue.data) = owner->base + a + b;
+        return true;
+    }
+
+    bool InvokeSetBase(
+        noc::FunctionInvocationContext& context,
+        const noc::ReflectedConstValueView* arguments,
+        uint32_t argumentCount,
+        noc::ReflectedValueView returnValue)
+    {
+        if (!context.mutableObject
+            || !arguments
+            || argumentCount != 1
+            || returnValue.IsValid())
+        {
+            return false;
+        }
+
+        static_cast<FunctionOwner*>(context.mutableObject)->base =
+            *static_cast<const int*>(arguments[0].data);
         return true;
     }
 
@@ -796,6 +844,186 @@ bool RunPhase16ReflectionRegistryTests()
     ok &= CheckReflectionRegistry(
         allocator.OutstandingBytes() == 0,
         "Invalid enum Freeze path leaked allocator memory");
+
+    {
+        noc::ReflectionRegistry functionRegistry;
+        ok &= CheckReflectionRegistry(
+            functionRegistry.Init(allocator, 2),
+            "Function registry init failed");
+
+        constexpr noc::TypeId kFunctionInt{ 0x3300000000000001ull };
+        constexpr noc::TypeId kFunctionOwner{ 0x3300000000000002ull };
+
+        const noc::TypeMetadata functionInt =
+            noc::MakeTypeMetadata<int>(
+                kFunctionInt,
+                "Nocturne.Tests.FunctionInt",
+                noc::TypeKind::SignedInteger,
+                1);
+
+        char mutableParameterName[] = "a";
+        const noc::FunctionParameterMetadata addParameters[] = {
+            { mutableParameterName, kFunctionInt },
+            { "b", kFunctionInt }
+        };
+        const noc::FunctionParameterMetadata setParameters[] = {
+            { "value", kFunctionInt }
+        };
+
+        const noc::FunctionMetadata functions[] = {
+            {
+                noc::MakeFunctionId(
+                    "Nocturne.Tests.FunctionOwner.AddWithBase"),
+                "AddWithBase",
+                kFunctionOwner,
+                kFunctionInt,
+                noc::FunctionFlags::Member
+                    | noc::FunctionFlags::Const,
+                addParameters,
+                2,
+                &InvokeAddWithBase
+            },
+            {
+                noc::MakeFunctionId(
+                    "Nocturne.Tests.FunctionOwner.SetBase"),
+                "SetBase",
+                kFunctionOwner,
+                noc::TypeId::Invalid(),
+                noc::FunctionFlags::Member,
+                setParameters,
+                1,
+                &InvokeSetBase
+            }
+        };
+
+        noc::TypeMetadata ownerType =
+            noc::MakeTypeMetadata<FunctionOwner>(
+                kFunctionOwner,
+                "Nocturne.Tests.FunctionOwner",
+                noc::TypeKind::Struct,
+                1);
+        ownerType.functions = functions;
+        ownerType.functionCount = 2;
+
+        ok &= CheckReflectionRegistry(
+            functionRegistry.RegisterType(ownerType)
+                && functionRegistry.RegisterType(functionInt)
+                && functionRegistry.Freeze(),
+            "Function reflection schema failed");
+
+        mutableParameterName[0] = 'X';
+
+        const noc::FunctionMetadata* addFunction =
+            functionRegistry.FindFunctionByName(
+                kFunctionOwner,
+                "AddWithBase");
+        const noc::FunctionMetadata* setFunction =
+            functionRegistry.FindFunction(
+                kFunctionOwner,
+                noc::MakeFunctionId(
+                    "Nocturne.Tests.FunctionOwner.SetBase"));
+
+        ok &= CheckReflectionRegistry(
+            addFunction
+                && std::strcmp(
+                    addFunction->parameters[0].canonicalName,
+                    "a") == 0
+                && setFunction,
+            "Function metadata ownership/lookup failed");
+
+        FunctionOwner owner{};
+        owner.base = 10;
+        noc::FunctionInvocationContext functionContext{};
+        functionContext.object = &owner;
+
+        int a = 2;
+        int b = 3;
+        const noc::ReflectedConstValueView addArguments[] = {
+            { kFunctionInt, &a },
+            { kFunctionInt, &b }
+        };
+
+        noc::OwnedReflectedValue result;
+        ok &= CheckReflectionRegistry(
+            noc::InvokeReflectedFunction(
+                functionRegistry,
+                *addFunction,
+                functionContext,
+                addArguments,
+                2,
+                &allocator,
+                &result)
+                == noc::FunctionInvokeStatus::Success
+                && *static_cast<const int*>(result.Data()) == 15,
+            "Generic reflected function invocation failed");
+        result.Clear();
+
+        ok &= CheckReflectionRegistry(
+            noc::InvokeReflectedFunction(
+                functionRegistry,
+                *addFunction,
+                functionContext,
+                addArguments,
+                1,
+                &allocator,
+                &result)
+                == noc::FunctionInvokeStatus::ArgumentCountMismatch,
+            "Function invocation did not reject argument count mismatch");
+
+        const noc::ReflectedConstValueView wrongArgument{
+            kFunctionOwner,
+            &a
+        };
+        ok &= CheckReflectionRegistry(
+            noc::InvokeReflectedFunction(
+                functionRegistry,
+                *addFunction,
+                functionContext,
+                &wrongArgument,
+                1,
+                &allocator,
+                &result)
+                == noc::FunctionInvokeStatus::ArgumentCountMismatch,
+            "Function count validation ordering changed unexpectedly");
+
+        noc::FunctionInvocationContext mutatingContext{};
+        int newBase = 21;
+        const noc::ReflectedConstValueView setArgument{
+            kFunctionInt,
+            &newBase
+        };
+
+        ok &= CheckReflectionRegistry(
+            noc::InvokeReflectedFunction(
+                functionRegistry,
+                *setFunction,
+                mutatingContext,
+                &setArgument,
+                1,
+                nullptr,
+                nullptr)
+                == noc::FunctionInvokeStatus::MissingObject,
+            "Non-const member invocation did not require mutable object");
+
+        mutatingContext.mutableObject = &owner;
+        ok &= CheckReflectionRegistry(
+            noc::InvokeReflectedFunction(
+                functionRegistry,
+                *setFunction,
+                mutatingContext,
+                &setArgument,
+                1,
+                nullptr,
+                nullptr)
+                == noc::FunctionInvokeStatus::Success
+                && owner.base == 21,
+            "Void reflected member invocation failed");
+
+        functionRegistry.Shutdown();
+        ok &= CheckReflectionRegistry(
+            allocator.OutstandingBytes() == 0,
+            "Function reflection leaked allocator memory");
+    }
 
     {
         noc::ReflectionRegistry containerRegistry;

@@ -8,33 +8,6 @@
 
 namespace noc
 {
-    struct ReflectedConstValueView
-    {
-        TypeId typeId{};
-        const void* data = nullptr;
-
-        [[nodiscard]] bool IsValid() const noexcept
-        {
-            return typeId.IsValid() && data != nullptr;
-        }
-    };
-
-    struct ReflectedValueView
-    {
-        TypeId typeId{};
-        void* data = nullptr;
-
-        [[nodiscard]] bool IsValid() const noexcept
-        {
-            return typeId.IsValid() && data != nullptr;
-        }
-
-        [[nodiscard]] ReflectedConstValueView Const() const noexcept
-        {
-            return ReflectedConstValueView{ typeId, data };
-        }
-    };
-
     // Allocator-owned generic reflected value.
     //
     // Design choice (not directly from the book): the value snapshots the
