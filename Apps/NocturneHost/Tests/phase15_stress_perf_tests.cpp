@@ -2,6 +2,9 @@
 #include "Runtime/NameSystem.h"
 #include "Runtime/TransformSystem.h"
 #include "Runtime/World.h"
+#include "Runtime/Reflection/BuiltinTypes.h"
+#include "Runtime/Reflection/FoundationComponents.h"
+#include "Runtime/Reflection/ReflectionRegistry.h"
 
 #include "Core/Log.h"
 #include "Core/Memory/Allocator.h"
@@ -554,10 +557,21 @@ namespace
 
         noc::MallocAllocator backing;
         noc::DebugAlloc allocator(backing);
+        noc::ReflectionRegistry reflection;
         noc::World world;
 
         bool ok = true;
-        ok &= CheckPerf(world.Init(allocator), "Render extraction World init failed");
+        ok &= CheckPerf(
+            reflection.Init(allocator, 32),
+            "Render extraction ReflectionRegistry init failed");
+        ok &= CheckPerf(
+            noc::RegisterBuiltinReflectionTypes(reflection)
+                && noc::RegisterFoundationComponentReflectionTypes(reflection)
+                && reflection.Freeze(),
+            "Render extraction reflected schema setup failed");
+        ok &= CheckPerf(
+            world.Init(allocator, reflection),
+            "Render extraction World init failed");
 
         const noc::ResourceHandle mesh{ 1u, 1u };
         const noc::AABB bounds{
@@ -647,6 +661,7 @@ namespace
             "Render extraction allocated persistent bytes");
 
         world.Shutdown();
+        reflection.Shutdown();
 
         if (frameMemory)
             allocator.Deallocate(frameMemory);
