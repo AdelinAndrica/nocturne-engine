@@ -1,6 +1,7 @@
 #pragma once
 
 #include "EditorCommandHistory.h"
+#include "Core/Math/MathTypes.h"
 #include "EditorReflectionSnapshot.h"
 #include "EditorEntitySnapshot.h"
 #include "Runtime/Entity.h"

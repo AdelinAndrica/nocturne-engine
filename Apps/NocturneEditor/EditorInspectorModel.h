@@ -3,6 +3,7 @@
 #include "EditorCommandHistory.h"
 #include "Runtime/Entity.h"
 #include "Runtime/Reflection/ReflectionIds.h"
+#include "Runtime/Reflection/ReflectedValue.h"
 #include "Runtime/Reflection/ReflectionMetadata.h"
 
 #include <string>
