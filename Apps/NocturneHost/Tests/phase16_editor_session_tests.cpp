@@ -825,8 +825,19 @@ bool RunPhase16EditorSessionTests()
                     reparentChild).IsValid(),
             "Singular-parent reparent was not rejected atomically");
 
-        // Non-uniform target scale + rotated world basis produces shear in
-        // target-local space and therefore cannot be represented as TRS.
+        // Non-uniform target scale + a non-axis-aligned rotated world basis
+        // produces shear in target-local space and cannot be represented as
+        // a pure T*R*S matrix. 90 degrees would only permute scaled axes and
+        // remains representable, so use 45 degrees for the actual shear case.
+        const float shearHalfAngle =
+            0.125f * 3.14159265358979323846f;
+        const noc::Quat z45{
+            0.0f,
+            0.0f,
+            std::sin(shearHalfAngle),
+            std::cos(shearHalfAngle)
+        };
+
         ok &= CheckEditorSession(
             world.SetLocalTRS(
                 newParent,
@@ -836,7 +847,7 @@ bool RunPhase16EditorSessionTests()
                 && world.SetLocalTRS(
                     reparentChild,
                     noc::Vec3::Zero(),
-                    z90,
+                    z45,
                     noc::Vec3::One()),
             "Shear rejection setup failed");
 
