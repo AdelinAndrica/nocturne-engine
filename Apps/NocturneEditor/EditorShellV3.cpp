@@ -2706,6 +2706,9 @@ namespace nocturne::editor
         const int labelWidth =
             (std::max)(95, bodyWidth * 42 / 100);
 
+        const noc::ReflectionRegistry* reflection =
+            engine_ ? &engine_->Reflection() : nullptr;
+
         if (inspectorAddComponent_)
         {
             MoveWindow(
