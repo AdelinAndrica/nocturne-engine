@@ -149,6 +149,12 @@ namespace noc
             return world.GetName(entity);
         }
 
+        // Design choice (not directly from the book): Phase 16 does not make
+        // Name, Transform, Renderable, or Camera universally Required. Runtime
+        // World entities may legitimately be logical/non-spatial. Editor-created
+        // scene entities still receive Name + Transform through Create policy.
+        // Required remains an opt-in reflection policy that prevents user-facing
+        // Remove Component while allowing low-level lifecycle/undo restoration.
         constexpr ComponentReflectionFlags kFoundationComponentFlags =
             ComponentReflectionFlags::EditorAddable
             | ComponentReflectionFlags::EditorRemovable;

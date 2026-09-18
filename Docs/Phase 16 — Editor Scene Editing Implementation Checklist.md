@@ -774,7 +774,7 @@ Euler UI if used:
 # 27. Remove Component UX
 
 - [ ] Remove action per removable component.
-- [ ] Required components cannot be removed.
+- [x] Required components cannot be removed.
 - [ ] Remove command captures component state.
 - [ ] Undo restores exact component state.
 - [ ] Redo removes again.
@@ -886,7 +886,7 @@ Dacă nu este implementat:
 - [ ] restore allocation fail.
 - [ ] duplicate component.
 - [ ] absent component remove.
-- [ ] required component remove.
+- [x] required component remove.
 - [ ] invalid parent.
 - [ ] self parent.
 - [ ] cycle parent.

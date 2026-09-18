@@ -320,7 +320,7 @@ Keyboard shortcuts, Actor menu actions, hierarchy drag/drop and hierarchy contex
 | EditorSession-owned active transient transaction | IMPLEMENTED |
 | Nested transaction policy | IMPLEMENTED — nested Begin is rejected |
 | Generic compound rollback semantics | IMPLEMENTED — execute/redo compensate prior children; failed undo restores already-undone suffix when possible |
-| Required-component policy | PARTIAL — mechanism exists, but foundation required-component case/policy still needs closure |
+| Required-component policy | IMPLEMENTED — Required is opt-in removal protection; foundation components remain non-required by Phase 16 policy; Inspector/RemoveComponentCommand precedence is tested |
 | Full editor performance baseline | OPEN |
 | 10k hierarchy stress gate | OPEN |
 | 10k command-history stress | OPEN |
@@ -362,7 +362,28 @@ Automated editor-session tests cover begin, append, nested-begin rejection, comm
 
 The existing gizmo preview remains the contract-approved coalescing exception: preview state is transient and a completed drag records one SetTransformTRSCommand rather than one command per mouse event.
 
-### 11.2 Editor stress/performance
+### 11.2 Required-component policy — IMPLEMENTED
+
+**Design choice (not directly from the book):** \`ComponentReflectionFlags::Required\` is an authoring removal-protection policy, not a declaration that every runtime Entity must contain that component.
+
+Phase 16 foundation components remain non-required:
+
+- Name may be absent; hierarchy has an EntityHandle fallback label.
+- Transform may be absent for logical/non-spatial runtime entities.
+- Renderable is optional.
+- Camera is optional.
+- editor-created scene entities still receive Name + Transform by CreateEntityCommand policy.
+
+When a reflected component is flagged Required and is present:
+
+- Inspector marks the component non-removable even if EditorRemovable is also present;
+- RemoveComponentCommand::Init rejects the operation;
+- low-level component lifecycle adapters remain available for engine teardown, snapshot restoration and controlled tests;
+- undo of an Add operation may restore the previous "absent" state because undo restores pre-command state rather than acting as a new user-facing Remove action.
+
+The synthetic reflected enum component in Phase 16 editor-session tests is also flagged Required, proving Required precedence in both Inspector presentation and RemoveComponentCommand admission.
+
+### 11.3 Editor stress/performance
 
 Reflection has a baseline. The broader editor still needs measurements for:
 
@@ -382,7 +403,7 @@ Reflection has a baseline. The broader editor still needs measurements for:
 
 Timings should be observations first; correctness/leak/allocation invariants remain hard gates.
 
-### 11.3 Completion test matrices
+### 11.4 Completion test matrices
 
 Hierarchy still needs explicit coverage for empty/one/many/deep/wide trees, expand/collapse, duplicate names, stale rows, deterministic generation and 10k stress.
 
@@ -390,13 +411,13 @@ Inspector still needs consolidated coverage for no/stale selection, structural m
 
 Gizmo still needs the complete Local/World/parent/non-uniform/cancel/capture-loss/tool-switch evidence matrix.
 
-### 11.4 Prefab prototype seam
+### 11.5 Prefab prototype seam
 
 ReflectedEntitySubtreeSnapshot already supplies much of the transient capture/instantiate mechanism.
 
 Phase 16 should make the prototype seam explicit without introducing prefab persistence, prefab files, persistent IDs or serialized references. Durable representation belongs to the appropriate later persistence/prefab phase.
 
-### 11.5 Manual regression and soak
+### 11.6 Manual regression and soak
 
 Before completion, validate the preserved editor baseline plus new authoring operations:
 
@@ -456,18 +477,17 @@ e7144560 — phase16: cover editor history failure and budget semantics
 
 ## 13. Recommended next implementation order
 
-1. Close Required-component semantics and tests.
-2. Add editor stress/performance workloads: hierarchy 100/1k/10k, history 10k, subtree 1k, Inspector refresh, representative history memory.
-3. Complete hierarchy/Inspector/gizmo negative and lifecycle test matrices.
-4. Add real-engine function reflection proof and remaining reflection performance measurements.
-5. Clarify the transient prefab-prototype seam without Phase 17 persistence.
-6. Run full manual Phase 13/14/15 regression plus 15+ minute edit-session soak.
-7. Resolve remaining in-scope repository/build hygiene.
-8. Update the Implementation Checklist with verified evidence.
-9. Produce Phase 16 Implementation Report.
-10. Produce Phase 16 Test and CI Validation Report.
-11. Produce Phase 16 Completion Report only after all completion gates pass.
-12. Write Phase 17 handoff and update roadmap.
+1. Add editor stress/performance workloads: hierarchy 100/1k/10k, history 10k, subtree 1k, Inspector refresh, representative history memory.
+2. Complete hierarchy/Inspector/gizmo negative and lifecycle test matrices.
+3. Add real-engine function reflection proof and remaining reflection performance measurements.
+4. Clarify the transient prefab-prototype seam without Phase 17 persistence.
+5. Run full manual Phase 13/14/15 regression plus 15+ minute edit-session soak.
+6. Resolve remaining in-scope repository/build hygiene.
+7. Update the Implementation Checklist with verified evidence.
+8. Produce Phase 16 Implementation Report.
+9. Produce Phase 16 Test and CI Validation Report.
+10. Produce Phase 16 Completion Report only after all completion gates pass.
+11. Write Phase 17 handoff and update roadmap.
 
 ---
 

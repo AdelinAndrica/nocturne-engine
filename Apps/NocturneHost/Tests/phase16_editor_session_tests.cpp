@@ -206,7 +206,8 @@ namespace
 
         const noc::ComponentMetadata componentOps{
             noc::ComponentReflectionFlags::EditorAddable
-                | noc::ComponentReflectionFlags::EditorRemovable,
+                | noc::ComponentReflectionFlags::EditorRemovable
+                | noc::ComponentReflectionFlags::Required,
             &HasEnumDrawerTestComponent,
             &AddEnumDrawerTestComponent,
             &RemoveEnumDrawerTestComponent,
@@ -1050,6 +1051,23 @@ bool RunPhase16EditorSessionTests()
                 kEnumDrawerComponentTypeId,
                 enumModePropertyId);
 
+        bool requiredComponentRemovable = true;
+        for (const auto& component :
+             inspectorModel.Components())
+        {
+            if (component.typeId
+                == kEnumDrawerComponentTypeId)
+            {
+                requiredComponentRemovable =
+                    component.removable;
+                break;
+            }
+        }
+
+        auto requiredRemoval =
+            std::make_unique<
+                nocturne::editor::RemoveComponentCommand>();
+
         ok &= CheckEditorSession(
             enumModeProperty
                 && enumModeProperty->editable
@@ -1058,8 +1076,13 @@ bool RunPhase16EditorSessionTests()
                 && enumModeProperty->valueTypeId
                     == kEnumDrawerModeTypeId
                 && enumModeProperty->displayValue
-                    == "Translate",
-            "Generic enum Inspector property presentation failed");
+                    == "Translate"
+                && !requiredComponentRemovable
+                && !requiredRemoval->Init(
+                    context,
+                    authored,
+                    kEnumDrawerComponentTypeId),
+            "Generic enum/required-component Inspector policy failed");
 
         session.History().Clear();
 
