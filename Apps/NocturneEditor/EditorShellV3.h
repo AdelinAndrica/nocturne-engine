@@ -93,13 +93,22 @@ namespace nocturne::editor
             IdActorDuplicate,
             IdActorDelete,
             IdActorRename,
-            IdSceneRenameEdit
+            IdSceneRenameEdit,
+
+            IdInspectorEditBase = 12000
         };
 
         struct Panel
         {
             HWND header = nullptr;
             HWND body = nullptr;
+        };
+
+        struct InspectorEditBinding
+        {
+            HWND hwnd = nullptr;
+            noc::TypeId componentTypeId{};
+            noc::PropertyId propertyId{};
         };
 
         void CreateChrome_();
@@ -122,6 +131,25 @@ namespace nocturne::editor
         [[nodiscard]] bool HasTextInputFocus_() const;
 
         static LRESULT CALLBACK RenameEditSubclassProc_(
+            HWND hwnd,
+            UINT message,
+            WPARAM wParam,
+            LPARAM lParam,
+            UINT_PTR subclassId,
+            DWORD_PTR refData);
+
+        void DestroyInspectorControls_() noexcept;
+        [[nodiscard]] bool RebuildInspectorControls_();
+        void LayoutInspectorControls_();
+        void SyncInspectorControlValues_();
+        [[nodiscard]] bool CommitInspectorEdit_(HWND source);
+        void CancelInspectorEdit_(HWND source);
+        [[nodiscard]] InspectorEditBinding* FindInspectorEdit_(
+            HWND source) noexcept;
+        [[nodiscard]] const InspectorEditBinding* FindInspectorEdit_(
+            HWND source) const noexcept;
+
+        static LRESULT CALLBACK InspectorEditSubclassProc_(
             HWND hwnd,
             UINT message,
             WPARAM wParam,
@@ -188,6 +216,9 @@ namespace nocturne::editor
         HWND status_ = nullptr;
 
         EditorInspectorModel inspectorModel_;
+        std::vector<InspectorEditBinding> inspectorEdits_;
+        bool inspectorControlsRefreshing_ = false;
+
         int activeToolId_ = IdToolbarSelect;
         std::wstring contentRoot_ = L"Data";
     };

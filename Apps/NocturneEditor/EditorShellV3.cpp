@@ -903,6 +903,8 @@ namespace nocturne::editor
 
     void EditorShellV3::Shutdown()
     {
+        DestroyInspectorControls_();
+
         if (renameEdit_)
         {
             RemoveWindowSubclass(
@@ -1110,6 +1112,7 @@ namespace nocturne::editor
 
     void EditorShellV3::RefreshInspector()
     {
+        DestroyInspectorControls_();
         inspectorModel_.Clear();
 
         if (!engine_ || !session_)
@@ -1131,6 +1134,12 @@ namespace nocturne::editor
                 AppendConsole_(
                     L"Inspector refresh failed.");
             }
+        }
+
+        if (!RebuildInspectorControls_())
+        {
+            AppendConsole_(
+                L"Inspector control rebuild failed.");
         }
 
         if (inspector_.body)
@@ -1168,7 +1177,12 @@ namespace nocturne::editor
         const int browserY = contentY + pad + searchH + 7, browserH = (std::max)(0, contentH - (2*pad + searchH + 7)); const int treeW = (std::clamp)(bottomLeft * 30 / 100, 110, 145); MoveWindow(contentTree_, gap+pad,browserY,treeW,browserH,TRUE); MoveWindow(contentTable_, gap+pad+treeW+7,browserY,(std::max)(0,bottomLeft-2*pad-treeW-7),browserH,TRUE);
         const int consoleY = bottomY + headerH, consoleH = (std::max)(0, actualBottom - headerH), scrollW = 8; MoveWindow(consoleEdit_, bottomCenterX+8,consoleY+6,(std::max)(0,bottomCenter-8-6-scrollW-3),(std::max)(0,consoleH-12),TRUE); MoveWindow(consoleScroll_, bottomCenterX+bottomCenter-scrollW-6,consoleY+7,scrollW,(std::max)(0,consoleH-14),TRUE);
         const int buttonY = bottomY + actualBottom - buttonH - 9, actionGap = 9, actionW = (std::max)(96,(rightW-24-actionGap)/2); MoveWindow(playButton_, bottomRightX+12,buttonY,actionW,buttonH,TRUE); MoveWindow(buildButton_, bottomRightX+12+actionW+actionGap,buttonY,actionW,buttonH,TRUE);
-        MoveWindow(status_, 0,statusY,w,statusH,TRUE); InvalidateRect(viewport_.body,nullptr,FALSE); InvalidateRect(inspector_.body,nullptr,FALSE); InvalidateRect(buildPlay_.body,nullptr,FALSE); InvalidateRect(status_,nullptr,FALSE);
+        MoveWindow(status_, 0,statusY,w,statusH,TRUE);
+        LayoutInspectorControls_();
+        InvalidateRect(viewport_.body,nullptr,FALSE);
+        InvalidateRect(inspector_.body,nullptr,FALSE);
+        InvalidateRect(buildPlay_.body,nullptr,FALSE);
+        InvalidateRect(status_,nullptr,FALSE);
     }
 
     void EditorShellV3::AppendConsole_(const wchar_t* message)
@@ -1319,6 +1333,469 @@ namespace nocturne::editor
             AppendConsole_(L"Duplicate Entity failed: allocation failure.");
             return false;
         }
+    }
+
+    void EditorShellV3::DestroyInspectorControls_() noexcept
+    {
+        inspectorControlsRefreshing_ = true;
+
+        for (InspectorEditBinding& binding : inspectorEdits_)
+        {
+            if (!binding.hwnd)
+                continue;
+
+            RemoveWindowSubclass(
+                binding.hwnd,
+                &EditorShellV3::InspectorEditSubclassProc_,
+                0x1620);
+            DestroyWindow(binding.hwnd);
+            binding.hwnd = nullptr;
+        }
+
+        inspectorEdits_.clear();
+        inspectorControlsRefreshing_ = false;
+    }
+
+    bool EditorShellV3::RebuildInspectorControls_()
+    {
+        DestroyInspectorControls_();
+
+        if (!hwnd_
+            || !inspector_.body
+            || !inspectorModel_.Entity().IsValid())
+        {
+            return true;
+        }
+
+        size_t editableCount = 0;
+        for (const InspectorComponentView& component :
+             inspectorModel_.Components())
+        {
+            for (const InspectorPropertyView& property :
+                 component.properties)
+            {
+                if (property.editable)
+                    ++editableCount;
+            }
+        }
+
+        try
+        {
+            inspectorEdits_.reserve(editableCount);
+        }
+        catch (const std::bad_alloc&)
+        {
+            return false;
+        }
+
+        for (const InspectorComponentView& component :
+             inspectorModel_.Components())
+        {
+            for (const InspectorPropertyView& property :
+                 component.properties)
+            {
+                if (!property.editable)
+                    continue;
+
+                const size_t bindingIndex =
+                    inspectorEdits_.size();
+
+                if (bindingIndex
+                    > static_cast<size_t>(
+                        0xFFFF - IdInspectorEditBase))
+                {
+                    DestroyInspectorControls_();
+                    return false;
+                }
+
+                const int controlId =
+                    IdInspectorEditBase
+                    + static_cast<int>(bindingIndex);
+
+                const std::wstring displayValue =
+                    Utf8ToWide_(
+                        property.displayValue.c_str());
+
+                HWND edit = CreateWindowExW(
+                    0,
+                    L"EDIT",
+                    displayValue.c_str(),
+                    WS_CHILD | WS_TABSTOP
+                        | WS_BORDER | ES_AUTOHSCROLL,
+                    0, 0, 1, 1,
+                    hwnd_,
+                    reinterpret_cast<HMENU>(
+                        static_cast<INT_PTR>(controlId)),
+                    GetModuleHandleW(nullptr),
+                    nullptr);
+
+                if (!edit)
+                {
+                    DestroyInspectorControls_();
+                    return false;
+                }
+
+                SendMessageW(
+                    edit,
+                    WM_SETFONT,
+                    reinterpret_cast<WPARAM>(uiFont_),
+                    TRUE);
+
+                if (!SetWindowSubclass(
+                        edit,
+                        &EditorShellV3::InspectorEditSubclassProc_,
+                        0x1620,
+                        reinterpret_cast<DWORD_PTR>(this)))
+                {
+                    DestroyWindow(edit);
+                    DestroyInspectorControls_();
+                    return false;
+                }
+
+                try
+                {
+                    inspectorEdits_.push_back({
+                        edit,
+                        component.typeId,
+                        property.propertyId
+                    });
+                }
+                catch (const std::bad_alloc&)
+                {
+                    RemoveWindowSubclass(
+                        edit,
+                        &EditorShellV3::InspectorEditSubclassProc_,
+                        0x1620);
+                    DestroyWindow(edit);
+                    DestroyInspectorControls_();
+                    return false;
+                }
+            }
+        }
+
+        LayoutInspectorControls_();
+        return true;
+    }
+
+    void EditorShellV3::LayoutInspectorControls_()
+    {
+        if (!hwnd_
+            || !inspector_.body
+            || inspectorEdits_.empty())
+        {
+            return;
+        }
+
+        RECT bodyWindow{};
+        RECT bodyClient{};
+        GetWindowRect(inspector_.body, &bodyWindow);
+        GetClientRect(inspector_.body, &bodyClient);
+
+        POINT bodyPoints[2]{
+            { bodyWindow.left, bodyWindow.top },
+            { bodyWindow.right, bodyWindow.bottom }
+        };
+        MapWindowPoints(
+            HWND_DESKTOP,
+            hwnd_,
+            bodyPoints,
+            2);
+
+        const int bodyLeft = bodyPoints[0].x;
+        const int bodyTop = bodyPoints[0].y;
+        const int bodyWidth =
+            static_cast<int>(
+                bodyClient.right - bodyClient.left);
+        const int bodyHeight =
+            static_cast<int>(
+                bodyClient.bottom - bodyClient.top);
+
+        const int labelWidth =
+            (std::max)(95, bodyWidth * 42 / 100);
+
+        size_t bindingIndex = 0;
+        int y = 43;
+
+        for (const InspectorComponentView& component :
+             inspectorModel_.Components())
+        {
+            y += 31;
+
+            for (const InspectorPropertyView& property :
+                 component.properties)
+            {
+                if (property.editable)
+                {
+                    if (bindingIndex >= inspectorEdits_.size())
+                        return;
+
+                    HWND edit =
+                        inspectorEdits_[bindingIndex].hwnd;
+
+                    const int x =
+                        labelWidth + 4;
+                    const int width =
+                        (std::max)(
+                            32,
+                            bodyWidth - x - 12);
+
+                    if (edit)
+                    {
+                        MoveWindow(
+                            edit,
+                            bodyLeft + x,
+                            bodyTop + y + 1,
+                            width,
+                            22,
+                            TRUE);
+
+                        const bool visible =
+                            y >= 0
+                            && y + 24 <= bodyHeight;
+
+                        ShowWindow(
+                            edit,
+                            visible ? SW_SHOW : SW_HIDE);
+                    }
+
+                    ++bindingIndex;
+                }
+
+                y += 27;
+            }
+
+            y += 7;
+        }
+    }
+
+    EditorShellV3::InspectorEditBinding*
+    EditorShellV3::FindInspectorEdit_(HWND source) noexcept
+    {
+        for (InspectorEditBinding& binding : inspectorEdits_)
+        {
+            if (binding.hwnd == source)
+                return &binding;
+        }
+
+        return nullptr;
+    }
+
+    const EditorShellV3::InspectorEditBinding*
+    EditorShellV3::FindInspectorEdit_(HWND source) const noexcept
+    {
+        for (const InspectorEditBinding& binding : inspectorEdits_)
+        {
+            if (binding.hwnd == source)
+                return &binding;
+        }
+
+        return nullptr;
+    }
+
+    void EditorShellV3::SyncInspectorControlValues_()
+    {
+        for (const InspectorEditBinding& binding : inspectorEdits_)
+        {
+            if (!binding.hwnd)
+                continue;
+
+            const InspectorPropertyView* property =
+                inspectorModel_.FindProperty(
+                    binding.componentTypeId,
+                    binding.propertyId);
+            if (!property)
+                continue;
+
+            const std::wstring value =
+                Utf8ToWide_(
+                    property->displayValue.c_str());
+
+            SetWindowTextW(
+                binding.hwnd,
+                value.c_str());
+        }
+    }
+
+    bool EditorShellV3::CommitInspectorEdit_(HWND source)
+    {
+        InspectorEditBinding* binding =
+            FindInspectorEdit_(source);
+        if (!binding
+            || !session_
+            || !engine_
+            || !inspectorModel_.Entity().IsValid())
+        {
+            return false;
+        }
+
+        const noc::EntityHandle entity =
+            inspectorModel_.Entity();
+        const noc::TypeId componentTypeId =
+            binding->componentTypeId;
+        const noc::PropertyId propertyId =
+            binding->propertyId;
+
+        const int length =
+            GetWindowTextLengthW(source);
+
+        std::wstring wide;
+        try
+        {
+            const size_t count =
+                static_cast<size_t>(
+                    (std::max)(0, length));
+
+            wide.resize(count + 1u);
+            GetWindowTextW(
+                source,
+                wide.data(),
+                static_cast<int>(count + 1u));
+            wide.resize(count);
+        }
+        catch (const std::bad_alloc&)
+        {
+            AppendConsole_(
+                L"Inspector edit failed: allocation failure.");
+            return false;
+        }
+
+        std::string utf8;
+        if (!WideToUtf8_(
+                wide.c_str(),
+                utf8))
+        {
+            AppendConsole_(
+                L"Inspector edit rejected: invalid Unicode input.");
+            CancelInspectorEdit_(source);
+            return false;
+        }
+
+        auto context =
+            session_->CommandContext();
+
+        const bool committed =
+            inspectorModel_.CommitTextEdit(
+                context,
+                session_->History(),
+                entity,
+                componentTypeId,
+                propertyId,
+                utf8.c_str());
+
+        if (!committed)
+        {
+            AppendConsole_(
+                L"Inspector edit rejected by reflected semantic setter.");
+            CancelInspectorEdit_(source);
+            return false;
+        }
+
+        session_->SetSceneDirty();
+
+        if (!inspectorModel_.Refresh(
+                context,
+                entity))
+        {
+            AppendConsole_(
+                L"Inspector refresh after edit failed.");
+            return false;
+        }
+
+        // Name changes are reflected in the hierarchy immediately. Rebuilding
+        // the tree is generic and does not inspect component type.
+        PopulateScene_();
+        SyncInspectorControlValues_();
+
+        if (inspector_.body)
+            InvalidateRect(
+                inspector_.body,
+                nullptr,
+                FALSE);
+
+        UpdateStatus_();
+        return true;
+    }
+
+    void EditorShellV3::CancelInspectorEdit_(HWND source)
+    {
+        const InspectorEditBinding* binding =
+            FindInspectorEdit_(source);
+        if (!binding)
+            return;
+
+        const InspectorPropertyView* property =
+            inspectorModel_.FindProperty(
+                binding->componentTypeId,
+                binding->propertyId);
+        if (!property)
+            return;
+
+        const std::wstring value =
+            Utf8ToWide_(
+                property->displayValue.c_str());
+
+        SetWindowTextW(
+            source,
+            value.c_str());
+        SendMessageW(
+            source,
+            EM_SETSEL,
+            0,
+            -1);
+    }
+
+    LRESULT CALLBACK EditorShellV3::InspectorEditSubclassProc_(
+        HWND hwnd,
+        UINT message,
+        WPARAM wParam,
+        LPARAM lParam,
+        UINT_PTR subclassId,
+        DWORD_PTR refData)
+    {
+        (void)subclassId;
+
+        auto* self =
+            reinterpret_cast<EditorShellV3*>(refData);
+        if (!self)
+        {
+            return DefSubclassProc(
+                hwnd,
+                message,
+                wParam,
+                lParam);
+        }
+
+        switch (message)
+        {
+        case WM_KEYDOWN:
+            if (wParam == VK_RETURN)
+            {
+                (void)self->CommitInspectorEdit_(hwnd);
+                return 0;
+            }
+
+            if (wParam == VK_ESCAPE)
+            {
+                self->inspectorControlsRefreshing_ = true;
+                self->CancelInspectorEdit_(hwnd);
+                if (self->sceneTree_)
+                    SetFocus(self->sceneTree_);
+                self->inspectorControlsRefreshing_ = false;
+                return 0;
+            }
+            break;
+
+        case WM_KILLFOCUS:
+            if (!self->inspectorControlsRefreshing_)
+                (void)self->CommitInspectorEdit_(hwnd);
+            break;
+        }
+
+        return DefSubclassProc(
+            hwnd,
+            message,
+            wParam,
+            lParam);
     }
 
     bool EditorShellV3::BeginRenameSelection_()
@@ -1796,7 +2273,23 @@ namespace nocturne::editor
         case WM_SIZE: Layout_(LOWORD(lParam), HIWORD(lParam)); InvalidateRect(native, nullptr, TRUE); result = 0; return false;
         case WM_ERASEBKGND: { RECT rc{}; GetClientRect(native, &rc); FillRect(reinterpret_cast<HDC>(wParam), &rc, windowBrush_); result = 1; return true; }
         case WM_CTLCOLOREDIT:
-            if (reinterpret_cast<HWND>(lParam) == contentSearch_) { HDC dc = reinterpret_cast<HDC>(wParam); SetTextColor(dc, c.textPrimary); SetBkColor(dc, c.inputBg); result = reinterpret_cast<intptr_t>(editBrush_); return true; } break;
+        {
+            const HWND edit =
+                reinterpret_cast<HWND>(lParam);
+
+            if (edit == contentSearch_
+                || FindInspectorEdit_(edit) != nullptr)
+            {
+                HDC dc =
+                    reinterpret_cast<HDC>(wParam);
+                SetTextColor(dc, c.textPrimary);
+                SetBkColor(dc, c.inputBg);
+                result =
+                    reinterpret_cast<intptr_t>(editBrush_);
+                return true;
+            }
+            break;
+        }
         case WM_COMMAND:
         {
             const int id = LOWORD(wParam);
@@ -2020,16 +2513,17 @@ namespace nocturne::editor
 
                         valueRc.left += 7;
                         valueRc.right -= 5;
-                        DrawTextUi(
-                            dis->hDC,
-                            propertyValue.c_str(),
-                            valueRc,
-                            property.editable
-                                ? c.textPrimary
-                                : c.textMuted,
-                            uiFont_,
-                            DT_LEFT | DT_VCENTER
-                                | DT_SINGLELINE | DT_END_ELLIPSIS);
+                        if (!property.editable)
+                        {
+                            DrawTextUi(
+                                dis->hDC,
+                                propertyValue.c_str(),
+                                valueRc,
+                                c.textMuted,
+                                uiFont_,
+                                DT_LEFT | DT_VCENTER
+                                    | DT_SINGLELINE | DT_END_ELLIPSIS);
+                        }
 
                         y += 27;
                     }

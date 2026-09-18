@@ -62,6 +62,31 @@ namespace nocturne::editor
                     : property.canonicalName;
         }
 
+        bool SupportsGenericTextEdit(
+            const noc::TypeMetadata& valueType)
+        {
+            switch (valueType.kind)
+            {
+            case noc::TypeKind::Bool:
+            case noc::TypeKind::SignedInteger:
+            case noc::TypeKind::UnsignedInteger:
+            case noc::TypeKind::FloatingPoint:
+            case noc::TypeKind::String:
+            case noc::TypeKind::Enum:
+                return true;
+
+            case noc::TypeKind::Struct:
+                return valueType.typeId == noc::BuiltinTypeIds::Vec2
+                    || valueType.typeId == noc::BuiltinTypeIds::Vec3
+                    || valueType.typeId == noc::BuiltinTypeIds::Vec4
+                    || valueType.typeId == noc::BuiltinTypeIds::Quat
+                    || valueType.typeId == noc::BuiltinTypeIds::AABB;
+
+            default:
+                return false;
+            }
+        }
+
         bool ParseFloatList(
             const char* text,
             float* values,
@@ -263,7 +288,8 @@ namespace nocturne::editor
                         property.write != nullptr
                         && !noc::HasFlag(
                             property.flags,
-                            noc::PropertyFlags::ReadOnly);
+                            noc::PropertyFlags::ReadOnly)
+                        && SupportsGenericTextEdit(*valueType);
 
                     if (!FormatValue_(
                             context,
@@ -841,7 +867,7 @@ namespace nocturne::editor
                 std::snprintf(
                     buffer,
                     sizeof(buffer),
-                    "[%.3g %.3g %.3g] — [%.3g %.3g %.3g]",
+                    "%.4g, %.4g, %.4g, %.4g, %.4g, %.4g",
                     b.min.x, b.min.y, b.min.z,
                     b.max.x, b.max.y, b.max.z);
                 outText = buffer; return true;
