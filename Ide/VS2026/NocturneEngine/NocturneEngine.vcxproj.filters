@@ -37,7 +37,10 @@
     <Filter Include="Header Files\Runtime">
       <UniqueIdentifier>{52391dce-8f59-4643-b8bb-6aa3b18b4793}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\Runtime\Reflection">\n      <UniqueIdentifier>{7B6D72D1-53DE-4B28-9A19-5D4339D06DA4}</UniqueIdentifier>\n    </Filter>\n    <Filter Include="Header Files\Runtime\Components">
+    <Filter Include="Header Files\Runtime\Reflection">
+      <UniqueIdentifier>{7B6D72D1-53DE-4B28-9A19-5D4339D06DA4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Runtime\Components">
       <UniqueIdentifier>{A3F17B18-3E5B-49AF-8E27-C4C5D2B79315}</UniqueIdentifier>
     </Filter>
     <Filter Include="Header Files\Platform">

@@ -114,7 +114,9 @@
     <ClInclude Include="..\..\..\Engine\Runtime\Engine.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\EngineConfig.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Frustum.h" />
-    <ClInclude Include="..\..\..\Engine\Runtime\MainLoop.h" />\n    <ClInclude Include="..\..\..\Engine\Runtime\Reflection\ReflectionIds.h" />\n    <ClInclude Include="..\..\..\Engine\Runtime\Reflection\ReflectionMetadata.h" />
+    <ClInclude Include="..\..\..\Engine\Runtime\MainLoop.h" />
+    <ClInclude Include="..\..\..\Engine\Runtime\Reflection\ReflectionIds.h" />
+    <ClInclude Include="..\..\..\Engine\Runtime\Reflection\ReflectionMetadata.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\SceneObject.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\World.h" />
   </ItemGroup>
