@@ -175,7 +175,9 @@ namespace nocturne::editor
         void UpdateStatus_();
         [[nodiscard]] bool RequestEditorExit_();
 
-        [[nodiscard]] bool ExecuteCreateEntity_();
+        [[nodiscard]] bool ExecuteCreateEntity_(
+            noc::EntityHandle parent =
+                noc::EntityHandle::Invalid());
         [[nodiscard]] bool ExecuteDeleteSelection_();
         [[nodiscard]] bool ExecuteDuplicateSelection_();
         [[nodiscard]] bool ExecuteReparentEntity_(

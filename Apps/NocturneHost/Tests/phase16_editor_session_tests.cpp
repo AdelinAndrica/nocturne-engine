@@ -598,6 +598,63 @@ bool RunPhase16EditorSessionTests()
         ok &= CheckEditorSession(
             world.DestroyEntity(recreated),
             "Command-created entity cleanup failed");
+
+        auto createChild =
+            std::make_unique<
+                nocturne::editor::CreateEntityCommand>();
+
+        ok &= CheckEditorSession(
+            createChild->Init(
+                "Created Child",
+                authored),
+            "Parented CreateEntityCommand init failed");
+
+        auto* createChildRaw =
+            createChild.get();
+
+        ok &= CheckEditorSession(
+            session.History().Execute(
+                context,
+                std::move(createChild)),
+            "Parented CreateEntityCommand execute failed");
+
+        const noc::EntityHandle firstChild =
+            createChildRaw->CurrentEntity();
+
+        ok &= CheckEditorSession(
+            firstChild.IsValid()
+                && world.IsAlive(firstChild)
+                && world.ParentOf(firstChild) == authored
+                && world.GetName(firstChild)
+                && std::strcmp(
+                    world.GetName(firstChild)->value,
+                    "Created Child") == 0,
+            "Create-under-parent hierarchy mismatch");
+
+        ok &= CheckEditorSession(
+            session.History().Undo(context)
+                && !world.IsAlive(firstChild)
+                && !createChildRaw->CurrentEntity().IsValid(),
+            "Create-under-parent undo failed");
+
+        ok &= CheckEditorSession(
+            session.History().Redo(context),
+            "Create-under-parent redo failed");
+
+        const noc::EntityHandle recreatedChild =
+            createChildRaw->CurrentEntity();
+
+        ok &= CheckEditorSession(
+            recreatedChild.IsValid()
+                && recreatedChild != firstChild
+                && world.IsAlive(recreatedChild)
+                && world.ParentOf(recreatedChild) == authored,
+            "Create-under-parent redo did not restore parentage with new runtime identity");
+
+        session.History().Clear();
+        ok &= CheckEditorSession(
+            world.DestroyEntity(recreatedChild),
+            "Create-under-parent cleanup failed");
     }
 
     {

@@ -1847,12 +1847,27 @@ namespace nocturne::editor
         return true;
     }
 
-    bool EditorShellV3::ExecuteCreateEntity_()
+    bool EditorShellV3::ExecuteCreateEntity_(
+        noc::EntityHandle parent)
     {
-        if (!session_)
+        if (!session_ || !engine_)
             return false;
 
-        auto context = session_->CommandContext();
+        noc::World& world =
+            engine_->GetWorld();
+
+        if (parent.IsValid()
+            && (!world.IsAlive(parent)
+                || session_->IsToolOwned(parent)
+                || !world.HasTransform(parent)))
+        {
+            AppendConsole_(
+                L"Create Child Entity rejected: parent is stale, tool-owned, or has no Transform.");
+            return false;
+        }
+
+        auto context =
+            session_->CommandContext();
 
         try
         {
@@ -1860,15 +1875,21 @@ namespace nocturne::editor
                 std::make_unique<CreateEntityCommand>();
             auto* commandRaw = command.get();
 
-            // Design choice (not directly from the book): Actor > Create Entity
-            // creates an authored root entity. Parenting remains an explicit
-            // hierarchy operation rather than an implicit side effect of selection.
-            if (!command->Init("Entity")
+            // Design choice (not directly from the book): toolbar/Actor create
+            // remains an authored scene-root operation. Hierarchy context
+            // creation can explicitly pass the selected authored entity as the
+            // parent; both flows reuse the same CreateEntityCommand.
+            if (!command->Init(
+                    "Entity",
+                    parent)
                 || !session_->History().Execute(
                     context,
                     std::move(command)))
             {
-                AppendConsole_(L"Create Entity failed.");
+                AppendConsole_(
+                    parent.IsValid()
+                        ? L"Create Child Entity failed."
+                        : L"Create Entity failed.");
                 return false;
             }
 
@@ -1887,12 +1908,18 @@ namespace nocturne::editor
             PopulateScene_();
             RefreshInspector();
             UpdateStatus_();
-            AppendConsole_(L"Entity created.");
+            AppendConsole_(
+                parent.IsValid()
+                    ? L"Child entity created."
+                    : L"Entity created.");
             return true;
         }
         catch (const std::bad_alloc&)
         {
-            AppendConsole_(L"Create Entity failed: allocation failure.");
+            AppendConsole_(
+                parent.IsValid()
+                    ? L"Create Child Entity failed: allocation failure."
+                    : L"Create Entity failed: allocation failure.");
             return false;
         }
     }
@@ -2077,6 +2104,7 @@ namespace nocturne::editor
         enum : UINT
         {
             ContextCreate = 1,
+            ContextCreateChild,
             ContextRename,
             ContextDuplicate,
             ContextDelete,
@@ -2096,7 +2124,12 @@ namespace nocturne::editor
             menu,
             MF_STRING,
             ContextCreate,
-            L"Create Entity");
+            L"Create Root Entity");
+        AppendMenuW(
+            menu,
+            selectionFlags,
+            ContextCreateChild,
+            L"Create Child Entity");
         AppendMenuW(
             menu,
             MF_SEPARATOR,
@@ -2266,6 +2299,10 @@ namespace nocturne::editor
         {
         case ContextCreate:
             (void)ExecuteCreateEntity_();
+            break;
+        case ContextCreateChild:
+            if (hasSelection)
+                (void)ExecuteCreateEntity_(selected);
             break;
         case ContextRename:
             if (hasSelection)
