@@ -33,6 +33,8 @@ namespace noc
         InvalidEnumUnderlyingType,
         InvalidAttributeMetadata,
         DuplicateAttributeKind,
+        InvalidContainerMetadata,
+        UnknownContainerElementType,
         AllocationFailure,
         ValidationFailure
     };
@@ -58,6 +60,8 @@ namespace noc
         case ReflectionRegistryError::InvalidEnumUnderlyingType: return "InvalidEnumUnderlyingType";
         case ReflectionRegistryError::InvalidAttributeMetadata: return "InvalidAttributeMetadata";
         case ReflectionRegistryError::DuplicateAttributeKind: return "DuplicateAttributeKind";
+        case ReflectionRegistryError::InvalidContainerMetadata: return "InvalidContainerMetadata";
+        case ReflectionRegistryError::UnknownContainerElementType: return "UnknownContainerElementType";
         case ReflectionRegistryError::AllocationFailure: return "AllocationFailure";
         case ReflectionRegistryError::ValidationFailure: return "ValidationFailure";
         }
@@ -122,6 +126,9 @@ namespace noc
             TypeId ownerTypeId,
             PropertyId propertyId,
             AttributeKind kind) const noexcept;
+
+        [[nodiscard]] const ContainerMetadata* FindContainer(
+            TypeId typeId) const noexcept;
 
     private:
         struct Impl;

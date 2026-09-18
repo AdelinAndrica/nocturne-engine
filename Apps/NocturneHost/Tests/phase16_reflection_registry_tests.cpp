@@ -116,6 +116,89 @@ namespace
             && *static_cast<const int*>(candidate) >= 0;
     }
 
+    struct FixedInt3
+    {
+        int values[3]{};
+    };
+
+    uint32_t FixedCount(const void*) { return 3; }
+    uint32_t FixedCapacity(const void*) { return 3; }
+    const void* FixedConstElement(const void* container, uint32_t index)
+    {
+        if (!container || index >= 3)
+            return nullptr;
+        return &static_cast<const FixedInt3*>(container)->values[index];
+    }
+    void* FixedMutableElement(void* container, uint32_t index)
+    {
+        if (!container || index >= 3)
+            return nullptr;
+        return &static_cast<FixedInt3*>(container)->values[index];
+    }
+
+    struct SmallSequence
+    {
+        int values[8]{};
+        uint32_t count = 0;
+    };
+
+    uint32_t SequenceCount(const void* container)
+    {
+        return container
+            ? static_cast<const SmallSequence*>(container)->count
+            : 0;
+    }
+    uint32_t SequenceCapacity(const void*) { return 8; }
+    const void* SequenceConstElement(const void* container, uint32_t index)
+    {
+        if (!container)
+            return nullptr;
+        const auto* sequence = static_cast<const SmallSequence*>(container);
+        return index < sequence->count ? &sequence->values[index] : nullptr;
+    }
+    void* SequenceMutableElement(void* container, uint32_t index)
+    {
+        if (!container)
+            return nullptr;
+        auto* sequence = static_cast<SmallSequence*>(container);
+        return index < sequence->count ? &sequence->values[index] : nullptr;
+    }
+    bool SequenceResize(void* container, uint32_t newCount)
+    {
+        if (!container || newCount > 8)
+            return false;
+        auto* sequence = static_cast<SmallSequence*>(container);
+        for (uint32_t i = sequence->count; i < newCount; ++i)
+            sequence->values[i] = 0;
+        sequence->count = newCount;
+        return true;
+    }
+    bool SequenceInsertDefault(void* container, uint32_t index)
+    {
+        if (!container)
+            return false;
+        auto* sequence = static_cast<SmallSequence*>(container);
+        if (sequence->count >= 8 || index > sequence->count)
+            return false;
+        for (uint32_t i = sequence->count; i > index; --i)
+            sequence->values[i] = sequence->values[i - 1u];
+        sequence->values[index] = 0;
+        ++sequence->count;
+        return true;
+    }
+    bool SequenceRemove(void* container, uint32_t index)
+    {
+        if (!container)
+            return false;
+        auto* sequence = static_cast<SmallSequence*>(container);
+        if (index >= sequence->count)
+            return false;
+        for (uint32_t i = index; i + 1u < sequence->count; ++i)
+            sequence->values[i] = sequence->values[i + 1u];
+        --sequence->count;
+        return true;
+    }
+
     enum class TestAccess : uint32_t
     {
         None = 0,
@@ -713,6 +796,119 @@ bool RunPhase16ReflectionRegistryTests()
     ok &= CheckReflectionRegistry(
         allocator.OutstandingBytes() == 0,
         "Invalid enum Freeze path leaked allocator memory");
+
+    {
+        noc::ReflectionRegistry containerRegistry;
+        ok &= CheckReflectionRegistry(
+            containerRegistry.Init(allocator, 3),
+            "Container registry init failed");
+
+        constexpr noc::TypeId kContainerInt{ 0x3200000000000001ull };
+        constexpr noc::TypeId kFixedType{ 0x3200000000000002ull };
+        constexpr noc::TypeId kSequenceType{ 0x3200000000000003ull };
+
+        const noc::TypeMetadata containerInt =
+            noc::MakeTypeMetadata<int>(
+                kContainerInt,
+                "Nocturne.Tests.ContainerInt",
+                noc::TypeKind::SignedInteger,
+                1);
+
+        const noc::ContainerMetadata fixedContainer{
+            kContainerInt,
+            3,
+            false,
+            &FixedCount,
+            &FixedCapacity,
+            &FixedConstElement,
+            &FixedMutableElement,
+            nullptr,
+            nullptr,
+            nullptr
+        };
+
+        noc::TypeMetadata fixedType =
+            noc::MakeTypeMetadata<FixedInt3>(
+                kFixedType,
+                "Nocturne.Tests.FixedInt3",
+                noc::TypeKind::FixedArray,
+                1);
+        fixedType.containerMetadata = &fixedContainer;
+
+        const noc::ContainerMetadata sequenceContainer{
+            kContainerInt,
+            0,
+            false,
+            &SequenceCount,
+            &SequenceCapacity,
+            &SequenceConstElement,
+            &SequenceMutableElement,
+            &SequenceResize,
+            &SequenceInsertDefault,
+            &SequenceRemove
+        };
+
+        noc::TypeMetadata sequenceType =
+            noc::MakeTypeMetadata<SmallSequence>(
+                kSequenceType,
+                "Nocturne.Tests.SmallSequence",
+                noc::TypeKind::DynamicSequence,
+                1);
+        sequenceType.containerMetadata = &sequenceContainer;
+
+        ok &= CheckReflectionRegistry(
+            containerRegistry.RegisterType(sequenceType)
+                && containerRegistry.RegisterType(containerInt)
+                && containerRegistry.RegisterType(fixedType)
+                && containerRegistry.Freeze(),
+            "Container reflection schema failed");
+
+        const noc::ContainerMetadata* reflectedFixed =
+            containerRegistry.FindContainer(kFixedType);
+        const noc::ContainerMetadata* reflectedSequence =
+            containerRegistry.FindContainer(kSequenceType);
+
+        FixedInt3 fixed{};
+        fixed.values[1] = 9;
+        ok &= CheckReflectionRegistry(
+            reflectedFixed
+                && reflectedFixed->fixedCount == 3
+                && *static_cast<const int*>(
+                    reflectedFixed->constElement(&fixed, 1)) == 9,
+            "Fixed-array container reflection failed");
+
+        SmallSequence sequence{};
+        ok &= CheckReflectionRegistry(
+            reflectedSequence
+                && reflectedSequence->resize(&sequence, 2)
+                && sequence.count == 2,
+            "Dynamic sequence resize failed");
+
+        *static_cast<int*>(
+            reflectedSequence->mutableElement(&sequence, 0)) = 11;
+        *static_cast<int*>(
+            reflectedSequence->mutableElement(&sequence, 1)) = 22;
+
+        ok &= CheckReflectionRegistry(
+            reflectedSequence->insertDefault(&sequence, 1)
+                && sequence.count == 3
+                && sequence.values[0] == 11
+                && sequence.values[1] == 0
+                && sequence.values[2] == 22,
+            "Dynamic sequence insert failed");
+
+        ok &= CheckReflectionRegistry(
+            reflectedSequence->remove(&sequence, 0)
+                && sequence.count == 2
+                && sequence.values[0] == 0
+                && sequence.values[1] == 22,
+            "Dynamic sequence remove failed");
+
+        containerRegistry.Shutdown();
+        ok &= CheckReflectionRegistry(
+            allocator.OutstandingBytes() == 0,
+            "Container reflection leaked allocator memory");
+    }
 
     {
         noc::ReflectionRegistry accessRegistry;

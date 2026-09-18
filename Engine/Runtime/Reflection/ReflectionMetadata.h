@@ -282,6 +282,39 @@ namespace noc
         bool isFlags = false;
     };
 
+    using ContainerCountFn = uint32_t (*)(const void* container);
+    using ContainerCapacityFn = uint32_t (*)(const void* container);
+    using ContainerConstElementFn =
+        const void* (*)(const void* container, uint32_t index);
+    using ContainerMutableElementFn =
+        void* (*)(void* container, uint32_t index);
+    using ContainerResizeFn =
+        bool (*)(void* container, uint32_t newCount);
+    using ContainerInsertDefaultFn =
+        bool (*)(void* container, uint32_t index);
+    using ContainerRemoveFn =
+        bool (*)(void* container, uint32_t index);
+
+    struct ContainerMetadata
+    {
+        TypeId elementTypeId{};
+
+        // Non-zero only for TypeKind::FixedArray.
+        uint32_t fixedCount = 0;
+
+        bool readOnly = false;
+
+        ContainerCountFn count = nullptr;
+        ContainerCapacityFn capacity = nullptr;
+        ContainerConstElementFn constElement = nullptr;
+        ContainerMutableElementFn mutableElement = nullptr;
+
+        // Optional structural operations for dynamic sequences.
+        ContainerResizeFn resize = nullptr;
+        ContainerInsertDefaultFn insertDefault = nullptr;
+        ContainerRemoveFn remove = nullptr;
+    };
+
     template <typename Enum>
     [[nodiscard]] constexpr EnumValueMetadata MakeEnumValueMetadata(
         EnumValueId valueId,
@@ -479,6 +512,7 @@ namespace noc
         uint32_t attributeCount = 0;
 
         const EnumMetadata* enumMetadata = nullptr;
+        const ContainerMetadata* containerMetadata = nullptr;
     };
 
     template <typename T>
@@ -502,6 +536,7 @@ namespace noc
             0,
             nullptr,
             0,
+            nullptr,
             nullptr
         };
     }

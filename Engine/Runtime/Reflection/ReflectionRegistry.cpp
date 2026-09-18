@@ -183,6 +183,63 @@ namespace noc
             return ReflectionRegistryError::None;
         }
 
+        [[nodiscard]] ReflectionRegistryError ValidateContainerIntrinsic(
+            const TypeMetadata& metadata) noexcept
+        {
+            const bool isContainer =
+                metadata.kind == TypeKind::FixedArray
+                || metadata.kind == TypeKind::DynamicSequence;
+
+            if (!isContainer)
+            {
+                return metadata.containerMetadata == nullptr
+                    ? ReflectionRegistryError::None
+                    : ReflectionRegistryError::InvalidContainerMetadata;
+            }
+
+            const ContainerMetadata* container = metadata.containerMetadata;
+            if (!container
+                || !container->elementTypeId.IsValid()
+                || !container->count
+                || !container->constElement
+                || !container->capacity)
+            {
+                return ReflectionRegistryError::InvalidContainerMetadata;
+            }
+
+            if (metadata.kind == TypeKind::FixedArray)
+            {
+                if (container->fixedCount == 0
+                    || container->resize
+                    || container->insertDefault
+                    || container->remove)
+                {
+                    return ReflectionRegistryError::InvalidContainerMetadata;
+                }
+            }
+            else if (container->fixedCount != 0)
+            {
+                return ReflectionRegistryError::InvalidContainerMetadata;
+            }
+
+            if (container->readOnly)
+            {
+                if (container->mutableElement
+                    || container->resize
+                    || container->insertDefault
+                    || container->remove)
+                {
+                    return ReflectionRegistryError::InvalidContainerMetadata;
+                }
+            }
+            else if (!container->mutableElement)
+            {
+                return ReflectionRegistryError::InvalidContainerMetadata;
+            }
+
+            return ReflectionRegistryError::None;
+        }
+
         [[nodiscard]] ReflectionRegistryError ValidateTypeIntrinsic(
             const TypeMetadata& metadata) noexcept
         {
@@ -241,7 +298,12 @@ namespace noc
                 }
             }
 
-            return ValidateEnumIntrinsic(metadata);
+            const ReflectionRegistryError enumError =
+                ValidateEnumIntrinsic(metadata);
+            if (enumError != ReflectionRegistryError::None)
+                return enumError;
+
+            return ValidateContainerIntrinsic(metadata);
         }
 
         [[nodiscard]] char* CopyString(
@@ -334,6 +396,15 @@ namespace noc
             IAllocator& allocator,
             TypeMetadata& metadata)
         {
+            if (metadata.containerMetadata)
+            {
+                auto* containerMetadata =
+                    const_cast<ContainerMetadata*>(metadata.containerMetadata);
+                containerMetadata->~ContainerMetadata();
+                allocator.Deallocate(containerMetadata);
+                metadata.containerMetadata = nullptr;
+            }
+
             if (metadata.enumMetadata)
             {
                 auto* enumMetadata =
@@ -403,6 +474,7 @@ namespace noc
             destination.attributes = nullptr;
             destination.attributeCount = 0;
             destination.enumMetadata = nullptr;
+            destination.containerMetadata = nullptr;
 
             destination.canonicalName =
                 CopyString(allocator, source.canonicalName);
@@ -459,6 +531,23 @@ namespace noc
                         return false;
                     }
                 }
+            }
+
+            if (source.containerMetadata)
+            {
+                auto* containerMetadata = static_cast<ContainerMetadata*>(
+                    allocator.Allocate(
+                        sizeof(ContainerMetadata),
+                        alignof(ContainerMetadata)));
+                if (!containerMetadata)
+                {
+                    DestroyOwnedMetadata(allocator, destination);
+                    return false;
+                }
+
+                new (containerMetadata) ContainerMetadata(
+                    *source.containerMetadata);
+                destination.containerMetadata = containerMetadata;
             }
 
             if (source.enumMetadata)
@@ -734,6 +823,16 @@ namespace noc
                 }
             }
 
+            if (metadata.containerMetadata)
+            {
+                if (!FindType(metadata.containerMetadata->elementTypeId))
+                {
+                    lastError_ =
+                        ReflectionRegistryError::UnknownContainerElementType;
+                    return false;
+                }
+            }
+
             if (metadata.kind == TypeKind::Enum)
             {
                 const TypeMetadata* underlying =
@@ -937,5 +1036,12 @@ namespace noc
                 return &property->attributes[i];
         }
         return nullptr;
+    }
+
+    const ContainerMetadata* ReflectionRegistry::FindContainer(
+        TypeId typeId) const noexcept
+    {
+        const TypeMetadata* type = FindType(typeId);
+        return type ? type->containerMetadata : nullptr;
     }
 }
