@@ -439,7 +439,25 @@ The hierarchy automated matrix now exercises the same \`EditorHierarchyModel\` c
 
 The editor performance suite supplies the complementary wide/deep/10k hierarchy workloads and deterministic repeated row generation. Expansion rendering/click behavior remains part of the separate manual UI regression gate, but expansion-state preservation semantics are now automated.
 
-Inspector still needs consolidated coverage for no/stale selection, structural mutation while open, invalid numeric text, NaN/Inf, long names, invalid camera lens, add/remove refresh and focus/cancel/commit lifecycle.
+#### Inspector — VERIFIED / CLOSED for headless authoring model
+
+The generic Inspector model/command matrix now covers:
+
+- no selection;
+- Name-only, Transform-only, Renderable-only and Camera-only entities;
+- multi-component entities;
+- add component → refresh → undo → refresh → redo → refresh;
+- remove component → refresh → undo restore → refresh;
+- stale entity refresh clearing presentation state;
+- stale Inspector presentation after structural component removal;
+- invalid numeric text;
+- NaN and Inf rejection;
+- overlong Name rejection through runtime semantic validation;
+- invalid Camera FOV/aspect/near/far rejection;
+- valid Camera edit + undo;
+- component-storage churn followed by property commit/refresh, proving the model does not retain raw component pointers.
+
+Win32 text-control focus, Enter/focus-loss commit and Escape cancel remain intentionally assigned to the separate manual UI regression/input-routing gate; they are not properties of EditorInspectorModel.
 
 Gizmo still needs the complete Local/World/parent/non-uniform/cancel/capture-loss/tool-switch evidence matrix.
 
@@ -509,7 +527,7 @@ e7144560 — phase16: cover editor history failure and budget semantics
 
 ## 13. Recommended next implementation order
 
-1. Complete Inspector and gizmo negative/lifecycle test matrices.
+1. Complete gizmo negative/lifecycle test matrix.
 2. Add real-engine function reflection proof and remaining reflection performance measurements.
 3. Close remaining allocation-discipline evidence for editor presentation/hot paths.
 4. Clarify the transient prefab-prototype seam without Phase 17 persistence.

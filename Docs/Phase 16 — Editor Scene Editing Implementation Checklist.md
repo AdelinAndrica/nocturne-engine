@@ -1021,8 +1021,8 @@ Măsurăm, nu ghicim:
 - [x] add component.
 - [x] remove component.
 - [x] undo component add/remove.
-- [ ] inspector transform edit.
-- [ ] inspector camera validation.
+- [x] inspector transform edit.
+- [x] inspector camera validation.
 - [ ] asset assignment.
 - [x] selection invalidation.
 - [x] tool camera protection.
@@ -1050,20 +1050,20 @@ Măsurăm, nu ghicim:
 
 # 42. Inspector tests
 
-- [ ] no selection.
-- [ ] Name only.
-- [ ] Transform.
-- [ ] Renderable.
-- [ ] Camera.
-- [ ] multiple components.
-- [ ] add/remove refresh.
-- [ ] stale entity.
-- [ ] invalid text.
-- [ ] NaN/Inf.
-- [ ] too-long name.
-- [ ] invalid lens.
-- [ ] structural mutation while Inspector open.
-- [ ] pointer invalidation safety.
+- [x] no selection.
+- [x] Name only.
+- [x] Transform.
+- [x] Renderable.
+- [x] Camera.
+- [x] multiple components.
+- [x] add/remove refresh.
+- [x] stale entity.
+- [x] invalid text.
+- [x] NaN/Inf.
+- [x] too-long name.
+- [x] invalid lens.
+- [x] structural mutation while Inspector open.
+- [x] pointer invalidation safety.
 
 ---
 

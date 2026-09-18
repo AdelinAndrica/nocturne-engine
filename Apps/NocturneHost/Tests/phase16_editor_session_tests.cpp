@@ -17,6 +17,8 @@
 #include <cmath>
 #include <cstring>
 #include <memory>
+#include <string>
+#include <vector>
 
 namespace
 {
@@ -1521,6 +1523,525 @@ bool RunPhase16EditorSessionTests()
             "Generic enum Inspector cleanup failed");
 
         session.History().Clear();
+    }
+
+    {
+        noc::World inspectorWorld;
+        nocturne::editor::EditorInspectorModel
+            inspectorMatrixModel;
+        nocturne::editor::EditorCommandHistory
+            inspectorHistory;
+
+        ok &= CheckEditorSession(
+            inspectorWorld.Init(
+                allocator,
+                reflection),
+            "Inspector matrix World init failed");
+
+        nocturne::editor::EditorCommandContext
+            inspectorContext{
+                inspectorWorld,
+                reflection,
+                allocator,
+                noc::EntityHandle::Invalid()
+            };
+
+        inspectorHistory.Configure(
+            128,
+            4u * 1024u * 1024u);
+
+        ok &= CheckEditorSession(
+            inspectorMatrixModel.Refresh(
+                inspectorContext,
+                noc::EntityHandle::Invalid())
+                && !inspectorMatrixModel.Entity().IsValid()
+                && inspectorMatrixModel.Components().empty(),
+            "Inspector no-selection state failed");
+
+        const noc::EntityHandle nameOnly =
+            inspectorWorld.CreateEntity();
+        const noc::EntityHandle transformOnly =
+            inspectorWorld.CreateEntity();
+        const noc::EntityHandle renderableOnly =
+            inspectorWorld.CreateEntity();
+        const noc::EntityHandle cameraOnly =
+            inspectorWorld.CreateEntity();
+
+        const noc::AABB inspectorBounds{
+            noc::Vec3{ -1.0f, -1.0f, -1.0f },
+            noc::Vec3{ 1.0f, 1.0f, 1.0f }
+        };
+
+        ok &= CheckEditorSession(
+            nameOnly.IsValid()
+                && transformOnly.IsValid()
+                && renderableOnly.IsValid()
+                && cameraOnly.IsValid()
+                && inspectorWorld.AddName(
+                    nameOnly,
+                    "Name Only")
+                && inspectorWorld.AddTransform(
+                    transformOnly)
+                && inspectorWorld.AddRenderable(
+                    renderableOnly,
+                    noc::ResourceHandle{},
+                    inspectorBounds)
+                && inspectorWorld.AddCamera(
+                    cameraOnly),
+            "Inspector isolated-component setup failed");
+
+        ok &= CheckEditorSession(
+            inspectorMatrixModel.Refresh(
+                inspectorContext,
+                nameOnly)
+                && inspectorMatrixModel.Components().size() == 1
+                && inspectorMatrixModel.FindProperty(
+                    noc::TypeId{
+                        noc::kNameComponentTypeId.value },
+                    noc::MakePropertyId(
+                        "Nocturne.Name.value")),
+            "Inspector Name-only projection failed");
+
+        ok &= CheckEditorSession(
+            inspectorMatrixModel.Refresh(
+                inspectorContext,
+                transformOnly)
+                && inspectorMatrixModel.Components().size() == 1
+                && inspectorMatrixModel.FindProperty(
+                    noc::TypeId{
+                        noc::kTransformComponentTypeId.value },
+                    noc::MakePropertyId(
+                        "Nocturne.Transform.localTranslation")),
+            "Inspector Transform-only projection failed");
+
+        ok &= CheckEditorSession(
+            inspectorMatrixModel.Refresh(
+                inspectorContext,
+                renderableOnly)
+                && inspectorMatrixModel.Components().size() == 1
+                && inspectorMatrixModel.FindProperty(
+                    noc::TypeId{
+                        noc::kRenderableComponentTypeId.value },
+                    noc::MakePropertyId(
+                        "Nocturne.Renderable.localBounds")),
+            "Inspector Renderable-only projection failed");
+
+        ok &= CheckEditorSession(
+            inspectorMatrixModel.Refresh(
+                inspectorContext,
+                cameraOnly)
+                && inspectorMatrixModel.Components().size() == 1
+                && inspectorMatrixModel.FindProperty(
+                    noc::TypeId{
+                        noc::kCameraComponentTypeId.value },
+                    noc::MakePropertyId(
+                        "Nocturne.Camera.fovYRadians")),
+            "Inspector Camera-only projection failed");
+
+        const noc::EntityHandle multi =
+            inspectorWorld.CreateEntity();
+
+        ok &= CheckEditorSession(
+            multi.IsValid()
+                && inspectorWorld.AddName(
+                    multi,
+                    "Inspector Matrix")
+                && inspectorWorld.AddTransform(multi)
+                && inspectorWorld.AddRenderable(
+                    multi,
+                    noc::ResourceHandle{},
+                    inspectorBounds)
+                && inspectorWorld.AddCamera(multi)
+                && inspectorMatrixModel.Refresh(
+                    inspectorContext,
+                    multi)
+                && inspectorMatrixModel.Components().size() == 4,
+            "Inspector multi-component projection failed");
+
+        inspectorHistory.Clear();
+
+        const noc::Vec3 originalTranslation =
+            inspectorWorld.GetTransform(multi)
+                ->localTranslation;
+
+        const uint32_t invalidHistoryCount =
+            inspectorHistory.CommandCount();
+
+        ok &= CheckEditorSession(
+            !inspectorMatrixModel.CommitTextEdit(
+                inspectorContext,
+                inspectorHistory,
+                multi,
+                noc::TypeId{
+                    noc::kTransformComponentTypeId.value },
+                noc::MakePropertyId(
+                    "Nocturne.Transform.localTranslation"),
+                "not-a-vector")
+                && !inspectorMatrixModel.CommitTextEdit(
+                    inspectorContext,
+                    inspectorHistory,
+                    multi,
+                    noc::TypeId{
+                        noc::kTransformComponentTypeId.value },
+                    noc::MakePropertyId(
+                        "Nocturne.Transform.localTranslation"),
+                    "nan, 0, 0")
+                && !inspectorMatrixModel.CommitTextEdit(
+                    inspectorContext,
+                    inspectorHistory,
+                    multi,
+                    noc::TypeId{
+                        noc::kTransformComponentTypeId.value },
+                    noc::MakePropertyId(
+                        "Nocturne.Transform.localTranslation"),
+                    "inf, 0, 0")
+                && inspectorHistory.CommandCount()
+                    == invalidHistoryCount
+                && inspectorWorld.GetTransform(multi)
+                    ->localTranslation
+                    == originalTranslation,
+            "Inspector invalid/NaN/Inf numeric input mutated state or history");
+
+        const std::string tooLongName(
+            noc::kNameComponentMaxBytes + 8u,
+            'N');
+
+        ok &= CheckEditorSession(
+            !inspectorMatrixModel.CommitTextEdit(
+                inspectorContext,
+                inspectorHistory,
+                multi,
+                noc::TypeId{
+                    noc::kNameComponentTypeId.value },
+                noc::MakePropertyId(
+                    "Nocturne.Name.value"),
+                tooLongName.c_str())
+                && std::strcmp(
+                    inspectorWorld.GetName(multi)->value,
+                    "Inspector Matrix") == 0
+                && inspectorHistory.CommandCount()
+                    == invalidHistoryCount,
+            "Inspector overlong Name bypassed runtime validation");
+
+        const noc::CameraComponent* cameraBeforeInvalid =
+            inspectorWorld.GetCamera(multi);
+
+        const float originalFov =
+            cameraBeforeInvalid->fovYRadians;
+        const float originalAspect =
+            cameraBeforeInvalid->aspect;
+        const float originalNear =
+            cameraBeforeInvalid->nearZ;
+        const float originalFar =
+            cameraBeforeInvalid->farZ;
+
+        ok &= CheckEditorSession(
+            !inspectorMatrixModel.CommitTextEdit(
+                inspectorContext,
+                inspectorHistory,
+                multi,
+                noc::TypeId{
+                    noc::kCameraComponentTypeId.value },
+                noc::MakePropertyId(
+                    "Nocturne.Camera.fovYRadians"),
+                "0")
+                && !inspectorMatrixModel.CommitTextEdit(
+                    inspectorContext,
+                    inspectorHistory,
+                    multi,
+                    noc::TypeId{
+                        noc::kCameraComponentTypeId.value },
+                noc::MakePropertyId(
+                    "Nocturne.Camera.aspect"),
+                "0")
+                && !inspectorMatrixModel.CommitTextEdit(
+                    inspectorContext,
+                    inspectorHistory,
+                    multi,
+                    noc::TypeId{
+                        noc::kCameraComponentTypeId.value },
+                    noc::MakePropertyId(
+                        "Nocturne.Camera.nearZ"),
+                    "2000")
+                && !inspectorMatrixModel.CommitTextEdit(
+                    inspectorContext,
+                    inspectorHistory,
+                    multi,
+                    noc::TypeId{
+                        noc::kCameraComponentTypeId.value },
+                    noc::MakePropertyId(
+                        "Nocturne.Camera.farZ"),
+                    "0.01")
+                && inspectorHistory.CommandCount()
+                    == invalidHistoryCount,
+            "Inspector invalid camera lens values entered history");
+
+        const noc::CameraComponent* cameraAfterInvalid =
+            inspectorWorld.GetCamera(multi);
+
+        ok &= CheckEditorSession(
+            cameraAfterInvalid
+                && cameraAfterInvalid->fovYRadians
+                    == originalFov
+                && cameraAfterInvalid->aspect
+                    == originalAspect
+                && cameraAfterInvalid->nearZ
+                    == originalNear
+                && cameraAfterInvalid->farZ
+                    == originalFar,
+            "Inspector invalid camera lens values mutated runtime state");
+
+        ok &= CheckEditorSession(
+            inspectorMatrixModel.CommitTextEdit(
+                inspectorContext,
+                inspectorHistory,
+                multi,
+                noc::TypeId{
+                    noc::kCameraComponentTypeId.value },
+                noc::MakePropertyId(
+                    "Nocturne.Camera.fovYRadians"),
+                "1.2")
+                && inspectorWorld.GetCamera(multi)
+                && std::fabs(
+                    inspectorWorld.GetCamera(multi)
+                        ->fovYRadians
+                        - 1.2f) < 1.0e-5f
+                && inspectorHistory.Undo(
+                    inspectorContext)
+                && std::fabs(
+                    inspectorWorld.GetCamera(multi)
+                        ->fovYRadians
+                        - originalFov) < 1.0e-5f,
+            "Inspector valid Camera edit/undo failed");
+
+        inspectorHistory.Clear();
+
+        const noc::EntityHandle componentEntity =
+            inspectorWorld.CreateEntity();
+
+        ok &= CheckEditorSession(
+            componentEntity.IsValid()
+                && inspectorWorld.AddName(
+                    componentEntity,
+                    "Component Refresh")
+                && inspectorMatrixModel.Refresh(
+                    inspectorContext,
+                    componentEntity)
+                && !inspectorMatrixModel.FindProperty(
+                    noc::TypeId{
+                        noc::kTransformComponentTypeId.value },
+                    noc::MakePropertyId(
+                        "Nocturne.Transform.localTranslation")),
+            "Inspector add/remove refresh setup failed");
+
+        auto addTransform =
+            std::make_unique<
+                nocturne::editor::AddComponentCommand>();
+
+        ok &= CheckEditorSession(
+            addTransform->Init(
+                inspectorContext,
+                componentEntity,
+                noc::TypeId{
+                    noc::kTransformComponentTypeId.value })
+                && inspectorHistory.Execute(
+                    inspectorContext,
+                    std::move(addTransform))
+                && inspectorMatrixModel.Refresh(
+                    inspectorContext,
+                    componentEntity)
+                && inspectorMatrixModel.FindProperty(
+                    noc::TypeId{
+                        noc::kTransformComponentTypeId.value },
+                    noc::MakePropertyId(
+                        "Nocturne.Transform.localTranslation")),
+            "Inspector Add Component refresh failed");
+
+        ok &= CheckEditorSession(
+            inspectorHistory.Undo(
+                inspectorContext)
+                && inspectorMatrixModel.Refresh(
+                    inspectorContext,
+                    componentEntity)
+                && !inspectorMatrixModel.FindProperty(
+                    noc::TypeId{
+                        noc::kTransformComponentTypeId.value },
+                    noc::MakePropertyId(
+                        "Nocturne.Transform.localTranslation"))
+                && inspectorHistory.Redo(
+                    inspectorContext)
+                && inspectorMatrixModel.Refresh(
+                    inspectorContext,
+                    componentEntity)
+                && inspectorMatrixModel.FindProperty(
+                    noc::TypeId{
+                        noc::kTransformComponentTypeId.value },
+                    noc::MakePropertyId(
+                        "Nocturne.Transform.localTranslation")),
+            "Inspector Add Component undo/redo refresh failed");
+
+        inspectorHistory.Clear();
+
+        auto removeTransform =
+            std::make_unique<
+                nocturne::editor::RemoveComponentCommand>();
+
+        ok &= CheckEditorSession(
+            removeTransform->Init(
+                inspectorContext,
+                componentEntity,
+                noc::TypeId{
+                    noc::kTransformComponentTypeId.value })
+                && inspectorHistory.Execute(
+                    inspectorContext,
+                    std::move(removeTransform))
+                && inspectorMatrixModel.Refresh(
+                    inspectorContext,
+                    componentEntity)
+                && !inspectorMatrixModel.FindProperty(
+                    noc::TypeId{
+                        noc::kTransformComponentTypeId.value },
+                    noc::MakePropertyId(
+                        "Nocturne.Transform.localTranslation"))
+                && inspectorHistory.Undo(
+                    inspectorContext)
+                && inspectorMatrixModel.Refresh(
+                    inspectorContext,
+                    componentEntity)
+                && inspectorMatrixModel.FindProperty(
+                    noc::TypeId{
+                        noc::kTransformComponentTypeId.value },
+                    noc::MakePropertyId(
+                        "Nocturne.Transform.localTranslation")),
+            "Inspector Remove Component refresh/undo failed");
+
+        inspectorHistory.Clear();
+
+        ok &= CheckEditorSession(
+            inspectorMatrixModel.Refresh(
+                inspectorContext,
+                cameraOnly)
+                && inspectorWorld.RemoveCamera(
+                    cameraOnly)
+                && !inspectorMatrixModel.CommitTextEdit(
+                    inspectorContext,
+                    inspectorHistory,
+                    cameraOnly,
+                    noc::TypeId{
+                        noc::kCameraComponentTypeId.value },
+                    noc::MakePropertyId(
+                        "Nocturne.Camera.fovYRadians"),
+                    "1.1")
+                && inspectorHistory.CommandCount() == 0
+                && inspectorMatrixModel.Refresh(
+                    inspectorContext,
+                    cameraOnly)
+                && !inspectorMatrixModel.FindProperty(
+                    noc::TypeId{
+                        noc::kCameraComponentTypeId.value },
+                    noc::MakePropertyId(
+                        "Nocturne.Camera.fovYRadians")),
+            "Inspector structural mutation while open was not stale-safe");
+
+        const noc::EntityHandle pointerSafe =
+            inspectorWorld.CreateEntity();
+
+        ok &= CheckEditorSession(
+            pointerSafe.IsValid()
+                && inspectorWorld.AddTransform(pointerSafe)
+                && inspectorMatrixModel.Refresh(
+                    inspectorContext,
+                    pointerSafe)
+                && inspectorMatrixModel.FindProperty(
+                    noc::TypeId{
+                        noc::kTransformComponentTypeId.value },
+                    noc::MakePropertyId(
+                        "Nocturne.Transform.localTranslation")),
+            "Inspector pointer-invalidation setup failed");
+
+        std::vector<noc::EntityHandle>
+            storageChurnEntities;
+        try
+        {
+            storageChurnEntities.reserve(512);
+
+            for (uint32_t i = 0;
+                 i < 512;
+                 ++i)
+            {
+                const noc::EntityHandle entity =
+                    inspectorWorld.CreateEntity();
+
+                if (!entity.IsValid()
+                    || !inspectorWorld.AddTransform(entity))
+                {
+                    ok &= CheckEditorSession(
+                        false,
+                        "Inspector component-storage churn setup failed");
+                    break;
+                }
+
+                storageChurnEntities.push_back(entity);
+            }
+        }
+        catch (const std::bad_alloc&)
+        {
+            ok &= CheckEditorSession(
+                false,
+                "Inspector component-storage churn allocation failed");
+        }
+
+        inspectorHistory.Clear();
+
+        ok &= CheckEditorSession(
+            inspectorMatrixModel.CommitTextEdit(
+                inspectorContext,
+                inspectorHistory,
+                pointerSafe,
+                noc::TypeId{
+                    noc::kTransformComponentTypeId.value },
+                noc::MakePropertyId(
+                    "Nocturne.Transform.localTranslation"),
+                "11, 12, 13")
+                && inspectorWorld.GetTransform(pointerSafe)
+                && inspectorWorld.GetTransform(pointerSafe)
+                    ->localTranslation.x == 11.0f
+                && inspectorMatrixModel.Refresh(
+                    inspectorContext,
+                    pointerSafe),
+            "Inspector retained invalid component pointers across storage relocation");
+
+        for (const noc::EntityHandle entity :
+             storageChurnEntities)
+        {
+            ok &= CheckEditorSession(
+                inspectorWorld.DestroyEntity(entity),
+                "Inspector storage-churn cleanup failed");
+        }
+
+        const noc::EntityHandle staleInspectorEntity =
+            inspectorWorld.CreateEntity();
+
+        ok &= CheckEditorSession(
+            staleInspectorEntity.IsValid()
+                && inspectorWorld.AddName(
+                    staleInspectorEntity,
+                    "Stale Inspector")
+                && inspectorMatrixModel.Refresh(
+                    inspectorContext,
+                    staleInspectorEntity)
+                && inspectorWorld.DestroyEntity(
+                    staleInspectorEntity)
+                && !inspectorMatrixModel.Refresh(
+                    inspectorContext,
+                    staleInspectorEntity)
+                && !inspectorMatrixModel.Entity().IsValid()
+                && inspectorMatrixModel.Components().empty(),
+            "Inspector stale-entity refresh did not clear presentation state");
+
+        inspectorHistory.Clear();
+        inspectorMatrixModel.Clear();
+        inspectorWorld.Shutdown();
     }
 
     const noc::Vec3 first{ 1.0f, 2.0f, 3.0f };
