@@ -61,6 +61,9 @@ namespace noc {
 		JobSystem& Jobs() { return jobs_; }
 		const JobSystem& Jobs() const { return jobs_; }
 
+		ReflectionRegistry& Reflection() { return reflection_; }
+		const ReflectionRegistry& Reflection() const { return reflection_; }
+
 		World& GetWorld() { return world_; }
 		const World& GetWorld() const { return world_; }
 
@@ -103,6 +106,10 @@ namespace noc {
 		InputSystem input_;
 
 		RenderSystem render_;
+
+		// Phase 16 authoritative runtime schema. Declared before World so
+		// destruction order naturally keeps reflection alive through World.
+		ReflectionRegistry reflection_;
 		World world_;
 
 		EngineConfig cfg_{};
