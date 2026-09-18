@@ -1,3 +1,16 @@
+# What Phase 17 must reuse from Phase 16
+
+Phase 17 scene persistence must build on the existing authoritative reflection and editor authoring seams rather than replace them:
+
+- `ReflectionRegistry` and stable `TypeId` / `PropertyId`;
+- reflected component enumeration and semantic property access;
+- `OwnedReflectedValue` lifecycle/allocator semantics;
+- `ReflectedComponentSnapshot`;
+- `ReflectedEntitySubtreeSnapshot`;
+- `TransientEntityPrototype` as an in-memory prototype seam only.
+
+**Design choice (not directly from the book):** `TransientEntityPrototype` is not a persistent prefab representation. Phase 17 must define durable scene/prefab identity, file format, reference fixups, migration/version policy and atomic persistence independently while reusing reflection schema and semantic access.
+
 # Handoff — Phase 16: Editor Scene Editing + Runtime Reflection
 
 > **Current implementation note — 2026-09-18**

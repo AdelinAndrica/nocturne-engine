@@ -5,6 +5,7 @@
 #include "../../NocturneEditor/EditorReflectionSnapshot.h"
 #include "../../NocturneEditor/EditorSession.h"
 #include "../../NocturneEditor/EditorTransformMath.h"
+#include "../../NocturneEditor/EditorTransientPrototype.h"
 
 #include "Core/Log.h"
 #include "Core/Memory/Allocator.h"
@@ -3124,12 +3125,119 @@ bool RunPhase16EditorSessionTests()
 
         session.History().Clear();
 
+        nocturne::editor::TransientEntityPrototype
+            prototype;
+
         ok &= CheckEditorSession(
-            world.DestroyEntity(duplicateChild2)
+            prototype.Capture(
+                context,
+                sourceRoot)
+                && prototype.IsValid()
+                && prototype.EntityCount() == 2
+                && world.IsAlive(sourceRoot)
+                && world.IsAlive(sourceChild),
+            "Transient prototype capture failed or mutated source");
+
+        noc::EntityHandle prototypeRootA{};
+        noc::EntityHandle prototypeRootB{};
+
+        ok &= CheckEditorSession(
+            prototype.Instantiate(
+                context,
+                noc::EntityHandle::Invalid(),
+                prototypeRootA)
+                && prototype.Instantiate(
+                    context,
+                    noc::EntityHandle::Invalid(),
+                    prototypeRootB),
+            "Transient prototype repeated instantiate failed");
+
+        const noc::EntityHandle prototypeChildA =
+            world.FirstChildOf(prototypeRootA);
+        const noc::EntityHandle prototypeChildB =
+            world.FirstChildOf(prototypeRootB);
+
+        ok &= CheckEditorSession(
+            prototypeRootA.IsValid()
+                && prototypeRootB.IsValid()
+                && prototypeChildA.IsValid()
+                && prototypeChildB.IsValid()
+                && prototypeRootA != prototypeRootB
+                && prototypeRootA != sourceRoot
+                && prototypeRootB != sourceRoot
+                && prototypeChildA != prototypeChildB
+                && world.GetName(prototypeRootA)
+                && world.GetName(prototypeRootB)
+                && world.GetName(prototypeChildA)
+                && world.GetName(prototypeChildB)
+                && std::strcmp(
+                    world.GetName(prototypeRootA)->value,
+                    "Delete Parent") == 0
+                && std::strcmp(
+                    world.GetName(prototypeChildA)->value,
+                    "Delete Child") == 0
+                && std::strcmp(
+                    world.GetName(prototypeRootB)->value,
+                    "Delete Parent") == 0
+                && std::strcmp(
+                    world.GetName(prototypeChildB)->value,
+                    "Delete Child") == 0
+                && world.ParentOf(prototypeChildA)
+                    == prototypeRootA
+                && world.ParentOf(prototypeChildB)
+                    == prototypeRootB,
+            "Transient prototype instances lost reflected subtree state");
+
+        const noc::EntityHandle prototypeParent =
+            world.CreateEntity();
+
+        ok &= CheckEditorSession(
+            prototypeParent.IsValid()
+                && world.AddTransform(prototypeParent),
+            "Transient prototype parent setup failed");
+
+        noc::EntityHandle prototypeRootC{};
+
+        ok &= CheckEditorSession(
+            prototype.Instantiate(
+                context,
+                prototypeParent,
+                prototypeRootC)
+                && world.ParentOf(prototypeRootC)
+                    == prototypeParent,
+            "Transient prototype parented instantiate failed");
+
+        nocturne::editor::TransientEntityPrototype
+            toolPrototype;
+
+        ok &= CheckEditorSession(
+            !toolPrototype.Capture(
+                context,
+                camera),
+            "Transient prototype captured tool-owned editor camera");
+
+        prototype.Clear();
+
+        ok &= CheckEditorSession(
+            !prototype.IsValid(),
+            "Transient prototype Clear failed");
+
+        ok &= CheckEditorSession(
+            world.DestroyEntity(
+                world.FirstChildOf(prototypeRootA))
+                && world.DestroyEntity(prototypeRootA)
+                && world.DestroyEntity(
+                    world.FirstChildOf(prototypeRootB))
+                && world.DestroyEntity(prototypeRootB)
+                && world.DestroyEntity(
+                    world.FirstChildOf(prototypeRootC))
+                && world.DestroyEntity(prototypeRootC)
+                && world.DestroyEntity(prototypeParent)
+                && world.DestroyEntity(duplicateChild2)
                 && world.DestroyEntity(duplicateRoot2)
                 && world.DestroyEntity(sourceChild)
                 && world.DestroyEntity(sourceRoot),
-            "Delete/duplicate test cleanup failed");
+            "Delete/duplicate/prototype test cleanup failed");
 
         auto toolDelete =
             std::make_unique<

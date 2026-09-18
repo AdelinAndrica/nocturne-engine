@@ -70,6 +70,7 @@
     <ClInclude Include="..\..\..\Apps\NocturneHost\ZipWriter.h" />
     <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorHierarchyModel.h" />
     <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorGizmoTransaction.h" />
+    <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorTransientPrototype.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>18.0</VCProjectVersion>

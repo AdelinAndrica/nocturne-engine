@@ -30,6 +30,7 @@
     <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorHierarchyModel.h" />
     <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorViewportController.h" />
     <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorGizmoTransaction.h" />
+    <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorTransientPrototype.h" />
     <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorCommands.h" />
     <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorReflectionSnapshot.h" />
     <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorEntitySnapshot.h" />

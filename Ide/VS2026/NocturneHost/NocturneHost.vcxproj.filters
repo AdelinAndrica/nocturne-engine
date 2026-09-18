@@ -77,5 +77,8 @@
     <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorGizmoTransaction.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorTransientPrototype.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -330,7 +330,7 @@ Keyboard shortcuts, Actor menu actions, hierarchy drag/drop and hierarchy contex
 | Dedicated gizmo matrix | PARTIAL |
 | Real-engine function reflection proof | VERIFIED — real Vec3.Length / Vec3.Dot functions are registered in builtin runtime schema and invoked generically |
 | Reflection perf contract expansion | VERIFIED — TypeId/name/property/function lookup, raw+generic invoke, property enumeration and reflected component enumeration measured |
-| Explicit prefab prototype seam | PARTIAL — transient snapshot/instantiate mechanism exists; explicit prototype contract remains |
+| Explicit prefab prototype seam | VERIFIED — TransientEntityPrototype explicitly reuses reflected subtree snapshots with no prefab file/asset ID/persistent identity/serialization claims |
 | Manual Phase 13/14/15 UI regression | OPEN |
 | 15+ minute edit-session soak | OPEN |
 | Final Phase 16 Implementation Report | OPEN |
@@ -517,11 +517,23 @@ Automated proof covers stable FunctionId lookup, canonical-name lookup, return/p
 
 The reflection performance baseline now measures TypeId lookup, canonical-name lookup, property lookup/read/enumeration, function lookup, raw function invocation, generic validated function invocation and reflected component enumeration. Frozen lookup/enumeration/raw-invoke paths are asserted not to call the reflection allocator. Generic invocation reports its OwnedReflectedValue allocation cost separately.
 
-### 11.7 Prefab prototype seam
+### 11.7 Prefab prototype seam — VERIFIED
 
-ReflectedEntitySubtreeSnapshot already supplies much of the transient capture/instantiate mechanism.
+\`TransientEntityPrototype\` now makes the Phase 16 prototype seam explicit while reusing \`ReflectedEntitySubtreeSnapshot\` as the only reflected subtree template representation.
 
-Phase 16 should make the prototype seam explicit without introducing prefab persistence, prefab files, persistent IDs or serialized references. Durable representation belongs to the appropriate later persistence/prefab phase.
+**Design choice (not directly from the book):** this type is editor-only and in-memory. It does not define a prefab file, asset identity, persistent entity identity, serialized entity references, migration/version compatibility, override persistence or disk format.
+
+Automated coverage verifies:
+
+- capture leaves the source subtree alive;
+- reflection-backed Name/Transform/component state is retained;
+- the same transient prototype can instantiate repeatedly;
+- every instance receives fresh runtime EntityHandles;
+- parented instantiation works;
+- tool-owned editor camera capture is rejected;
+- prototype Clear releases the transient template state.
+
+The reusable seam for Phase 17 is therefore the reflected schema plus subtree capture/instantiate mechanics, not the transient runtime handles.
 
 ### 11.8 Manual regression and soak
 
@@ -583,14 +595,13 @@ e7144560 — phase16: cover editor history failure and budget semantics
 
 ## 13. Recommended next implementation order
 
-1. Clarify the transient prefab-prototype seam without Phase 17 persistence.
-2. Run full manual Phase 13/14/15 regression plus 15+ minute edit-session soak.
-3. Resolve remaining in-scope repository/build hygiene.
-4. Reconcile every remaining unchecked checklist gate with evidence or an explicit defer.
-5. Produce Phase 16 Implementation Report.
-6. Produce Phase 16 Test and CI Validation Report.
-7. Produce Phase 16 Completion Report only after all completion gates pass.
-8. Write Phase 17 handoff and update roadmap.
+1. Run full manual Phase 13/14/15 regression plus 15+ minute edit-session soak.
+2. Resolve remaining in-scope repository/build hygiene.
+3. Reconcile every remaining unchecked checklist gate with evidence or an explicit defer.
+4. Produce Phase 16 Implementation Report.
+5. Produce Phase 16 Test and CI Validation Report.
+6. Produce Phase 16 Completion Report only after all completion gates pass.
+7. Finalize the Phase 17 handoff draft and update roadmap.
 
 ---
 

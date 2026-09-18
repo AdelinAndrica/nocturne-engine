@@ -834,13 +834,13 @@ Dacă nu este implementat:
 
 # 31. Prefab prototype seam
 
-- [ ] Nu introducem prefab file.
-- [ ] Reuse transient snapshot/instantiate mechanism.
-- [ ] Prototype scope explicitly named.
-- [ ] No persistent asset ID assumptions.
-- [ ] No serialized references.
-- [ ] No false compatibility guarantees.
-- [ ] Phase 17 handoff states what can be reused.
+- [x] Nu introducem prefab file.
+- [x] Reuse transient snapshot/instantiate mechanism.
+- [x] Prototype scope explicitly named.
+- [x] No persistent asset ID assumptions.
+- [x] No serialized references.
+- [x] No false compatibility guarantees.
+- [x] Phase 17 handoff states what can be reused.
 
 ---
 
