@@ -53,6 +53,7 @@
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorCommands.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorReflectionSnapshot.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorEntitySnapshot.cpp" />
+    <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorInspectorModel.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorSession.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorCommandHistory.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneHost\ZipWriter.cpp" />

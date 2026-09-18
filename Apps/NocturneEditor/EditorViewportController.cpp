@@ -695,8 +695,12 @@ namespace nocturne::editor
         gizmoAxis_ = -1;
         RefreshDebugSelection_();
 
-        if (syncTree && shell_)
-            shell_->SyncSceneSelection();
+        if (shell_)
+        {
+            if (syncTree)
+                shell_->SyncSceneSelection();
+            shell_->RefreshInspector();
+        }
 
         if (overlay_)
             InvalidateRect(overlay_, nullptr, FALSE);
@@ -1020,6 +1024,8 @@ namespace nocturne::editor
         }
 
         RefreshDebugSelection_();
+        if (shell_)
+            shell_->RefreshInspector();
 
         if (overlay_)
             InvalidateRect(overlay_, nullptr, FALSE);

@@ -17,6 +17,7 @@
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorCommands.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorReflectionSnapshot.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorEntitySnapshot.cpp" />
+    <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorInspectorModel.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorSession.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorCommandHistory.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorTheme.cpp" />
@@ -30,6 +31,7 @@
     <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorCommands.h" />
     <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorReflectionSnapshot.h" />
     <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorEntitySnapshot.h" />
+    <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorInspectorModel.h" />
     <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorSession.h" />
     <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorCommandHistory.h" />
     <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorTheme.h" />

@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "Platform/Win32/WinWindow.h"
+#include "EditorInspectorModel.h"
 
 namespace noc { class Engine; }
 namespace nocturne::editor { class EditorSession; }
@@ -39,6 +40,7 @@ namespace nocturne::editor
         HWND SceneTree() const { return sceneTree_; }
         int ActiveToolId() const { return activeToolId_; }
         void SyncSceneSelection();
+        void RefreshInspector();
 
     private:
         enum ControlId : int
@@ -150,6 +152,7 @@ namespace nocturne::editor
         HWND buildButton_ = nullptr;
         HWND status_ = nullptr;
 
+        EditorInspectorModel inspectorModel_;
         int activeToolId_ = IdToolbarSelect;
         std::wstring contentRoot_ = L"Data";
     };

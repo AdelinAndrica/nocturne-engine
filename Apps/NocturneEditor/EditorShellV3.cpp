@@ -1,5 +1,6 @@
 #include "EditorShellV3.h"
 #include "EditorSession.h"
+#include "EditorCommands.h"
 #include "Runtime/Entity.h"
 #include "EditorTheme.h"
 #include "EditorIconRenderer.h"
@@ -1019,6 +1020,38 @@ namespace nocturne::editor
             session_->SelectedEntity());
     }
 
+    void EditorShellV3::RefreshInspector()
+    {
+        inspectorModel_.Clear();
+
+        if (!engine_ || !session_)
+            return;
+
+        const noc::EntityHandle selected =
+            session_->SelectedEntity();
+
+        if (selected.IsValid())
+        {
+            auto context =
+                session_->CommandContext();
+
+            if (!inspectorModel_.Refresh(
+                    context,
+                    selected))
+            {
+                inspectorModel_.Clear();
+                AppendConsole_(
+                    L"Inspector refresh failed.");
+            }
+        }
+
+        if (inspector_.body)
+            InvalidateRect(
+                inspector_.body,
+                nullptr,
+                FALSE);
+    }
+
     void EditorShellV3::PopulateContent_()
     {
         TreeClear(contentTree_); TableClear(contentTable_); TreeAdd(contentTree_, L"Content", 0, Icon::Folder, true, true);
@@ -1071,6 +1104,8 @@ namespace nocturne::editor
                 if (session_->History().Undo(context))
                 {
                     session_->SetSceneDirty();
+                    PopulateScene_();
+                    RefreshInspector();
                     AppendConsole_(L"Undo applied.");
                 }
                 else AppendConsole_(L"Undo failed; history cursor preserved.");
@@ -1083,6 +1118,8 @@ namespace nocturne::editor
                 if (session_->History().Redo(context))
                 {
                     session_->SetSceneDirty();
+                    PopulateScene_();
+                    RefreshInspector();
                     AppendConsole_(L"Redo applied.");
                 }
                 else AppendConsole_(L"Redo failed; history cursor preserved.");
@@ -1156,7 +1193,7 @@ namespace nocturne::editor
                     session_->ClearSelection();
 
                 SyncSceneSelection();
-                InvalidateRect(inspector_.body, nullptr, FALSE);
+                RefreshInspector();
                 UpdateStatus_();
                 result = 0;
                 return true;
@@ -1184,9 +1221,188 @@ namespace nocturne::editor
             }
             if (dis->hwndItem == inspector_.body)
             {
-                RECT rc=dis->rcItem; Fill(dis->hDC,rc,c.panelBg); RECT title{rc.left+18,rc.top+54,rc.right-18,rc.top+78}; DrawTextUi(dis->hDC,L"No object selected",title,c.textPrimary,uiBold_,DT_CENTER|DT_VCENTER|DT_SINGLELINE);
-                RECT helper{rc.left+20,rc.top+84,rc.right-20,rc.top+120}; DrawTextUi(dis->hDC,L"Select an object in the scene to inspect its properties.",helper,c.textMuted,smallFont_,DT_CENTER|DT_WORDBREAK); Line(dis->hDC,rc.left+18,rc.top+142,rc.right-18,rc.top+142,c.border);
-                RECT tipsTitle{rc.left+20,rc.top+156,rc.right-20,rc.top+180}; DrawTextUi(dis->hDC,L"Tips",tipsTitle,c.textPrimary,uiBold_,DT_LEFT|DT_VCENTER|DT_SINGLELINE); const wchar_t* tips[]={L"• Select an object in Scene Hierarchy or click in the viewport.",L"• Use Select / Move / Rotate / Scale from the toolbar.",L"• Inspector components arrive with scene editing."}; int y=rc.top+185; for(const auto* tip:tips){RECT tr{rc.left+21,y,rc.right-18,y+40};DrawTextUi(dis->hDC,tip,tr,c.textMuted,smallFont_,DT_LEFT|DT_WORDBREAK);y+=52;} result=TRUE; return true;
+                RECT rc = dis->rcItem;
+                Fill(dis->hDC, rc, c.panelBg);
+
+                const noc::EntityHandle selected =
+                    inspectorModel_.Entity();
+
+                if (!selected.IsValid())
+                {
+                    RECT title{
+                        rc.left + 18,
+                        rc.top + 54,
+                        rc.right - 18,
+                        rc.top + 78
+                    };
+                    DrawTextUi(
+                        dis->hDC,
+                        L"No object selected",
+                        title,
+                        c.textPrimary,
+                        uiBold_,
+                        DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+                    RECT helper{
+                        rc.left + 20,
+                        rc.top + 84,
+                        rc.right - 20,
+                        rc.top + 124
+                    };
+                    DrawTextUi(
+                        dis->hDC,
+                        L"Select an authored entity to inspect reflected components.",
+                        helper,
+                        c.textMuted,
+                        smallFont_,
+                        DT_CENTER | DT_WORDBREAK);
+
+                    result = TRUE;
+                    return true;
+                }
+
+                std::wstring entityTitle;
+                if (engine_)
+                {
+                    const noc::NameComponent* name =
+                        engine_->GetWorld().GetName(selected);
+                    if (name && name->value[0] != '\0')
+                        entityTitle = Utf8ToWide_(name->value);
+                }
+
+                if (entityTitle.empty())
+                {
+                    std::wstringstream ss;
+                    ss << L"Entity "
+                        << selected.index
+                        << L":"
+                        << selected.generation;
+                    entityTitle = ss.str();
+                }
+
+                RECT entityRc{
+                    rc.left + 14,
+                    rc.top + 10,
+                    rc.right - 14,
+                    rc.top + 36
+                };
+                DrawTextUi(
+                    dis->hDC,
+                    entityTitle.c_str(),
+                    entityRc,
+                    c.textPrimary,
+                    uiBold_,
+                    DT_LEFT | DT_VCENTER
+                        | DT_SINGLELINE | DT_END_ELLIPSIS);
+
+                int y = rc.top + 43;
+                const int labelWidth =
+                    (std::max)(95, (rc.right - rc.left) * 42 / 100);
+
+                for (const InspectorComponentView& component :
+                     inspectorModel_.Components())
+                {
+                    if (y >= rc.bottom - 20)
+                        break;
+
+                    RECT componentRc{
+                        rc.left + 8,
+                        y,
+                        rc.right - 8,
+                        y + 26
+                    };
+                    RoundBox(
+                        dis->hDC,
+                        componentRc,
+                        c.panelBgAlt,
+                        c.border,
+                        4);
+
+                    const std::wstring componentName =
+                        Utf8ToWide_(
+                            component.displayName.c_str());
+                    RECT componentText{
+                        componentRc.left + 8,
+                        componentRc.top,
+                        componentRc.right - 8,
+                        componentRc.bottom
+                    };
+                    DrawTextUi(
+                        dis->hDC,
+                        componentName.c_str(),
+                        componentText,
+                        c.textPrimary,
+                        uiBold_,
+                        DT_LEFT | DT_VCENTER
+                            | DT_SINGLELINE | DT_END_ELLIPSIS);
+
+                    y += 31;
+
+                    for (const InspectorPropertyView& property :
+                         component.properties)
+                    {
+                        if (y >= rc.bottom - 20)
+                            break;
+
+                        const std::wstring propertyName =
+                            Utf8ToWide_(
+                                property.displayName.c_str());
+                        const std::wstring propertyValue =
+                            Utf8ToWide_(
+                                property.displayValue.c_str());
+
+                        RECT labelRc{
+                            rc.left + 14,
+                            y,
+                            rc.left + labelWidth,
+                            y + 24
+                        };
+                        RECT valueRc{
+                            rc.left + labelWidth + 4,
+                            y + 1,
+                            rc.right - 12,
+                            y + 23
+                        };
+
+                        DrawTextUi(
+                            dis->hDC,
+                            propertyName.c_str(),
+                            labelRc,
+                            c.textMuted,
+                            smallFont_,
+                            DT_LEFT | DT_VCENTER
+                                | DT_SINGLELINE | DT_END_ELLIPSIS);
+
+                        RoundBox(
+                            dis->hDC,
+                            valueRc,
+                            c.inputBg,
+                            property.editable
+                                ? c.border
+                                : Blend(c.border, c.panelBg, 55),
+                            3);
+
+                        valueRc.left += 7;
+                        valueRc.right -= 5;
+                        DrawTextUi(
+                            dis->hDC,
+                            propertyValue.c_str(),
+                            valueRc,
+                            property.editable
+                                ? c.textPrimary
+                                : c.textMuted,
+                            uiFont_,
+                            DT_LEFT | DT_VCENTER
+                                | DT_SINGLELINE | DT_END_ELLIPSIS);
+
+                        y += 27;
+                    }
+
+                    y += 7;
+                }
+
+                result = TRUE;
+                return true;
             }
             if (dis->hwndItem == content_.body || dis->hwndItem == console_.body) { Fill(dis->hDC,dis->rcItem,c.panelBg); result=TRUE; return true; }
             if (dis->hwndItem == buildPlay_.body)

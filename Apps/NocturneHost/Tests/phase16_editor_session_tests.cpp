@@ -1,4 +1,5 @@
 #include "../../NocturneEditor/EditorCommands.h"
+#include "../../NocturneEditor/EditorInspectorModel.h"
 #include "../../NocturneEditor/EditorSession.h"
 
 #include "Core/Log.h"
@@ -91,6 +92,7 @@ bool RunPhase16EditorSessionTests()
         authored.IsValid()
             && camera.IsValid()
             && world.AddTransform(authored)
+            && world.AddName(authored, "Inspector Entity")
             && world.AddTransform(camera),
         "Editor-session entity setup failed");
 
@@ -109,6 +111,91 @@ bool RunPhase16EditorSessionTests()
 
     nocturne::editor::EditorCommandContext context =
         session.CommandContext();
+
+    {
+        nocturne::editor::EditorInspectorModel inspectorModel;
+
+        ok &= CheckEditorSession(
+            inspectorModel.Refresh(
+                context,
+                authored),
+            "Generic Inspector model refresh failed");
+
+        const auto* nameValue =
+            inspectorModel.FindProperty(
+                noc::TypeId{
+                    noc::kNameComponentTypeId.value },
+                noc::MakePropertyId(
+                    "Nocturne.Name.value"));
+        const auto* translation =
+            inspectorModel.FindProperty(
+                noc::TypeId{
+                    noc::kTransformComponentTypeId.value },
+                noc::MakePropertyId(
+                    "Nocturne.Transform.localTranslation"));
+
+        ok &= CheckEditorSession(
+            nameValue
+                && nameValue->editable
+                && nameValue->displayValue
+                    == "Inspector Entity"
+                && translation
+                && translation->valueTypeId
+                    == noc::BuiltinTypeIds::Vec3,
+            "Inspector model did not enumerate reflected properties");
+
+        session.History().Clear();
+
+        ok &= CheckEditorSession(
+            inspectorModel.CommitTextEdit(
+                context,
+                session.History(),
+                authored,
+                noc::TypeId{
+                    noc::kNameComponentTypeId.value },
+                noc::MakePropertyId(
+                    "Nocturne.Name.value"),
+                "Inspector Renamed")
+                && world.GetName(authored)
+                && std::strcmp(
+                    world.GetName(authored)->value,
+                    "Inspector Renamed") == 0,
+            "Generic Inspector string edit failed");
+
+        ok &= CheckEditorSession(
+            session.History().Undo(context)
+                && std::strcmp(
+                    world.GetName(authored)->value,
+                    "Inspector Entity") == 0,
+            "Generic Inspector string undo failed");
+
+        session.History().Clear();
+
+        ok &= CheckEditorSession(
+            inspectorModel.CommitTextEdit(
+                context,
+                session.History(),
+                authored,
+                noc::TypeId{
+                    noc::kTransformComponentTypeId.value },
+                noc::MakePropertyId(
+                    "Nocturne.Transform.localTranslation"),
+                "5, 6, 7")
+                && world.GetTransform(authored)
+                && world.GetTransform(authored)
+                    ->localTranslation.x == 5.0f
+                && world.GetTransform(authored)
+                    ->localTranslation.y == 6.0f
+                && world.GetTransform(authored)
+                    ->localTranslation.z == 7.0f,
+            "Generic Inspector Vec3 edit failed");
+
+        ok &= CheckEditorSession(
+            session.History().Undo(context),
+            "Generic Inspector Vec3 undo failed");
+
+        session.History().Clear();
+    }
 
     const noc::Vec3 first{ 1.0f, 2.0f, 3.0f };
     auto firstCommand =
