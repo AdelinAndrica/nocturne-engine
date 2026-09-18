@@ -3,6 +3,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
+#include <array>
 #include <cstdint>
 #include <cwctype>
 #include <iterator>
@@ -22,7 +23,9 @@ namespace nocturne::editor
     enum class InspectorEditPresentation : uint8_t
     {
         Generic = 0,
+        Vector2Axis,
         Vector3Axis,
+        Vector4Axis,
         EulerDegreesAxis,
         AngleDegrees
     };
@@ -126,6 +129,8 @@ namespace nocturne::editor
             InspectorEditPresentation presentation =
                 InspectorEditPresentation::Generic;
             uint8_t axis = 0;
+            std::array<noc::PropertyId, 2> nestedPath{};
+            uint8_t nestedPathCount = 0;
         };
 
         struct InspectorComponentActionBinding

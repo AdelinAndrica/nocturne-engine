@@ -73,24 +73,22 @@ namespace nocturne::editor
             noc::TypeId componentTypeId,
             const InspectorPropertyView& property) noexcept
         {
-            if (componentTypeId == kInspectorTransformTypeId)
+            if (componentTypeId == kInspectorTransformTypeId
+                && property.propertyId == kInspectorRotationPropertyId
+                && property.valueTypeId == noc::BuiltinTypeIds::Quat)
             {
-                if ((property.propertyId == kInspectorTranslationPropertyId
-                        || property.propertyId == kInspectorScalePropertyId)
-                    && property.valueTypeId == noc::BuiltinTypeIds::Vec3)
-                {
-                    return InspectorEditPresentation::Vector3Axis;
-                }
-
-                if (property.propertyId == kInspectorRotationPropertyId
-                    && property.valueTypeId == noc::BuiltinTypeIds::Quat)
-                {
-                    return InspectorEditPresentation::EulerDegreesAxis;
-                }
+                return InspectorEditPresentation::EulerDegreesAxis;
             }
 
             if (property.displayAngleDegrees)
                 return InspectorEditPresentation::AngleDegrees;
+
+            if (property.valueTypeId == noc::BuiltinTypeIds::Vec2)
+                return InspectorEditPresentation::Vector2Axis;
+            if (property.valueTypeId == noc::BuiltinTypeIds::Vec3)
+                return InspectorEditPresentation::Vector3Axis;
+            if (property.valueTypeId == noc::BuiltinTypeIds::Vec4)
+                return InspectorEditPresentation::Vector4Axis;
 
             return InspectorEditPresentation::Generic;
         }
@@ -99,17 +97,60 @@ namespace nocturne::editor
             noc::TypeId componentTypeId,
             const InspectorPropertyView& property) noexcept
         {
-            const InspectorEditPresentation presentation =
-                InspectorPresentationFor(
-                    componentTypeId,
-                    property);
+            switch (InspectorPresentationFor(
+                componentTypeId,
+                property))
+            {
+            case InspectorEditPresentation::Vector2Axis:
+                return 2u;
+            case InspectorEditPresentation::Vector3Axis:
+            case InspectorEditPresentation::EulerDegreesAxis:
+                return 3u;
+            case InspectorEditPresentation::Vector4Axis:
+                return 4u;
+            default:
+                return 1u;
+            }
+        }
 
-            return presentation
-                        == InspectorEditPresentation::Vector3Axis
-                    || presentation
-                        == InspectorEditPresentation::EulerDegreesAxis
-                ? 3u
-                : 1u;
+        noc::PropertyId InspectorVectorAxisPropertyId(
+            InspectorEditPresentation presentation,
+            uint32_t axis) noexcept
+        {
+            if (presentation
+                == InspectorEditPresentation::Vector2Axis)
+            {
+                constexpr noc::PropertyId ids[] = {
+                    noc::MakePropertyId("Nocturne.Vec2.x"),
+                    noc::MakePropertyId("Nocturne.Vec2.y")
+                };
+                return axis < 2 ? ids[axis] : noc::PropertyId{};
+            }
+
+            if (presentation
+                == InspectorEditPresentation::Vector3Axis)
+            {
+                constexpr noc::PropertyId ids[] = {
+                    noc::MakePropertyId("Nocturne.Vec3.x"),
+                    noc::MakePropertyId("Nocturne.Vec3.y"),
+                    noc::MakePropertyId("Nocturne.Vec3.z")
+                };
+                return axis < 3 ? ids[axis] : noc::PropertyId{};
+            }
+
+            if (presentation
+                == InspectorEditPresentation::Vector4Axis)
+            {
+                constexpr noc::PropertyId ids[] = {
+                    noc::MakePropertyId("Nocturne.Vec4.x"),
+                    noc::MakePropertyId("Nocturne.Vec4.y"),
+                    noc::MakePropertyId("Nocturne.Vec4.z"),
+                    noc::MakePropertyId("Nocturne.Vec4.w")
+                };
+                return axis < 4 ? ids[axis] : noc::PropertyId{};
+            }
+
+            return {};
         }
 
         const wchar_t* InspectorPropertyPresentationLabel(
@@ -2654,6 +2695,21 @@ namespace nocturne::editor
                             presentation,
                             static_cast<uint8_t>(axis)
                         });
+
+                        InspectorEditBinding& binding =
+                            inspectorEdits_.back();
+
+                        const noc::PropertyId axisProperty =
+                            InspectorVectorAxisPropertyId(
+                                presentation,
+                                axis);
+
+                        if (axisProperty.IsValid())
+                        {
+                            binding.nestedPath[0] =
+                                axisProperty;
+                            binding.nestedPathCount = 1;
+                        }
                     }
                     catch (const std::bad_alloc&)
                     {
@@ -2932,14 +2988,18 @@ namespace nocturne::editor
                         constexpr int kAxisGap = 4;
                         constexpr int kAxisLabelWidth = 11;
                         const int totalGap =
-                            kAxisGap * 2;
+                            kAxisGap
+                            * static_cast<int>(
+                                controlCount - 1);
                         const int segmentWidth =
                             (std::max)(
                                 24,
-                                (width - totalGap) / 3);
+                                (width - totalGap)
+                                    / static_cast<int>(
+                                        controlCount));
 
                         for (uint32_t axis = 0;
-                             axis < 3;
+                             axis < controlCount;
                              ++axis)
                         {
                             const int segmentLeft =
@@ -2949,7 +3009,7 @@ namespace nocturne::editor
                             const int editLeft =
                                 segmentLeft + kAxisLabelWidth;
                             const int segmentRight =
-                                axis == 2
+                                axis + 1 == controlCount
                                     ? x + width
                                     : segmentLeft + segmentWidth;
                             const int editWidth =
@@ -3743,6 +3803,61 @@ namespace nocturne::editor
         if (!binding.hwnd)
             return false;
 
+        if (binding.nestedPathCount > 0)
+        {
+            if (!session_
+                || !inspectorModel_.Entity().IsValid())
+            {
+                return false;
+            }
+
+            auto context =
+                session_->CommandContext();
+
+            noc::OwnedReflectedValue value;
+            if (!inspectorModel_.ReadNestedValue(
+                    context,
+                    inspectorModel_.Entity(),
+                    binding.componentTypeId,
+                    binding.propertyId,
+                    binding.nestedPath.data(),
+                    binding.nestedPathCount,
+                    value)
+                || !value.Data())
+            {
+                return false;
+            }
+
+            double numericValue = 0.0;
+            if (value.Type() == noc::BuiltinTypeIds::Float32)
+            {
+                numericValue =
+                    static_cast<double>(
+                        *static_cast<const float*>(
+                            value.Data()));
+            }
+            else if (value.Type() == noc::BuiltinTypeIds::Float64)
+            {
+                numericValue =
+                    *static_cast<const double*>(
+                        value.Data());
+            }
+            else
+            {
+                return false;
+            }
+
+            wchar_t buffer[64]{};
+            swprintf_s(
+                buffer,
+                L"%.6g",
+                numericValue);
+            SetWindowTextW(
+                binding.hwnd,
+                buffer);
+            return true;
+        }
+
         if (binding.presentation
             == InspectorEditPresentation::Generic)
         {
@@ -3964,7 +4079,20 @@ namespace nocturne::editor
 
         bool committed = false;
 
-        if (binding->presentation
+        if (binding->nestedPathCount > 0)
+        {
+            committed =
+                inspectorModel_.CommitNestedTextEdit(
+                    context,
+                    session_->History(),
+                    entity,
+                    componentTypeId,
+                    propertyId,
+                    binding->nestedPath.data(),
+                    binding->nestedPathCount,
+                    utf8.c_str());
+        }
+        else if (binding->presentation
             == InspectorEditPresentation::Generic)
         {
             committed =
@@ -5453,7 +5581,7 @@ namespace nocturne::editor
                         {
                             // The child button owns the value field chrome.
                         }
-                        else if (controlCount == 3)
+                        else if (controlCount > 1)
                         {
                             constexpr int kAxisGap = 4;
                             constexpr int kAxisLabelWidth = 11;
@@ -5463,13 +5591,18 @@ namespace nocturne::editor
                             const int segmentWidth =
                                 (std::max)(
                                     24,
-                                    (width - kAxisGap * 2) / 3);
+                                    (width
+                                        - kAxisGap
+                                            * static_cast<int>(
+                                                controlCount - 1))
+                                        / static_cast<int>(
+                                            controlCount));
                             constexpr const wchar_t* kAxisNames[] = {
-                                L"X", L"Y", L"Z"
+                                L"X", L"Y", L"Z", L"W"
                             };
 
                             for (uint32_t axis = 0;
-                                 axis < 3;
+                                 axis < controlCount;
                                  ++axis)
                             {
                                 const int segmentLeft =
@@ -5477,7 +5610,7 @@ namespace nocturne::editor
                                     + static_cast<int>(axis)
                                         * (segmentWidth + kAxisGap);
                                 const int segmentRight =
-                                    axis == 2
+                                    axis + 1 == controlCount
                                         ? valueRc.right
                                         : segmentLeft + segmentWidth;
 
