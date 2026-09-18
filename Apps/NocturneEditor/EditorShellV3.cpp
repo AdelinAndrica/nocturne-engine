@@ -1296,8 +1296,10 @@ namespace nocturne::editor
                         | DT_SINGLELINE | DT_END_ELLIPSIS);
 
                 int y = rc.top + 43;
+                const int inspectorWidth =
+                    static_cast<int>(rc.right - rc.left);
                 const int labelWidth =
-                    (std::max)(95, (rc.right - rc.left) * 42 / 100);
+                    (std::max)(95, inspectorWidth * 42 / 100);
 
                 for (const InspectorComponentView& component :
                      inspectorModel_.Components())
