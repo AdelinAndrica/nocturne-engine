@@ -1,4 +1,8 @@
+#include "Runtime/Reflection/BuiltinTypes.h"
 #include "Runtime/Reflection/ReflectionRegistry.h"
+
+#include "Core/Math/MathTypes.h"
+#include "Runtime/Bounds.h"
 
 #include "Core/Log.h"
 #include "Core/Memory/Allocator.h"
@@ -299,6 +303,102 @@ bool RunPhase16ReflectionRegistryTests()
     ok &= CheckReflectionRegistry(
         allocator.OutstandingBytes() == 0,
         "Failed Freeze path leaked allocator memory");
+
+    noc::ReflectionRegistry builtinRegistry;
+    ok &= CheckReflectionRegistry(
+        builtinRegistry.Init(allocator, 4),
+        "Builtin registry init failed");
+    ok &= CheckReflectionRegistry(
+        noc::RegisterBuiltinReflectionTypes(builtinRegistry),
+        "Builtin reflection registration failed");
+    ok &= CheckReflectionRegistry(
+        builtinRegistry.TypeCount() == 17,
+        "Unexpected builtin reflected type count");
+
+    const noc::TypeMetadata* vec3 =
+        builtinRegistry.FindType(noc::BuiltinTypeIds::Vec3);
+    const noc::PropertyMetadata* vec3X =
+        builtinRegistry.FindPropertyByName(
+            noc::BuiltinTypeIds::Vec3, "x");
+
+    ok &= CheckReflectionRegistry(
+        vec3
+            && vec3->kind == noc::TypeKind::Struct
+            && vec3->propertyCount == 3
+            && vec3X
+            && vec3X->valueTypeId == noc::BuiltinTypeIds::Float32,
+        "Vec3 builtin schema mismatch");
+
+    noc::Vec3 vector{ 1.0f, 2.0f, 3.0f };
+    float xValue = 0.0f;
+    noc::PropertyAccessContext vectorContext{};
+    vectorContext.object = &vector;
+    vectorContext.mutableObject = &vector;
+
+    ok &= CheckReflectionRegistry(
+        vec3X->read(vectorContext, &xValue)
+            && xValue == 1.0f,
+        "Vec3.x reflected read failed");
+
+    const float newX = 9.0f;
+    ok &= CheckReflectionRegistry(
+        vec3X->write(vectorContext, &newX)
+            && vector.x == 9.0f,
+        "Vec3.x reflected write failed");
+
+    const noc::TypeMetadata* aabb =
+        builtinRegistry.FindType(noc::BuiltinTypeIds::AABB);
+    const noc::TypeMetadata* mat4 =
+        builtinRegistry.FindType(noc::BuiltinTypeIds::Mat4);
+
+    ok &= CheckReflectionRegistry(
+        aabb
+            && aabb->kind == noc::TypeKind::Struct
+            && aabb->propertyCount == 2
+            && aabb->properties[0].valueTypeId
+                == noc::BuiltinTypeIds::Vec3,
+        "AABB nested schema mismatch");
+
+    ok &= CheckReflectionRegistry(
+        mat4
+            && mat4->kind == noc::TypeKind::Opaque
+            && mat4->propertyCount == 0,
+        "Mat4 opaque reflection policy mismatch");
+
+    // Registration uses stack-local property arrays; lookup after the helper
+    // returned proves registry ownership rather than descriptor borrowing.
+    ok &= CheckReflectionRegistry(
+        builtinRegistry.FindPropertyByName(
+            noc::BuiltinTypeIds::Vec4, "w") != nullptr,
+        "Temporary builtin property descriptors were not owned");
+
+    ok &= CheckReflectionRegistry(
+        builtinRegistry.Freeze(),
+        "Builtin reflection Freeze failed");
+
+    const std::size_t builtinAllocationsBefore =
+        allocator.AllocationCount();
+    const std::size_t builtinBytesBefore =
+        allocator.TotalAllocatedBytes();
+
+    for (uint32_t i = 0; i < 10000; ++i)
+    {
+        ok &= CheckReflectionRegistry(
+            builtinRegistry.FindProperty(
+                noc::BuiltinTypeIds::Vec3,
+                noc::MakePropertyId("Nocturne.Vec3.z")) != nullptr,
+            "Frozen builtin property lookup failed");
+    }
+
+    ok &= CheckReflectionRegistry(
+        allocator.AllocationCount() == builtinAllocationsBefore
+            && allocator.TotalAllocatedBytes() == builtinBytesBefore,
+        "Frozen builtin lookup allocated memory");
+
+    builtinRegistry.Shutdown();
+    ok &= CheckReflectionRegistry(
+        allocator.OutstandingBytes() == 0,
+        "Builtin reflection leaked allocator memory");
 
     NOC_LOG_INFO(
         "Phase16",

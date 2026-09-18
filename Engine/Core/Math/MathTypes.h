@@ -5,6 +5,21 @@
 namespace noc
 {
     // ============================================================
+    // Vec2
+    // ============================================================
+
+    struct Vec2
+    {
+        float x{}, y{};
+
+        constexpr Vec2() = default;
+        constexpr Vec2(float X, float Y) : x(X), y(Y) {}
+
+        static constexpr Vec2 Zero() { return { 0,0 }; }
+        static constexpr Vec2 One() { return { 1,1 }; }
+    };
+
+    // ============================================================
     // Vec3
     // ============================================================
 
@@ -44,6 +59,22 @@ namespace noc
         if (len <= 1e-6f) return Vec3::Zero();
         return v * (1.0f / len);
     }
+
+    // ============================================================
+    // Vec4
+    // ============================================================
+
+    struct Vec4
+    {
+        float x{}, y{}, z{}, w{};
+
+        constexpr Vec4() = default;
+        constexpr Vec4(float X, float Y, float Z, float W)
+            : x(X), y(Y), z(Z), w(W) {}
+
+        static constexpr Vec4 Zero() { return { 0,0,0,0 }; }
+        static constexpr Vec4 One() { return { 1,1,1,1 }; }
+    };
 
     // ============================================================
     // Quat
