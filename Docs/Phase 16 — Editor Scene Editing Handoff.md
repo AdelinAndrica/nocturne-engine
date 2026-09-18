@@ -39,8 +39,9 @@ Renderer-ul consumă `RenderQueue` extras și nu deține component state mutabil
 Acordă atenție specială:
 
 1. `Docs/Production Engineering Standard.md`
-2. `Docs/Phase 16 — Professional Grade Implementation Contract.md`
-3. `Docs/Phase 16 — Editor Scene Editing Implementation Checklist.md`
+2. `Docs/Phase 16 — Runtime Reflection Architecture Contract.md`
+3. `Docs/Phase 16 — Professional Grade Implementation Contract.md`
+4. `Docs/Phase 16 — Editor Scene Editing Implementation Checklist.md`
 4. `Docs/Phase 15 — Entity Component System Architecture.md`
 5. `Docs/Phase 15 — Implementation Report.md`
 6. `Docs/Phase 15 — Test and CI Validation Report.md`
@@ -67,6 +68,10 @@ După documentație, inspectează codul real înainte de a propune arhitectura P
   timpul dintre editare și observarea rezultatului trebuie să fie scurt și potrivit frecvenței operației.
 - §15.4.1.9 — **Saving and Loading World Chunks**:
   persistence este necesară unui editor complet, dar în roadmap-ul Nocturne implementarea fișierelor este Phase 17.
+- §16.2.1.6 — **Pure Component Models** și §16.2.2 — **Property-Centric Architectures**:
+  grounding pentru component/property identity, data-driven composition și necesitatea unei reprezentări coerente a proprietăților.
+- §16.3 — **World Chunk Data Formats** și §16.9 — **Scripting**:
+  viitorii consumatori ai aceleiași runtime schema; Phase 16 construiește reflection core-ul, nu file I/O sau scripting VM.
 
 ### Bob Nystrom — Game Programming Patterns
 
@@ -102,8 +107,14 @@ Orice politică specifică Nocturne care nu este prescrisă direct de sursele de
 
 Transformăm editorul dintr-un viewport de validare cu obiecte fixe într-un **world editor real** peste modelul Phase 15.
 
-La finalul fazei, utilizatorul trebuie să poată authora scena în memorie prin:
+La finalul fazei, engine-ul trebuie să aibă un **full runtime reflection system pentru tipurile Nocturne înregistrate**, iar utilizatorul trebuie să poată authora scena în memorie prin:
 
+- engine-wide `ReflectionRegistry`;
+- stable `TypeId`, `PropertyId` și reflected function identity;
+- type/property/enum/function/container reflection;
+- lifecycle/type operations și semantic property access;
+- generic component discovery și property traversal;
+- reflection-driven Inspector/property commands;
 - create entity;
 - delete entity;
 - duplicate entity/subtree conform semanticii documentate;
@@ -246,9 +257,15 @@ Operația trebuie să:
 
 Nu modificăm silent runtime hierarchy semantics pentru a obține UX-ul editorului.
 
-## 13. Inspector
+## 13. Runtime Reflection + Inspector
 
-Inspector-ul devine un client al World.
+Înainte de Inspector, Phase 16 implementează:
+
+`Docs/Phase 16 — Runtime Reflection Architecture Contract.md`
+
+Reflection este engine-wide și devine schema canonică pentru tipurile runtime Nocturne.
+
+Inspector-ul devine un **consumer generic** al ReflectionRegistry + World.
 
 Nu are voie să țină pointeri `TransformComponent*`, `RenderableComponent*` etc. peste structural mutation sau peste frame-uri dacă validitatea nu este garantată.
 
@@ -259,19 +276,21 @@ Inspector-ul trebuie să suporte cel puțin componentele Phase 15:
 - Renderable;
 - Camera.
 
-Trebuie să existe:
+Inspector flow:
 
-- editor descriptors/adapters pe `ComponentTypeId`;
-- field validation;
-- add/remove component workflow;
-- readonly/required states;
-- component-specific controls unde proprietatea nu poate fi tratată generic.
+```text
+EntityHandle
+  -> reflected component enumeration
+  -> TypeMetadata
+  -> PropertyMetadata
+  -> generic property editor by reflected TypeId/attributes
+  -> semantic getter/setter
+  -> command/transaction
+```
 
-**Design choice (not directly from the book):**
+Custom property drawers și custom component inspectors sunt extension points pentru cazuri speciale, nu surse alternative de schema.
 
-Phase 16 nu introduce full runtime reflection doar pentru Inspector.
-
-Se preferă un layer de editor component descriptors/adapters keyed by `ComponentTypeId`, suficient pentru Inspector și extensibil ulterior, fără să transforme Phase 16 în Phase 17 serialization/reflection.
+**Design choice (not directly from the book):** full runtime reflection pentru tipurile Nocturne înregistrate este infrastructură centrală Phase 16 și trebuie reutilizată de Phase 17 serialization/prefabs și Phase 24 scripting.
 
 ## 14. Transform tools și coordinate space
 
@@ -329,11 +348,11 @@ Aceste snapshot-uri:
 
 - nu sunt format de scenă;
 - nu sunt persistent entity identity;
-- nu sunt API de serialization;
 - nu se scriu pe disk;
-- nu blochează Phase 17 să introducă schema persistentă corectă.
+- folosesc reflection schema pentru component discovery/copy unde este legal;
+- nu blochează Phase 17 să introducă persistent identity, file format și migration policy.
 
-Snapshot-ul trebuie să copieze semantic data, nu pointeri interni în component storage.
+Snapshot-ul trebuie să copieze semantic data, nu pointeri interni în component storage. Reflection schema este production runtime infrastructure și va fi reutilizată de serializer; snapshot format-ul tranzitoriu nu este format persistent.
 
 ## 17. Selection model
 
@@ -359,7 +378,7 @@ Roadmap-ul Phase 16 menționează prefab prototype.
 
 Phase 16 nu introduce încă prefab files.
 
-Prototype-ul poate fi limitat la infrastructura transientă de subtree snapshot + instantiate, astfel încât Phase 17 să poată adăuga persistence/versioning fără a arunca authoring core-ul.
+Prototype-ul poate folosi infrastructura transientă de subtree snapshot + instantiate peste Reflection Core, astfel încât Phase 17 să adauge persistence/versioning/persistent identity fără a reinventa schema tipurilor.
 
 Orice UI numită „Prefab” trebuie să fie clar etichetată ca prototype până când Phase 17 definește persistence.
 
@@ -369,6 +388,11 @@ Gregory §15.4.1.10 pune accent pe rapid iteration.
 
 Phase 16 trebuie să măsoare cel puțin:
 
+- reflection registry startup/freeze;
+- TypeId/property/function lookup;
+- property enumeration și semantic get/set;
+- reflected component enumeration;
+- generic Inspector traversal;
 - hierarchy rebuild/enumeration;
 - selection update;
 - inspector refresh;
@@ -415,6 +439,12 @@ Phase 16 nu este completă doar pentru că editorul pornește.
 
 CI trebuie să păstreze toate gate-urile Phase 15 și să adauge teste Phase 16 pentru:
 
+- ReflectionRegistry;
+- type/property/enum/function/container metadata;
+- lifecycle/type ops;
+- semantic property access;
+- foundation-component reflection;
+- OCP synthetic reflected component extension;
 - command history;
 - undo/redo;
 - create/delete/duplicate;
@@ -465,28 +495,32 @@ După integrarea Phase 15 conform workflow-ului repo-ului:
 
 1. audit cod/editor state real;
 2. architecture document;
-3. Editor Session + selection model;
-4. command/transaction/history foundation;
-5. transient subtree snapshot;
-6. dynamic Scene Hierarchy;
-7. create/delete/duplicate/rename;
-8. reparent/unparent preserve-world;
-9. Inspector descriptor layer;
-10. Name/Transform Inspector;
-11. Renderable/Camera Inspector;
-12. component add/remove;
-13. Local/World gizmo orientation;
-14. gizmo → transaction integration;
-15. keyboard/menu/context workflows;
-16. diagnostics;
-17. tests;
-18. stress/performance;
-19. Phase 13/14/15 regressions;
-20. implementation report;
-21. completion report.
+3. **Runtime Reflection Core** conform contractului dedicat;
+4. migrare ComponentRegistry/metadata Phase 15 către reflection authority unică;
+5. reflectarea tipurilor built-in + Name/Transform/Renderable/Camera;
+6. generic property command + reflected component enumeration proof;
+7. Editor Session + selection model;
+8. command/transaction/history foundation;
+9. transient subtree snapshot;
+10. dynamic Scene Hierarchy;
+11. create/delete/duplicate/rename;
+12. reparent/unparent preserve-world;
+13. reflection-driven generic Inspector;
+14. custom drawers/inspectors doar unde reflection generic nu este suficient;
+15. Name/Transform/Renderable/Camera Inspector;
+16. component add/remove;
+17. Local/World gizmo orientation;
+18. gizmo → transaction integration;
+19. keyboard/menu/context workflows;
+20. diagnostics;
+21. reflection + editor tests;
+22. stress/performance;
+23. Phase 13/14/15 regressions;
+24. implementation report;
+25. completion report.
 
-Nu sărim direct la UI înainte ca selection + command history + mutation semantics să fie definite.
+Nu sărim direct la UI. Reflection Core trebuie să fie validat înainte de Inspector, iar selection + command history + mutation semantics trebuie definite înainte de authoring workflows mari.
 
 ## 25. Mesaj pentru chat-ul Phase 16
 
-> **Phase 15 este COMPLETE. Începem Phase 16 — Editor Scene Editing. Studiază integral toate fișierele .md din fazele anterioare, cu atenție specială asupra Production Engineering Standard, Phase 16 Professional Grade Implementation Contract, Phase 16 Implementation Checklist, documentației finale Phase 15 și documentației editorului Phase 14. Auditează codul real înainte de a propune arhitectura Phase 16. Păstrează EditorShellV3, un singur World autoritar și contractul Phase 15 de single source of truth. Phase 16 trebuie implementată production-grade: command/transaction-based editing, undo/redo, Scene Hierarchy reală, Inspector real, create/delete/duplicate/reparent, component editing, selection synchronization, Local/World transform orientation, diagnostics, tests, CI și performance baselines. Nu implementa persistence Phase 17 prematur.**
+> **Phase 15 este COMPLETE. Începem Phase 16 — Editor Scene Editing + Runtime Reflection. Studiază integral toate fișierele .md din fazele anterioare, în special Production Engineering Standard, Phase 16 Runtime Reflection Architecture Contract, Professional Grade Implementation Contract, Implementation Checklist, documentația finală Phase 15 și documentația editorului Phase 14. Auditează codul real înainte de arhitectură. Primul foundation milestone este full runtime reflection pentru tipurile Nocturne înregistrate: engine-wide ReflectionRegistry, stable TypeId/PropertyId/function identity, type/property/enum/function/container reflection, lifecycle ops, semantic accessors, component operations/enumeration, registry freeze/validation și reflection pentru componentele Phase 15. ComponentRegistry nu trebuie să rămână autoritate paralelă. Abia apoi construim Editor Session, commands/transactions, undo/redo, Scene Hierarchy, reflection-driven Inspector, create/delete/duplicate/reparent, component editing și Local/World gizmos. Phase 17 trebuie să reutilizeze reflection schema pentru serialization/prefabs, nu să creeze alta. Nu implementa însă file I/O, persistent Entity IDs sau scripting VM prematur.**

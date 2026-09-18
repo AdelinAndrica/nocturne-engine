@@ -463,8 +463,8 @@ Phase 15 completed the production runtime entity/component foundation: generatio
 
 ### Active
 
-16. **Phase 16 — Editor Scene Editing**  
-    Real scene-authoring workflows over the Phase 15 object model: create/delete/duplicate/reparent entities, component add/remove/edit, schema-driven inspectors, robust selection synchronization, transactional editing semantics, undo/redo integration for owned operations, prefab prototype and editor diagnostics. No scene-file persistence beyond interfaces required by the next phase.
+16. **Phase 16 — Editor Scene Editing + Runtime Reflection**  
+    Full engine-wide runtime reflection for registered Nocturne types (stable type/property/function identity, type/property/enum/function/container metadata, lifecycle/type operations, semantic access, component reflection and deterministic registry), then real scene-authoring workflows over the Phase 15 object model: create/delete/duplicate/reparent entities, reflection-driven component/property editing, robust selection synchronization, transactions, undo/redo, prefab prototype and editor diagnostics. Phase 17 must reuse this reflection schema for serialization/prefabs; Phase 24 must reuse it for scripting. No scene-file persistence in Phase 16.
 
 ### Future roadmap — production-grade scope
 

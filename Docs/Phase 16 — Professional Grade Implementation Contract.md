@@ -6,6 +6,8 @@
 >
 > **Applies with:** `Docs/Production Engineering Standard.md`
 >
+> **Reflection contract:** `Docs/Phase 16 — Runtime Reflection Architecture Contract.md`
+>
 > **Phase:** 16 — Editor Scene Editing
 >
 > Acest document definește cerințele de calitate specifice Phase 16. Nu înlocuiește standardul global; îl specializează pentru scene authoring.
@@ -32,6 +34,8 @@ Aceasta este **Design choice (not directly from the book)** ca standard de produ
 - §15.4.1.7: transform properties și asset linkages necesită editing specializat, nu doar property-grid generic.
 - §15.4.1.10: rapid iteration este o cerință importantă a world editor-ului.
 - §15.4.1.9: load/save este parte din editor complet, dar roadmap-ul Nocturne îl atribuie Phase 17.
+- §16.2.1.6 și §16.2.2: pure component/property-centric object models și data-driven composition fundamentează necesitatea unei scheme coerente pentru tipurile și proprietățile runtime.
+- §16.3 și §16.9: world data formats și scripting sunt consumatori viitori ai aceleiași runtime schema.
 
 ### Nystrom — Game Programming Patterns
 
@@ -41,7 +45,43 @@ Aceasta este **Design choice (not directly from the book)** ca standard de produ
 
 - §5.4.2 Transform Hierarchy: relațiile parent/child și transform propagation sunt fundația semanticii de reparenting.
 
-## 3. Single source of truth
+## 3. Runtime Reflection este foundation obligatoriu
+
+Phase 16 nu construiește Inspector-ul peste metadata ad-hoc.
+
+Înainte de scene-authoring UI, implementăm:
+
+`Docs/Phase 16 — Runtime Reflection Architecture Contract.md`
+
+**Design choice (not directly from the book):** Nocturne introduce full runtime reflection pentru toate tipurile engine/game declarate reflectable.
+
+Reflection include:
+
+- engine-wide `ReflectionRegistry`;
+- stable type/property/function identities;
+- type/property/enum/function/container metadata;
+- lifecycle/type operations;
+- typed attributes;
+- semantic getters/setters;
+- component operations și generic component enumeration;
+- registry validation/freeze;
+- generic reflected values;
+- foundation-component reflection.
+
+Reflection este schema canonică reutilizată de:
+
+- Inspector;
+- property undo/redo;
+- transient snapshots;
+- Phase 17 serialization/prefabs;
+- Phase 24 scripting;
+- debug tooling.
+
+`ComponentRegistry` Phase 15 nu poate rămâne autoritate paralelă.
+
+---
+
+## 4. Single source of truth
 
 World și component storage rămân autoritatea.
 
@@ -68,7 +108,7 @@ Editorul nu poate păstra o copie independentă autoritară de:
 
 Caches/presentation models sunt permise doar dacă invalidation/rebuild este explicit.
 
-## 4. Authoring mutation boundary
+## 5. Authoring mutation boundary
 
 **Design choice (not directly from the book):**
 
@@ -83,7 +123,7 @@ Excepția permisă este preview-ul tranzitoriu în timpul unui gest continuu, pr
 
 Nu introducem cod UI care modifică World direct în zeci de locuri independente.
 
-## 5. Atomicitate
+## 6. Atomicitate
 
 Operațiile compuse trebuie să fie all-or-nothing din perspectiva utilizatorului.
 
@@ -102,7 +142,7 @@ Dacă pasul N eșuează, sistemul:
 
 Un state parțial fără diagnostic este defect blocker.
 
-## 6. Undo/redo
+## 7. Undo/redo
 
 Undo/redo este feature de bază al Phase 16, nu polish ulterior.
 
@@ -123,7 +163,7 @@ Cerințe:
 
 History trebuie să testeze create/delete/duplicate/reparent/component edits, nu doar transform numeric edits.
 
-## 7. Entity lifetime și undo
+## 8. Entity lifetime și undo
 
 Runtime EntityHandles sunt tranzitorii.
 
@@ -139,7 +179,7 @@ Nu „rezervăm” sloturi EntityRegistry pentru a simula persistent identity.
 
 Persistent identity real rămâne Phase 17.
 
-## 8. Editor entity policy
+## 9. Editor entity policy
 
 **Design choice (not directly from the book):**
 
@@ -151,7 +191,7 @@ Aceasta este policy de tool, nu constraint de World.
 
 Dacă Phase 16 permite non-spatial entities, workflow-ul trebuie proiectat explicit; nu eliminăm Transform accidental și apoi lăsăm hierarchy/gizmo într-un state nedefinit.
 
-## 9. Tool-owned camera
+## 10. Tool-owned camera
 
 **Design choice (not directly from the book):**
 
@@ -169,7 +209,7 @@ Scene CameraComponents create de utilizator sunt authored entities separate.
 
 Tool camera poate rămâne în același World pentru render integration, dar editorul trebuie să știe că nu este authored scene content.
 
-## 10. Selection
+## 11. Selection
 
 Selection este identificată prin `EntityHandle`.
 
@@ -186,7 +226,7 @@ Cerințe:
 
 Niciun subsystem nu păstrează un index de row ca identitate a entității.
 
-## 11. Scene Hierarchy
+## 12. Scene Hierarchy
 
 Hierarchy este un projection/view al World-ului.
 
@@ -206,7 +246,7 @@ Cerințe:
 
 Hierarchy refresh nu trebuie să re-creeze inutil toate resursele Win32 pe fiecare frame.
 
-## 12. Reparenting UX
+## 13. Reparenting UX
 
 **Design choice (not directly from the book):**
 
@@ -224,29 +264,35 @@ Cazurile cu scale degenerat, non-invertible transform sau shear nereprezentabil 
 
 Nu deformăm silent obiectul.
 
-## 13. Inspector architecture
+## 14. Inspector architecture
 
 Inspector-ul nu trebuie implementat ca un singur `switch(ComponentTypeId)` gigant care devine imposibil de extins.
 
 **Design choice (not directly from the book):**
 
-Se definește un registry/editor-adapter layer keyed by `ComponentTypeId`.
+Inspector-ul este generic-first și consumă `ReflectionRegistry`.
 
-Un adapter poate declara:
+Pentru fiecare reflected component:
 
-- display name;
-- icon/category;
-- canAdd/canRemove;
-- property rows;
-- validators;
-- apply callbacks;
-- specialized UI hooks.
+- component operations determină membership/add/remove;
+- `TypeMetadata` descrie tipul;
+- `PropertyMetadata` descrie proprietățile;
+- reflected TypeId/attributes aleg generic property drawer;
+- semantic getter/setter aplică schimbarea prin invariants runtime;
+- generic property command înregistrează undo/redo.
 
-Acest layer este editor-only.
+Custom property drawers și custom component inspectors pot declara:
 
-Nu transformăm runtime metadata într-un full reflection system fără nevoie demonstrată.
+- specialized visualization;
+- multi-property semantic UI;
+- asset pickers;
+- hierarchy-aware controls.
 
-## 14. Property editing lifecycle
+Acestea sunt extensions keyed by reflection identity și nu redefinește canonical schema.
+
+Inspector-ul nu deține un al doilea registry de component/property metadata.
+
+## 15. Property editing lifecycle
 
 Un field edit trebuie să aibă:
 
@@ -269,7 +315,7 @@ Numeric fields trebuie să gestioneze:
 
 Nu scriem invalid values temporar în World doar fiindcă userul încă tastează.
 
-## 15. Transform Inspector
+## 16. Transform Inspector
 
 Transform Inspector trebuie să editeze local TRS.
 
@@ -288,7 +334,7 @@ Dacă rotation UI folosește Euler angles, conversia/quaternion ownership și di
 
 Aceasta este **Design choice (not directly from the book)**.
 
-## 16. Renderable Inspector
+## 17. Renderable Inspector
 
 Trebuie să suporte cel puțin:
 
@@ -301,7 +347,7 @@ Nu introducem asset previewer Phase 23.
 
 Asset assignment failure trebuie să păstreze component state anterior.
 
-## 17. Camera Inspector
+## 18. Camera Inspector
 
 Trebuie să suporte:
 
@@ -315,7 +361,7 @@ Validation folosește aceleași invariants runtime; Inspector nu bypass-ează `C
 
 Editor viewport camera nu este editată ca authored CameraComponent obișnuit.
 
-## 18. Component add/remove
+## 19. Component add/remove
 
 Add/remove trebuie să fie:
 
@@ -330,7 +376,7 @@ Remove Transform/Name trebuie să respecte editor entity policy.
 
 Remove active authored Camera trebuie să nu afecteze editor tool camera.
 
-## 19. Rename
+## 20. Rename
 
 Rename:
 
@@ -342,7 +388,7 @@ Rename:
 - hierarchy se actualizează imediat;
 - invalid UTF-8/conversion error are diagnostic.
 
-## 20. Delete
+## 21. Delete
 
 Destructive operations trebuie să aibă semantică explicită.
 
@@ -359,7 +405,7 @@ Undo restaurează:
 
 Tool-owned entities nu pot fi șterse prin scene workflow.
 
-## 21. Duplicate
+## 22. Duplicate
 
 **Design choice (not directly from the book):**
 
@@ -376,7 +422,7 @@ Copia:
 
 External entity references nu sunt încă rezolvate generic, deoarece persistent/reference serialization este Phase 17.
 
-## 22. Transform gizmo transaction
+## 23. Transform gizmo transaction
 
 Gizmo drag:
 
@@ -389,7 +435,7 @@ Gizmo drag:
 - undo revine exact la original;
 - redo reaplică exact final state.
 
-## 23. Local / World transform orientation
+## 24. Local / World transform orientation
 
 Gregory §15.4.1.7 justifică special handling pentru transforms.
 
@@ -410,7 +456,7 @@ Testele trebuie să acopere:
 - non-uniform parent scale;
 - local/world mode switching.
 
-## 24. Dirty/editor-session state
+## 25. Dirty/editor-session state
 
 **Design choice (not directly from the book):**
 
@@ -424,25 +470,34 @@ Phase 16 nu implementează persistence, dar dirty state este util pentru:
 
 Dirty flag nu reprezintă o copie a scenei.
 
-## 25. Persistence boundary
+## 26. Persistence boundary
 
 Nu există scene-file format în Phase 16.
 
-Transient snapshots pentru undo/prefab prototype:
+Transient snapshots pentru undo/prefab prototype folosesc Reflection Core pentru component/property discovery și safe copy unde schema permite.
 
-- nu sunt persistent schema;
-- nu primesc version compatibility contract;
-- nu sunt salvate;
-- nu folosesc runtime handles ca durable references.
+Snapshot format-ul:
+- nu este scene-file format;
+- nu este persistent identity;
+- nu este salvat pe disk;
+- nu folosește runtime handles ca durable references.
 
-Phase 17 definește persistence corect.
+Reflection schema însă ESTE infrastructură runtime persistentă între faze și Phase 17 o reutilizează pentru serializer, prefab property addressing și version metadata.
 
-## 26. Performance
+Phase 17 definește file format, persistent Entity IDs, fixups și migration/compatibility policy.
+
+## 27. Performance
 
 Phase 16 este UI/tooling, dar performance rămâne parte din product quality.
 
 Trebuie măsurate:
 
+- ReflectionRegistry startup/freeze;
+- TypeId/name/property/function lookups;
+- reflected property enumeration/get/set;
+- function invocation overhead;
+- component enumeration;
+- generic Inspector traversal;
 - hierarchy model rebuild;
 - hierarchy paint/update;
 - Inspector refresh;
@@ -465,7 +520,7 @@ Workloads:
 
 Niciun timer nu trebuie să forțeze rebuild complet dacă World-ul nu s-a modificat.
 
-## 27. Memory/history budget
+## 28. Memory/history budget
 
 History trebuie să aibă limită.
 
@@ -482,7 +537,7 @@ Reguli:
 
 Valoarea finală se stabilește după baseline.
 
-## 28. Input/focus
+## 29. Input/focus
 
 Shortcuts trebuie să respecte focus-ul Win32.
 
@@ -494,7 +549,7 @@ Exemple:
 - gizmo capture nu interferează cu camera capture;
 - context-menu commands folosesc aceeași command layer ca toolbar/keyboard.
 
-## 29. Error handling
+## 30. Error handling
 
 Failure paths obligatorii:
 
@@ -513,7 +568,7 @@ Failure paths obligatorii:
 
 Nu acceptăm silent state drift.
 
-## 30. Diagnostics
+## 31. Diagnostics
 
 Development diagnostics trebuie să includă:
 
@@ -527,7 +582,7 @@ Development diagnostics trebuie să includă:
 
 Nu logăm fiecare mouse-move de gizmo.
 
-## 31. Threading
+## 32. Threading
 
 Phase 16 editor authoring mutation rămâne main-thread.
 
@@ -535,7 +590,7 @@ Nu introducem locks în ECS doar pentru UI.
 
 Dacă asset lookup existent este async, result application în World trebuie făcut prin contractul thread-safe deja existent sau marshalled pe main thread.
 
-## 32. Testability
+## 33. Testability
 
 Scene editing core trebuie separat suficient de Win32 încât create/delete/undo/reparent logic să poată fi testată fără click simulation.
 
@@ -543,12 +598,15 @@ UI smoke/manual tests completează, nu înlocuiesc, testele core.
 
 Aceasta este **Design choice (not directly from the book)**.
 
-## 33. Build/CI
+## 34. Build/CI
 
 Phase 16 trebuie să păstreze toate gate-urile Phase 15.
 
 În plus:
 
+- Phase 16 runtime reflection unit/integration tests;
+- schema freeze/validation tests;
+- OCP synthetic reflected component extension test;
 - Phase 16 headless editor-authoring tests;
 - Debug x64 Host;
 - Debug x64 Editor;
@@ -557,7 +615,7 @@ Phase 16 trebuie să păstreze toate gate-urile Phase 15.
 - warnings review;
 - no stale Phase 14 validation code authority.
 
-## 34. Regression
+## 35. Regression
 
 Manual final regression include minimum:
 
@@ -580,10 +638,16 @@ Manual final regression include minimum:
 - Local/World transform orientation;
 - long-running editor stability.
 
-## 35. Completion rule
+## 36. Completion rule
 
 Phase 16 nu poate fi marcată COMPLETE dacă:
 
+- full runtime Reflection Core nu trece completion gate-ul din contractul dedicat;
+- `ReflectionRegistry` nu este engine-wide și unic;
+- `ComponentRegistry`/editor/serializer-style metadata rămâne autoritate paralelă;
+- foundation components nu sunt reflectate;
+- Inspector necesită modificarea unui central component/property switch pentru fiecare component nou;
+- semantic invariants pot fi bypass-ate prin raw reflected writes;
 - hierarchy încă depinde autoritar de `validationObjects_[4]`;
 - selection identity este încă row/index în loc de EntityHandle;
 - Inspector este placeholder;
@@ -595,9 +659,11 @@ Phase 16 nu poate fi marcată COMPLETE dacă:
 - CI nu păstrează Phase 15 gates;
 - docs descriu altceva decât codul final.
 
-## 36. Sellable-product criterion
+## 37. Sellable-product criterion
 
-Phase 16 este production-grade în scope atunci când un designer poate lucra o sesiune de authoring reală fără să depindă de validation-scene constants, fără să piardă accidental starea din operații obișnuite și fără ca editorul să poată corupe World-ul prin operații de bază.
+Phase 16 este production-grade în scope atunci când Reflection Core este o infrastructură generică și extensibilă suficient de stabilă pentru Inspector/Phase 17/Phase 24, iar un designer poate lucra o sesiune de authoring reală fără validation-scene constants, fără pierdere accidentală de state și fără ca editorul să corupă World-ul prin operații de bază.
+
+OCP acceptance criterion: un component reflectat nou cu proprietăți generice trebuie să poată apărea în generic Inspector/property tooling prin schema lui, fără modificarea switch-urilor centrale de Inspector/property command infrastructure.
 
 Aceasta nu înseamnă că editorul este shipping-complete după Phase 16.
 

@@ -22,6 +22,7 @@ This document consolidates the entire Markdown pack into a single coherent spec 
 >
 > Phase 16 planning / production-grade contract:
 >
+> - `Docs/Phase 16 — Runtime Reflection Architecture Contract.md`
 > - `Docs/Phase 16 — Professional Grade Implementation Contract.md`
 > - `Docs/Phase 16 — Editor Scene Editing Implementation Checklist.md`
 >

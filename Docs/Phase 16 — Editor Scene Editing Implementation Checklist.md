@@ -6,6 +6,8 @@
 >
 > **Contract specific:** `Docs/Phase 16 — Professional Grade Implementation Contract.md`
 >
+> **Reflection contract:** `Docs/Phase 16 — Runtime Reflection Architecture Contract.md`
+>
 > **Handoff:** `Docs/Phase 16 — Editor Scene Editing Handoff.md`
 >
 > **Obiectiv:** transformăm editorul Phase 13/14/15 dintr-un validation shell cu obiecte fixe într-un scene-authoring editor real peste World/ECS Phase 15, fără a implementa prematur persistence Phase 17.
@@ -30,6 +32,7 @@
 - [ ] Confirmăm branch-ul Phase 16.
 - [ ] Citim integral toate phase `.md`.
 - [ ] Citim Production Engineering Standard.
+- [ ] Citim Phase 16 Runtime Reflection Architecture Contract.
 - [ ] Citim Phase 16 Professional Grade Implementation Contract.
 - [ ] Citim Phase 15 Architecture / Implementation / Test & CI / Completion.
 - [ ] Citim Phase 14 editor architecture/completion.
@@ -72,7 +75,9 @@
 - [ ] Documentăm duplicate semantics.
 - [ ] Documentăm reparent semantics.
 - [ ] Documentăm component add/remove.
-- [ ] Documentăm Inspector descriptor architecture.
+- [ ] Documentăm Runtime Reflection architecture.
+- [ ] Documentăm migration path ComponentRegistry → ReflectionRegistry.
+- [ ] Documentăm Inspector ca reflection consumer.
 - [ ] Documentăm Local/World gizmo orientation.
 - [ ] Documentăm focus/input policy.
 - [ ] Documentăm history memory budget.
@@ -80,6 +85,197 @@
 - [ ] Documentăm Phase 17 persistence boundary.
 - [ ] Documentăm temporary scaffolding removal.
 - [ ] Marcăm toate design choices non-book.
+
+---
+
+
+# 3A. Runtime Reflection Core — BLOCKER înainte de Inspector
+
+Autoritate:
+
+`Docs/Phase 16 — Runtime Reflection Architecture Contract.md`
+
+Ownership:
+- [ ] `Engine` deține un singur `ReflectionRegistry`.
+- [ ] Reflection init precede World init.
+- [ ] Reflection shutdown este după World/consumers shutdown conform lifetime documentat.
+- [ ] World/Editor sunt non-owning consumers.
+- [ ] No global Reflection singleton.
+- [ ] ComponentRegistry Phase 15 este migrat/facade, nu autoritate paralelă.
+
+Identity:
+- [ ] stable TypeId.
+- [ ] invalid TypeId.
+- [ ] stable PropertyId.
+- [ ] invalid PropertyId.
+- [ ] stable FunctionId/identity.
+- [ ] IDs nu depind de registration order.
+- [ ] IDs nu depind de RTTI pointer/address.
+- [ ] duplicate IDs respinse.
+- [ ] duplicate canonical names respinse.
+
+Type system:
+- [ ] TypeKind.
+- [ ] primitive types.
+- [ ] String.
+- [ ] Enum.
+- [ ] Struct.
+- [ ] Component.
+- [ ] Entity reference category.
+- [ ] Resource reference category.
+- [ ] fixed array.
+- [ ] dynamic sequence/container adapter.
+- [ ] Function.
+- [ ] Opaque/custom seam.
+
+Type metadata:
+- [ ] canonical name.
+- [ ] version.
+- [ ] size/alignment.
+- [ ] flags.
+- [ ] deterministic enumeration.
+- [ ] registry-owned metadata/string lifetime.
+- [ ] no temporary descriptor pointers.
+
+Lifecycle/type ops:
+- [ ] default construct.
+- [ ] destruct.
+- [ ] copy construct.
+- [ ] move construct.
+- [ ] copy assign.
+- [ ] move assign.
+- [ ] equality/compare policy.
+- [ ] reset/default policy.
+- [ ] non-trivial type tests.
+- [ ] over-aligned type tests.
+- [ ] no generic memcpy for non-trivial values.
+
+Properties:
+- [ ] PropertyMetadata.
+- [ ] owner TypeId.
+- [ ] value TypeId.
+- [ ] flags.
+- [ ] getter.
+- [ ] setter/read-only.
+- [ ] semantic setter path.
+- [ ] optional safe direct-address path.
+- [ ] validation adapter.
+- [ ] default provider.
+- [ ] no raw write bypass pentru Camera invariants.
+- [ ] no raw write bypass pentru Transform hierarchy.
+
+Attributes:
+- [ ] typed attribute mechanism.
+- [ ] display name.
+- [ ] category.
+- [ ] tooltip.
+- [ ] numeric range/step.
+- [ ] units.
+- [ ] angle/color hints.
+- [ ] resource type constraint.
+- [ ] serialization/script aliases seam.
+- [ ] no Win32 dependency.
+
+Enums:
+- [ ] enum TypeId.
+- [ ] underlying type.
+- [ ] value metadata.
+- [ ] duplicate validation.
+- [ ] flags enum support/policy.
+- [ ] generic lookup/name conversion.
+
+Nested structs:
+- [ ] recursive property traversal.
+- [ ] Vec2/Vec3/Vec4 policy.
+- [ ] Quat policy.
+- [ ] AABB policy.
+- [ ] cycle/reference handling.
+
+Containers:
+- [ ] element TypeId.
+- [ ] count.
+- [ ] const access.
+- [ ] mutable access policy.
+- [ ] resize/insert/remove adapter seam.
+- [ ] no STL types required by public API.
+- [ ] fixed array tests.
+- [ ] dynamic sequence synthetic test.
+
+References:
+- [ ] ResourceHandle reflected semantically.
+- [ ] expected resource type constraint.
+- [ ] EntityHandle reflected as transient reference.
+- [ ] metadata seam pentru Phase 17 persistent translation.
+- [ ] runtime index/generation never marked durable identity.
+
+Components:
+- [ ] reflected component operations Has/Add/Remove/Get.
+- [ ] generic reflected component enumeration per entity.
+- [ ] Name reflected.
+- [ ] Transform reflected.
+- [ ] Renderable reflected.
+- [ ] Camera reflected.
+- [ ] internal caches/hierarchy links hidden/read-only appropriately.
+- [ ] derived fields marked transient/read-only.
+
+Functions:
+- [ ] FunctionMetadata.
+- [ ] stable function identity.
+- [ ] return TypeId.
+- [ ] parameters.
+- [ ] flags.
+- [ ] invocation adapter.
+- [ ] type/count validation.
+- [ ] const/static/member semantics.
+- [ ] real engine function reflection proof.
+- [ ] mismatch/failure tests.
+- [ ] Phase 24 script exposure policy deferred, mechanism implemented.
+
+Generic values:
+- [ ] const reflected value view.
+- [ ] mutable reflected value view.
+- [ ] owned reflected value.
+- [ ] allocator ownership explicit.
+- [ ] alignment/lifecycle correct.
+- [ ] copy/move non-trivial safe.
+- [ ] no std::any public dependency.
+
+Registry:
+- [ ] deterministic registration.
+- [ ] no static-init-order dependency.
+- [ ] Building state.
+- [ ] Freeze.
+- [ ] Frozen read-only state.
+- [ ] post-freeze registration rejected.
+- [ ] schema validation pass.
+- [ ] referenced TypeIds validation.
+- [ ] registry dump diagnostics.
+- [ ] shutdown/leak tests.
+
+Performance:
+- [ ] lookup by TypeId measured.
+- [ ] lookup by canonical name measured.
+- [ ] property lookup measured.
+- [ ] function lookup/invoke measured.
+- [ ] property enumeration measured.
+- [ ] reflected component enumeration measured.
+- [ ] no allocations on frozen hot lookups.
+- [ ] synthetic 1k reflected types.
+- [ ] 10k/100k lookup workloads unde util.
+- [ ] timings observations, correctness hard gate.
+
+OCP acceptance:
+- [ ] synthetic new reflected component.
+- [ ] schema registration only pentru generic fields.
+- [ ] generic Inspector model îl vede.
+- [ ] generic property command îl poate edita.
+- [ ] debug reflection dump îl vede.
+- [ ] NU modificăm central Inspector switch.
+- [ ] NU modificăm central property-command switch.
+- [ ] NU introducem serializer/scripting schema paralelă.
+
+Reflection milestone:
+- [ ] toate gate-urile din Reflection Architecture Contract sunt satisfăcute înainte de full Inspector implementation.
 
 ---
 
@@ -433,25 +629,33 @@ Scale:
 
 ---
 
-# 20. Inspector descriptor/adaptor layer
+# 20. Reflection-driven Inspector layer
 
-**Design choice (not directly from the book): editor-only descriptors keyed by ComponentTypeId; no full runtime reflection requirement.**
+Reflection schema este autoritatea; editor metadata este doar presentation extension.
 
-- [ ] EditorComponentDescriptor concept.
-- [ ] Registry keyed by ComponentTypeId.
-- [ ] Display name.
-- [ ] Icon/category optional.
-- [ ] CanAdd.
-- [ ] CanRemove.
-- [ ] Property rows/adapters.
-- [ ] Apply callbacks.
-- [ ] Validation callbacks.
-- [ ] Required-component policy.
-- [ ] Unknown component fallback.
-- [ ] No giant hard-coded Inspector switch.
-- [ ] No Win32 types leak into engine runtime headers.
+- [ ] Inspector enumeră reflected components.
+- [ ] Inspector enumeră reflected properties.
+- [ ] Generic drawer registry keyed by reflected TypeId/attributes.
+- [ ] Bool drawer.
+- [ ] integer drawer.
+- [ ] float drawer.
+- [ ] Vec/struct drawer.
+- [ ] enum drawer.
+- [ ] string drawer.
+- [ ] resource reference drawer.
+- [ ] readonly display.
+- [ ] nested struct traversal.
+- [ ] custom property drawer extension.
+- [ ] custom component inspector extension.
+- [ ] custom extensions referă reflection IDs și NU redefin canonical schema.
+- [ ] CanAdd/CanRemove vine din component reflection/editor policy.
+- [ ] Validation/apply folosește semantic reflected setters.
+- [ ] Unknown reflected type are safe fallback/diagnostic.
+- [ ] No giant hard-coded Inspector component switch.
+- [ ] No central property-name switch.
+- [ ] No Win32 types leak into engine runtime reflection headers.
 - [ ] No STL restriction violation in public engine headers.
-- [ ] Editor layer may use STL internally.
+- [ ] Editor layer poate folosi STL intern.
 
 ---
 
@@ -929,6 +1133,13 @@ Phase 15 gates remain:
 
 Phase 16 adds:
 
+- [ ] Runtime Reflection registry/type/property tests.
+- [ ] enum/struct/container/function reflection tests.
+- [ ] lifecycle/generic value tests.
+- [ ] semantic setter/invariant tests.
+- [ ] foundation component reflection tests.
+- [ ] OCP synthetic reflected component test.
+- [ ] reflection stress/perf tests.
 - [ ] Phase 16 command tests.
 - [ ] Phase 16 scene-edit integration tests.
 - [ ] Phase 16 stress/perf tests.
@@ -957,6 +1168,7 @@ Phase 16 adds:
 
 Înainte de completion:
 
+- [ ] `Phase 16 — Runtime Reflection Architecture Contract.md` actualizat cu implementarea reală.
 - [ ] `Phase 16 — Editor Scene Editing Architecture.md`.
 - [ ] Implementation Checklist actualizat cu status.
 - [ ] Implementation Report.
@@ -970,7 +1182,11 @@ Phase 16 adds:
 - [ ] Command/history documented.
 - [ ] Snapshot documented.
 - [ ] Reparent semantics documented.
-- [ ] Component editor descriptor model documented.
+- [ ] Runtime Reflection model documented.
+- [ ] Reflection registry ownership/freeze documented.
+- [ ] Type/property/function/container schema documented.
+- [ ] semantic property access documented.
+- [ ] reflection-driven Inspector extension model documented.
 - [ ] Local/World gizmo semantics documented.
 - [ ] Known limitations documented.
 - [ ] Deferred scope assigned.
@@ -983,6 +1199,17 @@ Phase 16 adds:
 
 Phase 16 poate fi marcată COMPLETE numai dacă:
 
+- [ ] Runtime Reflection completion gate este PASS.
+- [ ] Engine deține un singur ReflectionRegistry.
+- [ ] ComponentRegistry nu rămâne authority paralelă.
+- [ ] stable TypeId/PropertyId/function identity sunt implementate.
+- [ ] type/property/enum/function/container reflection este implementată.
+- [ ] lifecycle/type ops și generic reflected values sunt implementate.
+- [ ] semantic reflected setters protejează runtime invariants.
+- [ ] Name/Transform/Renderable/Camera sunt reflectate.
+- [ ] reflected component enumeration funcționează.
+- [ ] generic property command folosește reflection.
+- [ ] OCP synthetic component test trece fără central switch modifications.
 - [ ] Scene Hierarchy este reală și World-backed.
 - [ ] `validationObjects_[4]` nu mai este authoring authority.
 - [ ] selection identity este EntityHandle.
@@ -1024,7 +1251,9 @@ Phase 16 poate fi marcată COMPLETE numai dacă:
 - [ ] **NU** persistent Entity ID.
 - [ ] **NU** serialized entity reference fixups.
 - [ ] **NU** schema migration.
-- [ ] **NU** full generic runtime reflection doar pentru Inspector.
+- [ ] **NU** un al doilea reflection/schema registry pentru Inspector/serializer/scripting.
+- [ ] **NU** introspecție automată arbitrară a tuturor tipurilor third-party/C++ neînregistrate.
+- [ ] **NU** compiler/AST toolchain obligatoriu dacă explicit registration satisface contractul production-grade.
 - [ ] **NU** physics.
 - [ ] **NU** animation.
 - [ ] **NU** audio.
@@ -1040,10 +1269,14 @@ Phase 16 poate fi marcată COMPLETE numai dacă:
 
 ## Ordinea recomandată de execuție
 
-**Audit → Architecture → Editor Session/Selection → Command History → Snapshot → Dynamic Hierarchy → Create/Rename/Delete/Duplicate → Reparent → Inspector descriptors → component editors → Local/World gizmos → history integration → diagnostics → tests → stress/perf → regression → documentation → completion gate.**
+**Audit → Architecture → Full Runtime Reflection Core → migrate ComponentRegistry authority → reflect foundation types/components → generic property command/OCP proof → Editor Session/Selection → Command History → Snapshot → Dynamic Hierarchy → Create/Rename/Delete/Duplicate → Reparent → reflection-driven Inspector → custom property/component extensions → Local/World gizmos → history integration → diagnostics → tests → stress/perf → regression → documentation → completion gate.**
 
-Primul milestone intern recomandat este:
+Primul milestone intern obligatoriu este:
 
-**Editor Session + EntityHandle Selection + Command History + Transient Snapshot**
+**Runtime Reflection Core**
 
-Nu construim Inspector-ul mare și hierarchy drag/drop înainte ca aceste fundații să fie testate.
+Al doilea:
+
+**Editor Session + EntityHandle Selection + Command History + Reflection-backed Transient Snapshot**
+
+Nu construim full Inspector-ul sau hierarchy drag/drop înainte ca Reflection Core și command/selection foundations să fie testate.
