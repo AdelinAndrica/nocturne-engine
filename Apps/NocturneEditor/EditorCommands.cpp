@@ -172,6 +172,181 @@ namespace nocturne::editor
                 value.c_str());
     }
 
+    bool ReparentEntityCommand::Init(
+        EditorCommandContext& context,
+        noc::EntityHandle child,
+        noc::EntityHandle newParent)
+    {
+        if (child_.IsValid()
+            || !context.world.IsAlive(child)
+            || context.IsToolOwned(child)
+            || !context.world.HasTransform(child)
+            || child == newParent)
+        {
+            return false;
+        }
+
+        if (newParent.IsValid()
+            && (!context.world.IsAlive(newParent)
+                || context.IsToolOwned(newParent)
+                || !context.world.HasTransform(newParent)))
+        {
+            return false;
+        }
+
+        noc::EntityHandle ancestor = newParent;
+        while (ancestor.IsValid())
+        {
+            if (ancestor == child)
+                return false;
+
+            ancestor =
+                context.world.ParentOf(ancestor);
+        }
+
+        const noc::EntityHandle oldParent =
+            context.world.ParentOf(child);
+
+        if (oldParent == newParent)
+            return false;
+
+        const noc::TransformComponent* oldTransform =
+            context.world.GetTransform(child);
+        if (!oldTransform)
+            return false;
+
+        oldTranslation_ = oldTransform->localTranslation;
+        oldRotation_ = oldTransform->localRotation;
+        oldScale_ = oldTransform->localScale;
+
+        const noc::Mat4 childWorld =
+            context.world.GetWorldMatrix(child);
+
+        noc::Mat4 targetLocal = childWorld;
+
+        if (newParent.IsValid())
+        {
+            const noc::Mat4 parentWorld =
+                context.world.GetWorldMatrix(newParent);
+            noc::Mat4 inverseParent{};
+
+            if (!noc::TryInverseAffine(
+                    parentWorld,
+                    inverseParent))
+            {
+                return false;
+            }
+
+            targetLocal =
+                noc::Mul(inverseParent, childWorld);
+        }
+
+        if (!noc::TryDecomposeTRS(
+                targetLocal,
+                newTranslation_,
+                newRotation_,
+                newScale_))
+        {
+            return false;
+        }
+
+        child_ = child;
+        oldParent_ = oldParent;
+        newParent_ = newParent;
+        return true;
+    }
+
+    const char* ReparentEntityCommand::Label() const noexcept
+    {
+        return "Reparent Entity";
+    }
+
+    std::size_t ReparentEntityCommand::MemoryCostBytes() const noexcept
+    {
+        return sizeof(*this);
+    }
+
+    bool ReparentEntityCommand::Execute(
+        EditorCommandContext& context)
+    {
+        return Apply_(
+            context,
+            newParent_,
+            newTranslation_,
+            newRotation_,
+            newScale_,
+            oldParent_,
+            oldTranslation_,
+            oldRotation_,
+            oldScale_);
+    }
+
+    bool ReparentEntityCommand::Undo(
+        EditorCommandContext& context)
+    {
+        return Apply_(
+            context,
+            oldParent_,
+            oldTranslation_,
+            oldRotation_,
+            oldScale_,
+            newParent_,
+            newTranslation_,
+            newRotation_,
+            newScale_);
+    }
+
+    bool ReparentEntityCommand::Redo(
+        EditorCommandContext& context)
+    {
+        return Execute(context);
+    }
+
+    bool ReparentEntityCommand::Apply_(
+        EditorCommandContext& context,
+        noc::EntityHandle parent,
+        const noc::Vec3& translation,
+        const noc::Quat& rotation,
+        const noc::Vec3& scale,
+        noc::EntityHandle rollbackParent,
+        const noc::Vec3& rollbackTranslation,
+        const noc::Quat& rollbackRotation,
+        const noc::Vec3& rollbackScale)
+    {
+        if (!context.world.IsAlive(child_)
+            || context.IsToolOwned(child_)
+            || (parent.IsValid()
+                && (!context.world.IsAlive(parent)
+                    || context.IsToolOwned(parent))))
+        {
+            return false;
+        }
+
+        if (!context.world.SetParent(child_, parent))
+            return false;
+
+        if (!context.world.SetLocalTRS(
+                child_,
+                translation,
+                rotation,
+                scale))
+        {
+            (void)context.world.SetParent(
+                child_,
+                rollbackParent);
+            (void)context.world.SetLocalTRS(
+                child_,
+                rollbackTranslation,
+                rollbackRotation,
+                rollbackScale);
+            context.world.Update();
+            return false;
+        }
+
+        context.world.Update();
+        return true;
+    }
+
     bool DeleteEntityCommand::Init(
         EditorCommandContext& context,
         noc::EntityHandle entity)

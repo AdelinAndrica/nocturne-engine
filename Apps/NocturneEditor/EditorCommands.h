@@ -65,6 +65,46 @@ namespace nocturne::editor
         std::string newName_;
     };
 
+    class ReparentEntityCommand final : public IEditorCommand
+    {
+    public:
+        [[nodiscard]] bool Init(
+            EditorCommandContext& context,
+            noc::EntityHandle child,
+            noc::EntityHandle newParent);
+
+        [[nodiscard]] const char* Label() const noexcept override;
+        [[nodiscard]] std::size_t MemoryCostBytes() const noexcept override;
+
+        [[nodiscard]] bool Execute(EditorCommandContext& context) override;
+        [[nodiscard]] bool Undo(EditorCommandContext& context) override;
+        [[nodiscard]] bool Redo(EditorCommandContext& context) override;
+
+    private:
+        [[nodiscard]] bool Apply_(
+            EditorCommandContext& context,
+            noc::EntityHandle parent,
+            const noc::Vec3& translation,
+            const noc::Quat& rotation,
+            const noc::Vec3& scale,
+            noc::EntityHandle rollbackParent,
+            const noc::Vec3& rollbackTranslation,
+            const noc::Quat& rollbackRotation,
+            const noc::Vec3& rollbackScale);
+
+        noc::EntityHandle child_{};
+        noc::EntityHandle oldParent_{};
+        noc::EntityHandle newParent_{};
+
+        noc::Vec3 oldTranslation_{};
+        noc::Quat oldRotation_ = noc::Quat::Identity();
+        noc::Vec3 oldScale_ = noc::Vec3::One();
+
+        noc::Vec3 newTranslation_{};
+        noc::Quat newRotation_ = noc::Quat::Identity();
+        noc::Vec3 newScale_ = noc::Vec3::One();
+    };
+
     class DeleteEntityCommand final : public IEditorCommand
     {
     public:

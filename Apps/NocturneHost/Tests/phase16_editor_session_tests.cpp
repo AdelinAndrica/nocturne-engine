@@ -10,6 +10,7 @@
 #include "Runtime/Reflection/ReflectionRegistry.h"
 #include "Runtime/World.h"
 
+#include <cmath>
 #include <cstring>
 #include <memory>
 
@@ -579,6 +580,197 @@ bool RunPhase16EditorSessionTests()
         ok &= CheckEditorSession(
             !toolDelete->Init(context, camera),
             "Tool-owned editor camera accepted delete command");
+    }
+
+    {
+        session.History().Clear();
+
+        const noc::EntityHandle oldParent =
+            world.CreateEntity();
+        const noc::EntityHandle newParent =
+            world.CreateEntity();
+        const noc::EntityHandle reparentChild =
+            world.CreateEntity();
+
+        const float halfAngle = 0.25f * 3.14159265358979323846f;
+        const noc::Quat z90{
+            0.0f,
+            0.0f,
+            std::sin(halfAngle),
+            std::cos(halfAngle)
+        };
+
+        ok &= CheckEditorSession(
+            oldParent.IsValid()
+                && newParent.IsValid()
+                && reparentChild.IsValid()
+                && world.AddTransform(oldParent)
+                && world.AddTransform(newParent)
+                && world.AddTransform(reparentChild)
+                && world.SetLocalTRS(
+                    oldParent,
+                    noc::Vec3{ 10.0f, 0.0f, 0.0f },
+                    noc::Quat::Identity(),
+                    noc::Vec3::One())
+                && world.SetLocalTRS(
+                    newParent,
+                    noc::Vec3{ -5.0f, 2.0f, 0.0f },
+                    noc::Quat::Identity(),
+                    noc::Vec3{ 2.0f, 2.0f, 2.0f })
+                && world.SetLocalTRS(
+                    reparentChild,
+                    noc::Vec3{ 2.0f, 1.0f, 0.0f },
+                    z90,
+                    noc::Vec3::One())
+                && world.SetParent(
+                    reparentChild,
+                    oldParent),
+            "Reparent test setup failed");
+
+        world.Update();
+        const noc::Mat4 worldBefore =
+            world.GetWorldMatrix(reparentChild);
+
+        auto reparent =
+            std::make_unique<
+                nocturne::editor::ReparentEntityCommand>();
+
+        ok &= CheckEditorSession(
+            reparent->Init(
+                context,
+                reparentChild,
+                newParent),
+            "Preserve-world reparent init failed");
+
+        ok &= CheckEditorSession(
+            session.History().Execute(
+                context,
+                std::move(reparent))
+                && world.ParentOf(reparentChild)
+                    == newParent,
+            "Preserve-world reparent execute failed");
+
+        const noc::Mat4 worldAfter =
+            world.GetWorldMatrix(reparentChild);
+
+        ok &= CheckEditorSession(
+            std::fabs(
+                worldAfter.m[12]
+                    - worldBefore.m[12]) < 1.0e-3f
+                && std::fabs(
+                    worldAfter.m[13]
+                        - worldBefore.m[13]) < 1.0e-3f
+                && std::fabs(
+                    worldAfter.m[0]
+                        - worldBefore.m[0]) < 1.0e-3f
+                && std::fabs(
+                    worldAfter.m[1]
+                        - worldBefore.m[1]) < 1.0e-3f,
+            "Reparent did not preserve world pose");
+
+        ok &= CheckEditorSession(
+            session.History().Undo(context)
+                && world.ParentOf(reparentChild)
+                    == oldParent,
+            "Reparent undo failed");
+
+        const noc::Mat4 worldUndo =
+            world.GetWorldMatrix(reparentChild);
+        ok &= CheckEditorSession(
+            std::fabs(
+                worldUndo.m[12]
+                    - worldBefore.m[12]) < 1.0e-3f
+                && std::fabs(
+                    worldUndo.m[13]
+                        - worldBefore.m[13]) < 1.0e-3f,
+            "Reparent undo did not preserve original world pose");
+
+        session.History().Clear();
+
+        auto unparent =
+            std::make_unique<
+                nocturne::editor::ReparentEntityCommand>();
+
+        ok &= CheckEditorSession(
+            unparent->Init(
+                context,
+                reparentChild,
+                noc::EntityHandle::Invalid())
+                && session.History().Execute(
+                    context,
+                    std::move(unparent))
+                && !world.ParentOf(
+                    reparentChild).IsValid(),
+            "Preserve-world unparent failed");
+
+        const noc::Mat4 worldUnparent =
+            world.GetWorldMatrix(reparentChild);
+        ok &= CheckEditorSession(
+            std::fabs(
+                worldUnparent.m[12]
+                    - worldBefore.m[12]) < 1.0e-3f
+                && std::fabs(
+                    worldUnparent.m[13]
+                        - worldBefore.m[13]) < 1.0e-3f,
+            "Unparent did not preserve world pose");
+
+        session.History().Clear();
+
+        // Singular target parent must be rejected before hierarchy mutation.
+        ok &= CheckEditorSession(
+            world.SetLocalTRS(
+                newParent,
+                noc::Vec3::Zero(),
+                noc::Quat::Identity(),
+                noc::Vec3{ 0.0f, 1.0f, 1.0f }),
+            "Singular parent setup failed");
+
+        auto singular =
+            std::make_unique<
+                nocturne::editor::ReparentEntityCommand>();
+
+        ok &= CheckEditorSession(
+            !singular->Init(
+                context,
+                reparentChild,
+                newParent)
+                && !world.ParentOf(
+                    reparentChild).IsValid(),
+            "Singular-parent reparent was not rejected atomically");
+
+        // Non-uniform target scale + rotated world basis produces shear in
+        // target-local space and therefore cannot be represented as TRS.
+        ok &= CheckEditorSession(
+            world.SetLocalTRS(
+                newParent,
+                noc::Vec3::Zero(),
+                noc::Quat::Identity(),
+                noc::Vec3{ 2.0f, 1.0f, 1.0f })
+                && world.SetLocalTRS(
+                    reparentChild,
+                    noc::Vec3::Zero(),
+                    z90,
+                    noc::Vec3::One()),
+            "Shear rejection setup failed");
+
+        auto shear =
+            std::make_unique<
+                nocturne::editor::ReparentEntityCommand>();
+
+        ok &= CheckEditorSession(
+            !shear->Init(
+                context,
+                reparentChild,
+                newParent)
+                && !world.ParentOf(
+                    reparentChild).IsValid(),
+            "Non-representable shear reparent was accepted");
+
+        ok &= CheckEditorSession(
+            world.DestroyEntity(reparentChild)
+                && world.DestroyEntity(newParent)
+                && world.DestroyEntity(oldParent),
+            "Reparent test cleanup failed");
     }
 
     // Failed commands must not enter history.

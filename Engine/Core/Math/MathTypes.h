@@ -198,6 +198,312 @@ namespace noc
         return Mul(Translation(t), Mul(RotationFromQuat(r), Scale(s)));
     }
 
+    inline bool IsFinite(const Vec3& v)
+    {
+        return std::isfinite(v.x)
+            && std::isfinite(v.y)
+            && std::isfinite(v.z);
+    }
+
+    inline bool IsFinite(const Quat& q)
+    {
+        return std::isfinite(q.x)
+            && std::isfinite(q.y)
+            && std::isfinite(q.z)
+            && std::isfinite(q.w);
+    }
+
+    inline bool IsFinite(const Mat4& m)
+    {
+        for (float value : m.m)
+        {
+            if (!std::isfinite(value))
+                return false;
+        }
+        return true;
+    }
+
+    // Affine inverse for column-vector transforms. Returns false for
+    // non-affine/singular/non-finite input instead of manufacturing a matrix.
+    inline bool TryInverseAffine(
+        const Mat4& input,
+        Mat4& outInverse,
+        float epsilon = 1.0e-6f)
+    {
+        if (!IsFinite(input)
+            || std::fabs(M(input, 3, 0)) > epsilon
+            || std::fabs(M(input, 3, 1)) > epsilon
+            || std::fabs(M(input, 3, 2)) > epsilon
+            || std::fabs(M(input, 3, 3) - 1.0f) > epsilon)
+        {
+            return false;
+        }
+
+        const float a00 = M(input, 0, 0);
+        const float a01 = M(input, 0, 1);
+        const float a02 = M(input, 0, 2);
+        const float a10 = M(input, 1, 0);
+        const float a11 = M(input, 1, 1);
+        const float a12 = M(input, 1, 2);
+        const float a20 = M(input, 2, 0);
+        const float a21 = M(input, 2, 1);
+        const float a22 = M(input, 2, 2);
+
+        const float c00 = a11 * a22 - a12 * a21;
+        const float c01 = a02 * a21 - a01 * a22;
+        const float c02 = a01 * a12 - a02 * a11;
+        const float c10 = a12 * a20 - a10 * a22;
+        const float c11 = a00 * a22 - a02 * a20;
+        const float c12 = a02 * a10 - a00 * a12;
+        const float c20 = a10 * a21 - a11 * a20;
+        const float c21 = a01 * a20 - a00 * a21;
+        const float c22 = a00 * a11 - a01 * a10;
+
+        const float determinant =
+            a00 * c00 + a01 * c10 + a02 * c20;
+
+        if (!std::isfinite(determinant)
+            || std::fabs(determinant) <= epsilon)
+        {
+            return false;
+        }
+
+        const float invDet = 1.0f / determinant;
+        Mat4 result = Mat4::Identity();
+
+        M(result, 0, 0) = c00 * invDet;
+        M(result, 0, 1) = c01 * invDet;
+        M(result, 0, 2) = c02 * invDet;
+        M(result, 1, 0) = c10 * invDet;
+        M(result, 1, 1) = c11 * invDet;
+        M(result, 1, 2) = c12 * invDet;
+        M(result, 2, 0) = c20 * invDet;
+        M(result, 2, 1) = c21 * invDet;
+        M(result, 2, 2) = c22 * invDet;
+
+        const Vec3 translation{
+            M(input, 0, 3),
+            M(input, 1, 3),
+            M(input, 2, 3)
+        };
+
+        const Vec3 inverseTranslation{
+            -(M(result, 0, 0) * translation.x
+                + M(result, 0, 1) * translation.y
+                + M(result, 0, 2) * translation.z),
+            -(M(result, 1, 0) * translation.x
+                + M(result, 1, 1) * translation.y
+                + M(result, 1, 2) * translation.z),
+            -(M(result, 2, 0) * translation.x
+                + M(result, 2, 1) * translation.y
+                + M(result, 2, 2) * translation.z)
+        };
+
+        M(result, 0, 3) = inverseTranslation.x;
+        M(result, 1, 3) = inverseTranslation.y;
+        M(result, 2, 3) = inverseTranslation.z;
+
+        if (!IsFinite(result))
+            return false;
+
+        outInverse = result;
+        return true;
+    }
+
+    inline Quat QuatFromRotationMatrix(const Mat4& m)
+    {
+        Quat q{};
+        const float r00 = M(m, 0, 0);
+        const float r11 = M(m, 1, 1);
+        const float r22 = M(m, 2, 2);
+        const float trace = r00 + r11 + r22;
+
+        if (trace > 0.0f)
+        {
+            const float s =
+                std::sqrt(trace + 1.0f) * 2.0f;
+            q.w = 0.25f * s;
+            q.x = (M(m, 2, 1) - M(m, 1, 2)) / s;
+            q.y = (M(m, 0, 2) - M(m, 2, 0)) / s;
+            q.z = (M(m, 1, 0) - M(m, 0, 1)) / s;
+        }
+        else if (r00 > r11 && r00 > r22)
+        {
+            const float s =
+                std::sqrt(1.0f + r00 - r11 - r22) * 2.0f;
+            q.w = (M(m, 2, 1) - M(m, 1, 2)) / s;
+            q.x = 0.25f * s;
+            q.y = (M(m, 0, 1) + M(m, 1, 0)) / s;
+            q.z = (M(m, 0, 2) + M(m, 2, 0)) / s;
+        }
+        else if (r11 > r22)
+        {
+            const float s =
+                std::sqrt(1.0f + r11 - r00 - r22) * 2.0f;
+            q.w = (M(m, 0, 2) - M(m, 2, 0)) / s;
+            q.x = (M(m, 0, 1) + M(m, 1, 0)) / s;
+            q.y = 0.25f * s;
+            q.z = (M(m, 1, 2) + M(m, 2, 1)) / s;
+        }
+        else
+        {
+            const float s =
+                std::sqrt(1.0f + r22 - r00 - r11) * 2.0f;
+            q.w = (M(m, 1, 0) - M(m, 0, 1)) / s;
+            q.x = (M(m, 0, 2) + M(m, 2, 0)) / s;
+            q.y = (M(m, 1, 2) + M(m, 2, 1)) / s;
+            q.z = 0.25f * s;
+        }
+
+        const float lengthSq =
+            q.x * q.x
+            + q.y * q.y
+            + q.z * q.z
+            + q.w * q.w;
+
+        if (!std::isfinite(lengthSq)
+            || lengthSq <= 1.0e-12f)
+        {
+            return Quat::Identity();
+        }
+
+        const float invLength =
+            1.0f / std::sqrt(lengthSq);
+
+        return {
+            q.x * invLength,
+            q.y * invLength,
+            q.z * invLength,
+            q.w * invLength
+        };
+    }
+
+    // Decomposes only matrices representable as T*R*S. Design choice
+    // (not directly from the book): shear is rejected rather than silently
+    // approximated because editor reparent must preserve world pose exactly.
+    inline bool TryDecomposeTRS(
+        const Mat4& input,
+        Vec3& outTranslation,
+        Quat& outRotation,
+        Vec3& outScale,
+        float epsilon = 1.0e-5f,
+        float shearEpsilon = 1.0e-4f)
+    {
+        if (!IsFinite(input)
+            || std::fabs(M(input, 3, 0)) > epsilon
+            || std::fabs(M(input, 3, 1)) > epsilon
+            || std::fabs(M(input, 3, 2)) > epsilon
+            || std::fabs(M(input, 3, 3) - 1.0f) > epsilon)
+        {
+            return false;
+        }
+
+        Vec3 c0{
+            M(input, 0, 0),
+            M(input, 1, 0),
+            M(input, 2, 0)
+        };
+        Vec3 c1{
+            M(input, 0, 1),
+            M(input, 1, 1),
+            M(input, 2, 1)
+        };
+        Vec3 c2{
+            M(input, 0, 2),
+            M(input, 1, 2),
+            M(input, 2, 2)
+        };
+
+        float sx = Length(c0);
+        float sy = Length(c1);
+        float sz = Length(c2);
+
+        if (!std::isfinite(sx)
+            || !std::isfinite(sy)
+            || !std::isfinite(sz)
+            || sx <= epsilon
+            || sy <= epsilon
+            || sz <= epsilon)
+        {
+            return false;
+        }
+
+        Vec3 n0 = c0 * (1.0f / sx);
+        Vec3 n1 = c1 * (1.0f / sy);
+        Vec3 n2 = c2 * (1.0f / sz);
+
+        if (std::fabs(Dot(n0, n1)) > shearEpsilon
+            || std::fabs(Dot(n0, n2)) > shearEpsilon
+            || std::fabs(Dot(n1, n2)) > shearEpsilon)
+        {
+            return false;
+        }
+
+        float handedness =
+            Dot(Cross(n0, n1), n2);
+
+        if (!std::isfinite(handedness)
+            || std::fabs(handedness) <= epsilon)
+        {
+            return false;
+        }
+
+        if (handedness < 0.0f)
+        {
+            sx = -sx;
+            n0 = n0 * -1.0f;
+        }
+
+        Mat4 rotationMatrix = Mat4::Identity();
+        M(rotationMatrix, 0, 0) = n0.x;
+        M(rotationMatrix, 1, 0) = n0.y;
+        M(rotationMatrix, 2, 0) = n0.z;
+        M(rotationMatrix, 0, 1) = n1.x;
+        M(rotationMatrix, 1, 1) = n1.y;
+        M(rotationMatrix, 2, 1) = n1.z;
+        M(rotationMatrix, 0, 2) = n2.x;
+        M(rotationMatrix, 1, 2) = n2.y;
+        M(rotationMatrix, 2, 2) = n2.z;
+
+        const Vec3 translation{
+            M(input, 0, 3),
+            M(input, 1, 3),
+            M(input, 2, 3)
+        };
+        const Quat rotation =
+            QuatFromRotationMatrix(rotationMatrix);
+        const Vec3 scale{ sx, sy, sz };
+
+        if (!IsFinite(translation)
+            || !IsFinite(rotation)
+            || !IsFinite(scale))
+        {
+            return false;
+        }
+
+        const Mat4 recomposed =
+            TRS(translation, rotation, scale);
+
+        for (int i = 0; i < 16; ++i)
+        {
+            const float tolerance =
+                5.0e-4f
+                * (1.0f + std::fabs(input.m[i]));
+
+            if (std::fabs(
+                    recomposed.m[i] - input.m[i])
+                > tolerance)
+            {
+                return false;
+            }
+        }
+
+        outTranslation = translation;
+        outRotation = rotation;
+        outScale = scale;
+        return true;
+    }
+
     // ============================================================
     // Camera matrices
     // ============================================================
