@@ -2,6 +2,7 @@
 #include "../../NocturneEditor/EditorCommands.h"
 #include "../../NocturneEditor/EditorHierarchyModel.h"
 #include "../../NocturneEditor/EditorInspectorModel.h"
+#include "../../NocturneEditor/EditorSession.h"
 
 #include "Core/Log.h"
 #include "Core/Memory/Allocator.h"
@@ -552,6 +553,320 @@ namespace
         return ok;
     }
 
+    bool RunSelectionAndCreateBaseline(
+        noc::IAllocator& allocator,
+        const noc::ReflectionRegistry& reflection)
+    {
+        constexpr uint32_t kEntityCount = 1000;
+        constexpr uint32_t kSelectionCount = 100000;
+
+        noc::World world;
+        nocturne::editor::EditorSession session;
+        std::vector<noc::EntityHandle> entities;
+        bool ok = true;
+
+        ok &= CheckEditorPerf(
+            world.Init(allocator, reflection)
+                && session.Init(
+                    world,
+                    reflection,
+                    allocator,
+                    2048,
+                    8u * 1024u * 1024u),
+            "Selection/create perf setup failed");
+
+        if (!ok)
+        {
+            session.Shutdown();
+            world.Shutdown();
+            return false;
+        }
+
+        auto context =
+            session.CommandContext();
+
+        const auto createBegin = Clock::now();
+
+        for (uint32_t i = 0;
+             i < kEntityCount;
+             ++i)
+        {
+            auto command =
+                std::make_unique<
+                    nocturne::editor::CreateEntityCommand>();
+
+            if (!command->Init(
+                    "Perf Entity")
+                || !session.History().Execute(
+                    context,
+                    std::move(command)))
+            {
+                ok &= CheckEditorPerf(
+                    false,
+                    "Create 1k command workload failed");
+                break;
+            }
+        }
+
+        const auto createEnd = Clock::now();
+
+        ok &= CheckEditorPerf(
+            world.AliveCount() == kEntityCount
+                && session.History().CommandCount()
+                    == kEntityCount,
+            "Create 1k post-state mismatch");
+
+        try
+        {
+            entities.reserve(kEntityCount);
+
+            for (uint32_t i = 0;
+                 i < world.EntityCapacity();
+                 ++i)
+            {
+                const noc::EntityHandle entity =
+                    world.EntityAtIndex(i);
+
+                if (entity.IsValid())
+                    entities.push_back(entity);
+            }
+        }
+        catch (const std::bad_alloc&)
+        {
+            ok &= CheckEditorPerf(
+                false,
+                "Selection perf entity enumeration allocation failed");
+        }
+
+        const auto selectionBegin =
+            Clock::now();
+
+        uint32_t selectionHits = 0;
+        if (!entities.empty())
+        {
+            for (uint32_t i = 0;
+                 i < kSelectionCount;
+                 ++i)
+            {
+                if (session.SetSelection(
+                        entities[
+                            i % entities.size()]))
+                {
+                    ++selectionHits;
+                }
+            }
+        }
+
+        const auto selectionEnd =
+            Clock::now();
+
+        ok &= CheckEditorPerf(
+            selectionHits == kSelectionCount
+                && session.SelectedEntity().IsValid(),
+            "Selection latency workload failed");
+
+        NOC_LOG_INFO(
+            "Phase16EditorPerf",
+            "editor_create_1k: entities=%u time_us=%lld retained_history_bytes=%zu",
+            kEntityCount,
+            Micros(createBegin, createEnd),
+            session.History().UsedBytes());
+
+        NOC_LOG_INFO(
+            "Phase16EditorPerf",
+            "editor_selection: selections=%u entities=%u time_us=%lld",
+            kSelectionCount,
+            static_cast<uint32_t>(
+                entities.size()),
+            Micros(
+                selectionBegin,
+                selectionEnd));
+
+        session.Shutdown();
+        world.Shutdown();
+        return ok;
+    }
+
+    bool RunReparentAndGizmoCommitBaseline(
+        noc::IAllocator& allocator,
+        const noc::ReflectionRegistry& reflection)
+    {
+        noc::World world;
+        bool ok = true;
+
+        ok &= CheckEditorPerf(
+            world.Init(allocator, reflection),
+            "Reparent/gizmo perf World init failed");
+
+        if (!ok)
+            return false;
+
+        const noc::EntityHandle oldParent =
+            world.CreateEntity();
+        const noc::EntityHandle newParent =
+            world.CreateEntity();
+        const noc::EntityHandle child =
+            world.CreateEntity();
+
+        ok &= CheckEditorPerf(
+            oldParent.IsValid()
+                && newParent.IsValid()
+                && child.IsValid()
+                && world.AddTransform(oldParent)
+                && world.AddTransform(newParent)
+                && world.AddTransform(child)
+                && world.SetLocalTRS(
+                    oldParent,
+                    noc::Vec3{
+                        3.0f, 0.0f, 0.0f },
+                    noc::Quat::Identity(),
+                    noc::Vec3::One())
+                && world.SetLocalTRS(
+                    newParent,
+                    noc::Vec3{
+                        -4.0f, 1.0f, 0.0f },
+                    noc::Quat::Identity(),
+                    noc::Vec3::One())
+                && world.SetLocalTRS(
+                    child,
+                    noc::Vec3{
+                        1.0f, 2.0f, 3.0f },
+                    noc::Quat::Identity(),
+                    noc::Vec3::One())
+                && world.SetParent(
+                    child,
+                    oldParent),
+            "Reparent/gizmo perf transform setup failed");
+
+        world.Update();
+
+        nocturne::editor::EditorCommandContext context{
+            world,
+            reflection,
+            allocator,
+            noc::EntityHandle::Invalid()
+        };
+
+        nocturne::editor::EditorCommandHistory history;
+        history.Configure(
+            32,
+            1024u * 1024u);
+
+        const auto reparentBegin =
+            Clock::now();
+
+        auto reparent =
+            std::make_unique<
+                nocturne::editor::ReparentEntityCommand>();
+
+        const bool reparentOk =
+            reparent->Init(
+                context,
+                child,
+                newParent)
+            && history.Execute(
+                context,
+                std::move(reparent));
+
+        const auto reparentEnd =
+            Clock::now();
+
+        ok &= CheckEditorPerf(
+            reparentOk
+                && world.ParentOf(child)
+                    == newParent,
+            "Isolated reparent workload failed");
+
+        NOC_LOG_INFO(
+            "Phase16EditorPerf",
+            "editor_reparent_commit: time_us=%lld",
+            Micros(
+                reparentBegin,
+                reparentEnd));
+
+        history.Clear();
+
+        const noc::TransformComponent* transform =
+            world.GetTransform(child);
+
+        noc::Vec3 oldTranslation{};
+        noc::Quat oldRotation{};
+        noc::Vec3 oldScale{};
+
+        if (transform)
+        {
+            oldTranslation =
+                transform->localTranslation;
+            oldRotation =
+                transform->localRotation;
+            oldScale =
+                transform->localScale;
+        }
+
+        const noc::Vec3 newTranslation =
+            oldTranslation
+            + noc::Vec3{
+                0.25f, -0.5f, 1.0f };
+        const noc::Quat newRotation =
+            oldRotation;
+        const noc::Vec3 newScale =
+            oldScale;
+
+        ok &= CheckEditorPerf(
+            transform
+                && world.SetLocalTRS(
+                    child,
+                    newTranslation,
+                    newRotation,
+                    newScale),
+            "Gizmo commit live-state setup failed");
+
+        const auto gizmoCommitBegin =
+            Clock::now();
+
+        auto transformCommand =
+            std::make_unique<
+                nocturne::editor::SetTransformTRSCommand>();
+
+        const bool gizmoCommitOk =
+            transformCommand->InitExplicit(
+                context,
+                child,
+                oldTranslation,
+                oldRotation,
+                oldScale,
+                newTranslation,
+                newRotation,
+                newScale)
+            && history.RecordExecuted(
+                context,
+                std::move(transformCommand));
+
+        const auto gizmoCommitEnd =
+            Clock::now();
+
+        ok &= CheckEditorPerf(
+            gizmoCommitOk
+                && history.CommandCount() == 1
+                && history.Cursor() == 1,
+            "Isolated gizmo history commit failed");
+
+        NOC_LOG_INFO(
+            "Phase16EditorPerf",
+            "editor_gizmo_commit: time_us=%lld",
+            Micros(
+                gizmoCommitBegin,
+                gizmoCommitEnd));
+
+        ok &= CheckEditorPerf(
+            history.Undo(context),
+            "Gizmo commit perf undo failed");
+
+        history.Clear();
+        world.Shutdown();
+        return ok;
+    }
+
     bool RunSubtreeStress(
         noc::IAllocator& allocator,
         const noc::ReflectionRegistry& reflection)
@@ -767,6 +1082,12 @@ bool RunPhase16EditorPerfTests()
             allocator,
             reflection);
         ok &= RunInspectorRefreshBaseline(
+            allocator,
+            reflection);
+        ok &= RunSelectionAndCreateBaseline(
+            allocator,
+            reflection);
+        ok &= RunReparentAndGizmoCommitBaseline(
             allocator,
             reflection);
         ok &= RunSubtreeStress(

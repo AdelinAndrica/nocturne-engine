@@ -321,7 +321,7 @@ Keyboard shortcuts, Actor menu actions, hierarchy drag/drop and hierarchy contex
 | Nested transaction policy | IMPLEMENTED — nested Begin is rejected |
 | Generic compound rollback semantics | IMPLEMENTED — execute/redo compensate prior children; failed undo restores already-undone suffix when possible |
 | Required-component policy | IMPLEMENTED — Required is opt-in removal protection; foundation components remain non-required by Phase 16 policy; Inspector/RemoveComponentCommand precedence is tested |
-| Full editor performance baseline | PARTIAL / ACTIVE — hierarchy 100/1k/10k, wide/deep, Inspector refresh, history 10k/memory, delete+undo/duplicate subtree 1k are now measured; select/create/reparent/gizmo remain |
+| Full editor performance baseline | IMPLEMENTED for Phase 16 logical authoring workloads — hierarchy 100/1k/10k, wide/deep, selection, create 1k, Inspector refresh, history 10k/memory, subtree 1k, reparent and gizmo commit measured; low-level Win32/STL allocation-call instrumentation remains a separate allocation-discipline gate |
 | 10k hierarchy stress gate | IMPLEMENTED |
 | 10k command-history stress | IMPLEMENTED |
 | 1k delete/duplicate subtree stress | IMPLEMENTED |
@@ -409,13 +409,13 @@ Automated measured workloads now include:
 
 **Design choice (not directly from the book):** performance timings are logged as observations only. CI pass/fail is based on correctness, capacity, rollback/history semantics and allocator leak invariants until stable hardware baselines justify timing budgets.
 
-Still open from the full checklist:
+The Phase 16 logical authoring performance matrix is now covered, including select, create 1k, isolated reparent and gizmo commit.
 
-- select entity latency;
-- create 1k timing;
-- isolated reparent timing;
-- isolated gizmo commit timing;
-- deeper allocation instrumentation for Win32 control rebuild/paint paths.
+Still open under the separate allocation-discipline gate:
+
+- raw allocation-call instrumentation for hierarchy/Inspector Win32 presentation rebuilds;
+- paint-path allocation audit;
+- mouse-move hot-path allocation audit.
 
 ### 11.4 Completion test matrices
 
@@ -491,9 +491,9 @@ e7144560 — phase16: cover editor history failure and budget semantics
 
 ## 13. Recommended next implementation order
 
-1. Finish the remaining editor performance observations: select, create 1k, isolated reparent and gizmo commit.
-2. Complete hierarchy/Inspector/gizmo negative and lifecycle test matrices.
-3. Add real-engine function reflection proof and remaining reflection performance measurements.
+1. Complete hierarchy/Inspector/gizmo negative and lifecycle test matrices.
+2. Add real-engine function reflection proof and remaining reflection performance measurements.
+3. Close remaining allocation-discipline evidence for editor presentation/hot paths.
 4. Clarify the transient prefab-prototype seam without Phase 17 persistence.
 5. Run full manual Phase 13/14/15 regression plus 15+ minute edit-session soak.
 6. Resolve remaining in-scope repository/build hygiene.

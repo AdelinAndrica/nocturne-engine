@@ -940,7 +940,7 @@ Fiecare caz are:
 
 # 37. Allocation discipline
 
-- [x] Hierarchy refresh allocations measured.
+- [ ] Hierarchy refresh allocations measured.
 - [ ] Inspector rebuild allocations measured.
 - [ ] Command allocation ownership explicit.
 - [ ] Snapshot allocation ownership explicit.
@@ -956,7 +956,7 @@ Fiecare caz are:
 
 Măsurăm, nu ghicim:
 
-- [ ] select entity latency.
+- [x] select entity latency.
 - [x] hierarchy rebuild 100.
 - [x] hierarchy rebuild 1k.
 - [x] hierarchy rebuild 10k.
@@ -966,12 +966,12 @@ Măsurăm, nu ghicim:
 - [x] command push.
 - [x] undo.
 - [x] redo.
-- [ ] create 1k.
+- [x] create 1k.
 - [x] delete subtree 1k.
 - [x] undo delete subtree 1k.
 - [x] duplicate subtree 1k.
-- [ ] reparent.
-- [ ] gizmo commit.
+- [x] reparent.
+- [x] gizmo commit.
 - [x] history memory after representative editing session.
 
 - [x] Timings logged as observations.
