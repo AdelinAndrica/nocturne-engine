@@ -15,6 +15,7 @@
 #include "Input/InputSystem.h"
 #include "Render/RenderSystem.h"
 
+#include "Runtime/Reflection/ReflectionRegistry.h"
 #include "Runtime/World.h"
 #include <Platform/Win32/WinWindow.h>
 

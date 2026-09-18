@@ -887,7 +887,7 @@ bool RunPhase16ReflectionRegistryTests()
 
         noc::World componentWorld;
         ok &= CheckReflectionRegistry(
-            componentWorld.Init(allocator),
+            componentWorld.Init(allocator, componentRegistry),
             "Component reflection test World init failed");
 
         const noc::EntityHandle componentEntity =

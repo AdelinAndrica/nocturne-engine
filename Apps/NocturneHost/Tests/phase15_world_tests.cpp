@@ -5,6 +5,9 @@
 #include "Core/Memory/DebugAlloc.h"
 #include "Core/Memory/LinearArena.h"
 #include "Render/RenderQueue.h"
+#include "Runtime/Reflection/BuiltinTypes.h"
+#include "Runtime/Reflection/FoundationComponents.h"
+#include "Runtime/Reflection/ReflectionRegistry.h"
 
 #include <cmath>
 #include <cstddef>
@@ -34,11 +37,23 @@ bool RunPhase15WorldTests()
 
     noc::MallocAllocator backing;
     noc::DebugAlloc allocator(backing);
+    noc::ReflectionRegistry reflection;
     noc::World world;
 
     bool ok = true;
 
-    ok &= CheckWorld(world.Init(allocator), "World::Init failed");
+    ok &= CheckWorld(
+        reflection.Init(allocator, 32),
+        "World-test ReflectionRegistry init failed");
+    ok &= CheckWorld(
+        noc::RegisterBuiltinReflectionTypes(reflection)
+            && noc::RegisterFoundationComponentReflectionTypes(reflection)
+            && reflection.Freeze(),
+        "World-test reflected schema setup failed");
+
+    ok &= CheckWorld(
+        world.Init(allocator, reflection),
+        "World::Init failed");
     ok &= CheckWorld(world.AliveCount() == 0, "World must begin empty");
 
     ok &= CheckWorld(
@@ -236,6 +251,7 @@ bool RunPhase15WorldTests()
     ok &= CheckWorld(world.AliveCount() == 0, "World not empty after cleanup");
 
     world.Shutdown();
+    reflection.Shutdown();
 
     allocator.Deallocate(frameMemory);
 

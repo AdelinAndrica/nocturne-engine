@@ -17,6 +17,7 @@ namespace noc
 {
     class IAllocator;
     class LinearArena;
+    class ReflectionRegistry;
 
     struct RenderQueue;
 
@@ -42,7 +43,9 @@ namespace noc
         World(World&&) = delete;
         World& operator=(World&&) = delete;
 
-        bool Init(IAllocator& persistentAlloc);
+        bool Init(
+            IAllocator& persistentAlloc,
+            const ReflectionRegistry& reflection);
         void Shutdown();
 
         // Updates transform propagation and derived renderable bounds.

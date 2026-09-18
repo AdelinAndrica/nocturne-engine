@@ -62,10 +62,12 @@ namespace noc
         return (static_cast<uint32_t>(value) & static_cast<uint32_t>(flag)) != 0;
     }
 
-    // Minimal schema metadata required by Phase 15.
+    // Legacy Phase 15 component metadata view.
     //
-    // canonicalName is owned by ComponentRegistry for registered entries and is
-    // valid until the registry is shut down.
+    // Phase 16 design choice (not directly from the book): ComponentRegistry
+    // no longer owns schema or canonical-name storage. These values are derived
+    // from the engine-wide frozen ReflectionRegistry and canonicalName is valid
+    // for ReflectionRegistry lifetime.
     struct ComponentTypeMetadata
     {
         ComponentTypeId typeId{};

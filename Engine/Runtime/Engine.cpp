@@ -10,6 +10,8 @@
 
 #include "Platform/Win32/WinWindow.h"
 #include "Runtime/MainLoop.h"
+#include "Runtime/Reflection/BuiltinTypes.h"
+#include "Runtime/Reflection/FoundationComponents.h"
 
 #include "Render/RenderQueue.h"
 
@@ -183,6 +185,23 @@ namespace noc {
         if (!registry_.StartupAll(this))
             return false;
 
+        // Phase 16: build the one engine-wide reflected schema explicitly
+        // after persistent memory is available and before World startup.
+        if (!reflection_.Init(Allocator(), 32))
+            return false;
+
+        if (!RegisterBuiltinReflectionTypes(reflection_)
+            || !RegisterFoundationComponentReflectionTypes(reflection_)
+            || !reflection_.Freeze())
+        {
+            NOC_LOG_ERROR(
+                "Reflection",
+                "Reflection startup failed: %s",
+                ReflectionRegistryErrorName(reflection_.LastError()));
+            reflection_.Shutdown();
+            return false;
+        }
+
         if (cfg_.archivePath && cfg_.archivePath[0] != 0)
         {
             if (!vfs_.MountArchive(cfg_.archivePath))
@@ -222,7 +241,7 @@ namespace noc {
 
         render_.SetResourceManager(&resources_);
 
-        if (!world_.Init(Allocator()))
+        if (!world_.Init(Allocator(), reflection_))
             return false;
 
         initialized_ = true;
@@ -379,6 +398,7 @@ namespace noc {
         renderAttached_ = false;
         renderWidth_ = renderHeight_ = 0;
         world_.Shutdown();
+        reflection_.Shutdown();
         assets_.Shutdown();
         resources_.Shutdown();
         input_.Shutdown();

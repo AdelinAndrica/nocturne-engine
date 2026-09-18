@@ -9,6 +9,7 @@
 #include "Runtime/EntityRegistry.h"
 #include "Runtime/Frustum.h"
 #include "Runtime/NameSystem.h"
+#include "Runtime/Reflection/ReflectionRegistry.h"
 #include "Runtime/RenderableSystem.h"
 #include "Runtime/TransformSystem.h"
 
@@ -81,23 +82,17 @@ namespace noc
         float defaultNearZ = kDefaultNearZ;
         float defaultFarZ = kDefaultFarZ;
 
-        [[nodiscard]] bool Init(IAllocator& inAllocator)
+        [[nodiscard]] bool Init(
+            IAllocator& inAllocator,
+            const ReflectionRegistry& reflection)
         {
             allocator = &inAllocator;
 
             if (!entities.Init(inAllocator, 64))
                 return false;
 
-            if (!componentTypes.Init(inAllocator, 8))
+            if (!componentTypes.Init(reflection, inAllocator))
                 return false;
-
-            if (!componentTypes.Register(TransformComponentMetadata())
-                || !componentTypes.Register(RenderableComponentMetadata())
-                || !componentTypes.Register(CameraComponentMetadata())
-                || !componentTypes.Register(NameComponentMetadata()))
-            {
-                return false;
-            }
 
             if (!transforms.Init(entities, inAllocator, 64))
                 return false;
@@ -216,7 +211,9 @@ namespace noc
         Shutdown();
     }
 
-    bool World::Init(IAllocator& persistentAlloc)
+    bool World::Init(
+        IAllocator& persistentAlloc,
+        const ReflectionRegistry& reflection)
     {
         if (impl_)
             return true;
@@ -228,7 +225,7 @@ namespace noc
 
         impl_ = new (memory) Impl{};
 
-        if (!impl_->Init(persistentAlloc))
+        if (!impl_->Init(persistentAlloc, reflection))
         {
             impl_->Shutdown();
             impl_->~Impl();
@@ -247,7 +244,7 @@ namespace noc
         NOC_LOG_INFO(
             "World",
             "%s",
-            "World initialized with Phase 15 entity/component runtime");
+            "World initialized with Phase 16 reflected component schema");
         return true;
     }
 
