@@ -60,7 +60,11 @@ namespace noc
             if (!memory)
                 return false;
 
-            metadata.lifecycle.defaultConstruct(memory);
+            if (!metadata.lifecycle.defaultConstruct(memory, allocator))
+            {
+                allocator.Deallocate(memory);
+                return false;
+            }
 
             Capture_(allocator, metadata, memory);
             return true;
@@ -86,7 +90,14 @@ namespace noc
             if (!memory)
                 return false;
 
-            metadata.lifecycle.copyConstruct(memory, source);
+            if (!metadata.lifecycle.copyConstruct(
+                    memory,
+                    source,
+                    allocator))
+            {
+                allocator.Deallocate(memory);
+                return false;
+            }
 
             Capture_(allocator, metadata, memory);
             return true;
@@ -97,8 +108,10 @@ namespace noc
             if (!data_ || !source || !lifecycle_.copyAssign)
                 return false;
 
-            lifecycle_.copyAssign(data_, source);
-            return true;
+            return lifecycle_.copyAssign(
+                data_,
+                source,
+                *allocator_);
         }
 
         [[nodiscard]] bool CopyAssign(ReflectedConstValueView source)
@@ -112,8 +125,9 @@ namespace noc
             if (!data_ || !lifecycle_.reset)
                 return false;
 
-            lifecycle_.reset(data_);
-            return true;
+            return lifecycle_.reset(
+                data_,
+                *allocator_);
         }
 
         [[nodiscard]] bool Equals(ReflectedConstValueView other) const
@@ -133,7 +147,7 @@ namespace noc
             if (!data_)
                 return;
 
-            lifecycle_.destruct(data_);
+            lifecycle_.destruct(data_, *allocator_);
             allocator_->Deallocate(data_);
 
             allocator_ = nullptr;

@@ -5,6 +5,7 @@
 #include "Runtime/Bounds.h"
 #include "Runtime/Entity.h"
 #include "Runtime/Reflection/ReflectionRegistry.h"
+#include "Runtime/Reflection/ReflectionString.h"
 
 #include <cstdint>
 
@@ -25,6 +26,7 @@ namespace noc
         inline constexpr TypeId UInt64  { 0x1000000000000009ull };
         inline constexpr TypeId Float32 { 0x100000000000000Aull };
         inline constexpr TypeId Float64 { 0x100000000000000Bull };
+        inline constexpr TypeId String  { 0x100000000000000Cull };
 
         inline constexpr TypeId Vec2    { 0x1000000000000101ull };
         inline constexpr TypeId Vec3    { 0x1000000000000102ull };
@@ -251,7 +253,23 @@ namespace noc
                 "Nocturne.Float32", TypeKind::FloatingPoint)
             || !RegisterPrimitive<double>(
                 registry, BuiltinTypeIds::Float64,
-                "Nocturne.Float64", TypeKind::FloatingPoint)
+                "Nocturne.Float64", TypeKind::FloatingPoint))
+        {
+            return false;
+        }
+
+        TypeMetadata stringMetadata =
+            MakeTypeMetadata<ReflectionString>(
+                BuiltinTypeIds::String,
+                "Nocturne.String",
+                TypeKind::String,
+                1,
+                TypeFlags::Serializable
+                    | TypeFlags::ScriptVisible);
+        stringMetadata.lifecycle =
+            MakeReflectionStringLifecycleOperations();
+
+        if (!registry.RegisterType(stringMetadata)
             || !RegisterVec2(registry)
             || !RegisterVec3(registry)
             || !RegisterVec4(registry)

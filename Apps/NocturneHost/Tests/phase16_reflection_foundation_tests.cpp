@@ -2,6 +2,7 @@
 #include "Runtime/Reflection/ReflectionMetadata.h"
 
 #include "Core/Log.h"
+#include "Core/Memory/Allocator.h"
 
 #include <cstdint>
 #include <new>
@@ -78,6 +79,7 @@ bool RunPhase16ReflectionFoundationTests()
     NOC_LOG_INFO("Phase16", "%s", "Reflection foundation tests begin");
 
     bool ok = true;
+    noc::MallocAllocator lifecycleAllocator;
 
     constexpr noc::TypeId invalidType{};
     constexpr noc::TypeId explicitType{ 42 };
@@ -164,39 +166,39 @@ bool RunPhase16ReflectionFoundationTests()
 
     NonTrivialValue::liveCount = 0;
 
-    operations.defaultConstruct(storageA);
-    operations.defaultConstruct(storageB);
+    ok &= operations.defaultConstruct(storageA, lifecycleAllocator);
+    ok &= operations.defaultConstruct(storageB, lifecycleAllocator);
 
     auto* a = reinterpret_cast<NonTrivialValue*>(storageA);
     auto* b = reinterpret_cast<NonTrivialValue*>(storageB);
     a->value = 31;
 
-    operations.copyAssign(storageB, storageA);
+    ok &= operations.copyAssign(storageB, storageA, lifecycleAllocator);
     ok &= CheckReflectionFoundation(
         operations.equals(storageA, storageB),
         "Lifecycle copy-assign/equality failed");
 
-    operations.copyConstruct(storageC, storageA);
+    ok &= operations.copyConstruct(storageC, storageA, lifecycleAllocator);
     auto* c = reinterpret_cast<NonTrivialValue*>(storageC);
     ok &= CheckReflectionFoundation(
         c->value == 31,
         "Lifecycle copy construction failed");
 
-    operations.moveConstruct(storageD, storageC);
+    ok &= operations.moveConstruct(storageD, storageC, lifecycleAllocator);
     auto* d = reinterpret_cast<NonTrivialValue*>(storageD);
     ok &= CheckReflectionFoundation(
         d->value == 31,
         "Lifecycle move construction failed");
 
-    operations.reset(storageB);
+    ok &= operations.reset(storageB, lifecycleAllocator);
     ok &= CheckReflectionFoundation(
         b->value == 7,
         "Lifecycle reset failed");
 
-    operations.destruct(storageD);
-    operations.destruct(storageC);
-    operations.destruct(storageB);
-    operations.destruct(storageA);
+    operations.destruct(storageD, lifecycleAllocator);
+    operations.destruct(storageC, lifecycleAllocator);
+    operations.destruct(storageB, lifecycleAllocator);
+    operations.destruct(storageA, lifecycleAllocator);
 
     ok &= CheckReflectionFoundation(
         NonTrivialValue::liveCount == 0,

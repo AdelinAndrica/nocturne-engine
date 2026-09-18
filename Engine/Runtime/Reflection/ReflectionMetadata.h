@@ -11,6 +11,7 @@
 
 namespace noc
 {
+    class IAllocator;
     class World;
     struct EntityHandle;
     enum class TypeKind : uint8_t
@@ -259,14 +260,32 @@ namespace noc
 
     struct TypeLifecycleOperations
     {
-        void (*defaultConstruct)(void* destination) = nullptr;
-        void (*destruct)(void* object) = nullptr;
-        void (*copyConstruct)(void* destination, const void* source) = nullptr;
-        void (*moveConstruct)(void* destination, void* source) = nullptr;
-        void (*copyAssign)(void* destination, const void* source) = nullptr;
-        void (*moveAssign)(void* destination, void* source) = nullptr;
+        bool (*defaultConstruct)(
+            void* destination,
+            IAllocator& allocator) = nullptr;
+        void (*destruct)(
+            void* object,
+            IAllocator& allocator) = nullptr;
+        bool (*copyConstruct)(
+            void* destination,
+            const void* source,
+            IAllocator& allocator) = nullptr;
+        bool (*moveConstruct)(
+            void* destination,
+            void* source,
+            IAllocator& allocator) = nullptr;
+        bool (*copyAssign)(
+            void* destination,
+            const void* source,
+            IAllocator& allocator) = nullptr;
+        bool (*moveAssign)(
+            void* destination,
+            void* source,
+            IAllocator& allocator) = nullptr;
         bool (*equals)(const void* a, const void* b) = nullptr;
-        void (*reset)(void* object) = nullptr;
+        bool (*reset)(
+            void* object,
+            IAllocator& allocator) = nullptr;
     };
 
     struct PropertyAccessContext
@@ -455,39 +474,60 @@ namespace noc
             };
 
         template <typename T>
-        void DefaultConstruct(void* destination)
+        bool DefaultConstruct(
+            void* destination,
+            IAllocator&)
         {
             new (destination) T();
+            return true;
         }
 
         template <typename T>
-        void Destruct(void* object)
+        void Destruct(
+            void* object,
+            IAllocator&)
         {
             static_cast<T*>(object)->~T();
         }
 
         template <typename T>
-        void CopyConstruct(void* destination, const void* source)
+        bool CopyConstruct(
+            void* destination,
+            const void* source,
+            IAllocator&)
         {
             new (destination) T(*static_cast<const T*>(source));
+            return true;
         }
 
         template <typename T>
-        void MoveConstruct(void* destination, void* source)
+        bool MoveConstruct(
+            void* destination,
+            void* source,
+            IAllocator&)
         {
             new (destination) T(std::move(*static_cast<T*>(source)));
+            return true;
         }
 
         template <typename T>
-        void CopyAssign(void* destination, const void* source)
+        bool CopyAssign(
+            void* destination,
+            const void* source,
+            IAllocator&)
         {
             *static_cast<T*>(destination) = *static_cast<const T*>(source);
+            return true;
         }
 
         template <typename T>
-        void MoveAssign(void* destination, void* source)
+        bool MoveAssign(
+            void* destination,
+            void* source,
+            IAllocator&)
         {
             *static_cast<T*>(destination) = std::move(*static_cast<T*>(source));
+            return true;
         }
 
         template <typename T>
@@ -497,9 +537,12 @@ namespace noc
         }
 
         template <typename T>
-        void Reset(void* object)
+        bool Reset(
+            void* object,
+            IAllocator&)
         {
             *static_cast<T*>(object) = T{};
+            return true;
         }
 
         template <typename Owner, typename Value, Value Owner::*Member>

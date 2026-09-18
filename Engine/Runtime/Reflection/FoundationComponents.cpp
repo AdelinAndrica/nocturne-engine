@@ -10,6 +10,7 @@
 #include "Runtime/Reflection/ComponentReflection.h"
 #include "Runtime/Reflection/ReflectionMetadata.h"
 #include "Runtime/Reflection/ReflectionRegistry.h"
+#include "Runtime/Reflection/ReflectionString.h"
 #include "Runtime/World.h"
 
 #include <cmath>
@@ -797,17 +798,83 @@ namespace noc
             return registry.RegisterType(metadata);
         }
 
+        bool ReadNameValue(
+            const PropertyAccessContext& context,
+            void* destination)
+        {
+            const auto* runtime = ComponentContext(context);
+            if (!runtime || !destination)
+                return false;
+
+            const NameComponent* component =
+                runtime->world->GetName(runtime->entity);
+            if (!component)
+                return false;
+
+            return static_cast<ReflectionString*>(destination)
+                ->Assign(component->value);
+        }
+
+        bool ValidateNameValue(
+            const PropertyAccessContext&,
+            const void* candidate)
+        {
+            if (!candidate)
+                return false;
+
+            return static_cast<const ReflectionString*>(candidate)->Size()
+                <= kNameComponentMaxBytes;
+        }
+
+        bool WriteNameValue(
+            PropertyAccessContext& context,
+            const void* source)
+        {
+            auto* runtime = ComponentContext(context);
+            if (!runtime || !source)
+                return false;
+
+            return runtime->world->SetName(
+                runtime->entity,
+                static_cast<const ReflectionString*>(source)->CStr());
+        }
+
         [[nodiscard]] bool RegisterName(ReflectionRegistry& registry)
         {
-            // Name.value is added when the allocator-aware reflected String
-            // value type lands. The component membership schema is already
-            // authoritative and generic.
-            return registry.RegisterType(
+            const AttributeMetadata attributes[] = {
+                MakeStringAttribute(
+                    AttributeKind::DisplayName,
+                    "Name")
+            };
+
+            PropertyMetadata properties[] = {
+                {
+                    MakePropertyId("Nocturne.Name.value"),
+                    "value",
+                    ToReflectionTypeId(kNameComponentTypeId),
+                    BuiltinTypeIds::String,
+                    kAuthorable,
+                    &ReadNameValue,
+                    &WriteNameValue,
+                    nullptr,
+                    nullptr,
+                    &ValidateNameValue,
+                    nullptr,
+                    attributes,
+                    1
+                }
+            };
+
+            TypeMetadata metadata =
                 MakeFoundationComponentType<NameComponent>(
                     kNameComponentTypeId,
                     kNameComponentCanonicalName,
                     kNameComponentVersion,
-                    kNameOps));
+                    kNameOps,
+                    properties,
+                    1);
+
+            return registry.RegisterType(metadata);
         }
     }
 

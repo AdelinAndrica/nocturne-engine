@@ -1,5 +1,6 @@
 #include "Runtime/Reflection/BuiltinTypes.h"
 #include "Runtime/Reflection/ReflectionRegistry.h"
+#include "Runtime/Reflection/ReflectionString.h"
 #include "Runtime/Reflection/ReflectedValue.h"
 #include "Runtime/Reflection/PropertyAccess.h"
 #include "Runtime/Reflection/FunctionInvocation.h"
@@ -1065,6 +1066,48 @@ bool RunPhase16ReflectionRegistryTests()
                 == noc::PropertyAccessStatus::WriteFailed,
             "World semantic TRS seam accepted NaN");
 
+
+        const noc::PropertyMetadata* nameProperty =
+            componentRegistry.FindPropertyByName(
+                nameType->typeId,
+                "value");
+
+        noc::ReflectionString reflectedName(allocator);
+        ok &= CheckReflectionRegistry(
+            reflectedName.Assign("Reflected Entity"),
+            "Reflected string setup failed");
+        ok &= CheckReflectionRegistry(
+            nameProperty
+                && noc::WritePropertyValue(
+                    *nameProperty,
+                    propertyContext,
+                    noc::ReflectedConstValueView{
+                        noc::BuiltinTypeIds::String,
+                        &reflectedName })
+                    == noc::PropertyAccessStatus::Success
+                && componentWorld.GetName(componentEntity)
+                && std::strcmp(
+                    componentWorld.GetName(componentEntity)->value,
+                    "Reflected Entity") == 0,
+            "Semantic Name property write failed");
+
+        noc::OwnedReflectedValue reflectedNameRead;
+        ok &= CheckReflectionRegistry(
+            noc::ReadPropertyValue(
+                componentRegistry,
+                *nameProperty,
+                propertyContext,
+                allocator,
+                reflectedNameRead)
+                == noc::PropertyAccessStatus::Success
+                && std::strcmp(
+                    static_cast<const noc::ReflectionString*>(
+                        reflectedNameRead.Data())->CStr(),
+                    "Reflected Entity") == 0,
+            "Semantic Name property read failed");
+
+        reflectedNameRead.Clear();
+        reflectedName.Clear();
 
         ok &= CheckReflectionRegistry(
             nameType->componentMetadata->remove(
