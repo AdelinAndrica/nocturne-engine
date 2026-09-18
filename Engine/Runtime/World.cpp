@@ -430,6 +430,42 @@ namespace noc
         return impl_->transforms.SetParent(child, targetParent);
     }
 
+    EntityHandle World::ParentOf(EntityHandle entity) const
+    {
+        if (!impl_
+            || !impl_->entities.IsAlive(entity)
+            || !impl_->transforms.Has(entity))
+        {
+            return EntityHandle::Invalid();
+        }
+
+        return impl_->transforms.ParentOf(entity);
+    }
+
+    EntityHandle World::FirstChildOf(EntityHandle entity) const
+    {
+        if (!impl_
+            || !impl_->entities.IsAlive(entity)
+            || !impl_->transforms.Has(entity))
+        {
+            return EntityHandle::Invalid();
+        }
+
+        return impl_->transforms.FirstChildOf(entity);
+    }
+
+    EntityHandle World::NextSiblingOf(EntityHandle entity) const
+    {
+        if (!impl_
+            || !impl_->entities.IsAlive(entity)
+            || !impl_->transforms.Has(entity))
+        {
+            return EntityHandle::Invalid();
+        }
+
+        return impl_->transforms.NextSiblingOf(entity);
+    }
+
     Mat4 World::GetWorldMatrix(SceneObjectHandle entity)
     {
         Mat4 world = Mat4::Identity();

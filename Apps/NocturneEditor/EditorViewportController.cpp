@@ -326,8 +326,6 @@ namespace nocturne::editor
             NOC_LOG_ERROR("Editor", "Phase 14 viewport body subclass failed");
             return false;
         }
-        SetWindowSubclass(sceneTree_, &EditorViewportController::SceneTreeSubclassProc_, kSubclassIdTree,
-            reinterpret_cast<DWORD_PTR>(this));
 
         // STATIC controls require SS_NOTIFY to participate reliably in mouse
         // interaction. The subclass also returns HTCLIENT explicitly below.
@@ -385,8 +383,6 @@ namespace nocturne::editor
             engine_->ClearDebugSelectionBounds();
         if (body_)
             RemoveWindowSubclass(body_, &EditorViewportController::BodySubclassProc_, kSubclassIdBody);
-        if (sceneTree_)
-            RemoveWindowSubclass(sceneTree_, &EditorViewportController::SceneTreeSubclassProc_, kSubclassIdTree);
         if (renderHost_)
             RemoveWindowSubclass(renderHost_, &EditorViewportController::RenderHostSubclassProc_, kSubclassIdRenderHost);
         if (GetCapture() == renderHost_)
@@ -720,24 +716,8 @@ namespace nocturne::editor
         gizmoAxis_ = -1;
         RefreshDebugSelection_();
 
-        if (syncTree)
-        {
-            const int index =
-                ValidationIndexForEntity_(session_->SelectedEntity());
-
-            if (index >= 0)
-            {
-                hierarchyObjectsExpanded_ = true;
-                hierarchySelectedRow_ = 2 + index;
-            }
-            else
-            {
-                hierarchySelectedRow_ = 0;
-            }
-
-            if (sceneTree_)
-                InvalidateRect(sceneTree_, nullptr, FALSE);
-        }
+        if (syncTree && shell_)
+            shell_->SyncSceneSelection();
 
         if (overlay_)
             InvalidateRect(overlay_, nullptr, FALSE);

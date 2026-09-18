@@ -79,6 +79,13 @@ namespace noc
             SceneObjectHandle child,
             SceneObjectHandle parent);
 
+        [[nodiscard]] EntityHandle ParentOf(
+            EntityHandle entity) const;
+        [[nodiscard]] EntityHandle FirstChildOf(
+            EntityHandle entity) const;
+        [[nodiscard]] EntityHandle NextSiblingOf(
+            EntityHandle entity) const;
+
         [[nodiscard]] Mat4 GetWorldMatrix(SceneObjectHandle entity);
 
         // --- Renderable component ---

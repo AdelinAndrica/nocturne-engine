@@ -38,6 +38,7 @@ namespace nocturne::editor
         HWND ViewportBody() const { return viewport_.body; }
         HWND SceneTree() const { return sceneTree_; }
         int ActiveToolId() const { return activeToolId_; }
+        void SyncSceneSelection();
 
     private:
         enum ControlId : int

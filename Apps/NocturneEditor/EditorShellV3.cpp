@@ -1,5 +1,6 @@
 #include "EditorShellV3.h"
 #include "EditorSession.h"
+#include "Runtime/Entity.h"
 #include "EditorTheme.h"
 #include "EditorIconRenderer.h"
 #include "NocturneEditorResource.h"
@@ -33,6 +34,7 @@ namespace nocturne::editor
         constexpr wchar_t kScrollClass[] = L"NocturneV3Scroll";
         constexpr UINT WM_NOC_V3_ACTIVE = WM_APP + 0x310;
         constexpr UINT WM_NOC_V3_SCROLL = WM_APP + 0x311;
+        constexpr WORD kTreeSelectionChanged = 0x7F01;
 
         enum class Icon
         {
@@ -56,7 +58,15 @@ namespace nocturne::editor
         };
         struct HeaderInit { Icon icon = Icon::None; };
         struct HeaderState { Icon icon = Icon::None; std::wstring title; HFONT font = nullptr; };
-        struct TreeItem { std::wstring text; int depth = 0; Icon icon = Icon::None; bool expandable = false; bool expanded = true; };
+        struct TreeItem
+        {
+            std::wstring text;
+            int depth = 0;
+            Icon icon = Icon::None;
+            bool expandable = false;
+            bool expanded = true;
+            noc::EntityHandle entity{};
+        };
         struct TreeState { std::vector<TreeItem> items; HFONT font = nullptr; int firstRow = 0; int selected = -1; int hover = -1; };
         struct TableRow { std::wstring asset; std::wstring type; Icon icon = Icon::None; };
         struct TableState { std::vector<TableRow> rows; HFONT font = nullptr; int firstRow = 0; int selected = -1; int hover = -1; };
@@ -441,8 +451,22 @@ namespace nocturne::editor
                     {
                         const int index = visible[visibleRow]; state->selected = index;
                         const int arrowX = 9 + state->items[index].depth * 16;
-                        if (state->items[index].expandable && GET_X_LPARAM(lParam) >= arrowX && GET_X_LPARAM(lParam) <= arrowX + 14) state->items[index].expanded = !state->items[index].expanded;
+                        if (state->items[index].expandable
+                            && GET_X_LPARAM(lParam) >= arrowX
+                            && GET_X_LPARAM(lParam) <= arrowX + 14)
+                        {
+                            state->items[index].expanded =
+                                !state->items[index].expanded;
+                        }
+
                         InvalidateRect(hwnd, nullptr, FALSE);
+                        SendMessageW(
+                            GetParent(hwnd),
+                            WM_COMMAND,
+                            MAKEWPARAM(
+                                GetDlgCtrlID(hwnd),
+                                kTreeSelectionChanged),
+                            reinterpret_cast<LPARAM>(hwnd));
                     }
                 }
                 return 0;
@@ -664,7 +688,84 @@ namespace nocturne::editor
 
         void ButtonActive(HWND h, bool active) { if (h) SendMessageW(h, WM_NOC_V3_ACTIVE, active ? TRUE : FALSE, 0); }
         void TreeClear(HWND h) { auto* s = h ? reinterpret_cast<TreeState*>(GetWindowLongPtrW(h, GWLP_USERDATA)) : nullptr; if (!s) return; s->items.clear(); s->firstRow = 0; s->selected = -1; s->hover = -1; InvalidateRect(h, nullptr, FALSE); }
-        void TreeAdd(HWND h, std::wstring text, int depth, Icon icon, bool expandable = false, bool expanded = true) { auto* s = h ? reinterpret_cast<TreeState*>(GetWindowLongPtrW(h, GWLP_USERDATA)) : nullptr; if (!s) return; s->items.push_back({ std::move(text), depth, icon, expandable, expanded }); if (s->selected < 0) s->selected = 0; InvalidateRect(h, nullptr, FALSE); }
+        void TreeAdd(
+            HWND h,
+            std::wstring text,
+            int depth,
+            Icon icon,
+            bool expandable = false,
+            bool expanded = true,
+            noc::EntityHandle entity = noc::EntityHandle::Invalid())
+        {
+            auto* s = h
+                ? reinterpret_cast<TreeState*>(
+                    GetWindowLongPtrW(h, GWLP_USERDATA))
+                : nullptr;
+            if (!s) return;
+
+            s->items.push_back({
+                std::move(text),
+                depth,
+                icon,
+                expandable,
+                expanded,
+                entity
+            });
+
+            if (s->selected < 0)
+                s->selected = 0;
+
+            InvalidateRect(h, nullptr, FALSE);
+        }
+
+        [[nodiscard]] noc::EntityHandle TreeSelectedEntity(HWND h)
+        {
+            auto* s = h
+                ? reinterpret_cast<TreeState*>(
+                    GetWindowLongPtrW(h, GWLP_USERDATA))
+                : nullptr;
+
+            if (!s
+                || s->selected < 0
+                || s->selected >= static_cast<int>(s->items.size()))
+            {
+                return noc::EntityHandle::Invalid();
+            }
+
+            return s->items[s->selected].entity;
+        }
+
+        void TreeSelectEntity(
+            HWND h,
+            noc::EntityHandle entity)
+        {
+            auto* s = h
+                ? reinterpret_cast<TreeState*>(
+                    GetWindowLongPtrW(h, GWLP_USERDATA))
+                : nullptr;
+            if (!s) return;
+
+            int selected = 0;
+            if (entity.IsValid())
+            {
+                for (int i = 0;
+                     i < static_cast<int>(s->items.size());
+                     ++i)
+                {
+                    if (s->items[i].entity == entity)
+                    {
+                        selected = i;
+                        break;
+                    }
+                }
+            }
+
+            if (s->selected != selected)
+            {
+                s->selected = selected;
+                InvalidateRect(h, nullptr, FALSE);
+            }
+        }
         void TableClear(HWND h) { auto* s = h ? reinterpret_cast<TableState*>(GetWindowLongPtrW(h, GWLP_USERDATA)) : nullptr; if (!s) return; s->rows.clear(); s->firstRow = 0; s->selected = -1; s->hover = -1; InvalidateRect(h, nullptr, FALSE); }
         void TableAdd(HWND h, std::wstring asset, std::wstring type, Icon icon) { auto* s = h ? reinterpret_cast<TableState*>(GetWindowLongPtrW(h, GWLP_USERDATA)) : nullptr; if (!s) return; s->rows.push_back({ std::move(asset), std::move(type), icon }); InvalidateRect(h, nullptr, FALSE); }
         void SetScroll(HWND h, int maximum, int page, int pos) { auto* s = h ? reinterpret_cast<ScrollState*>(GetWindowLongPtrW(h, GWLP_USERDATA)) : nullptr; if (!s) return; s->minimum = 0; s->maximum = maximum; s->page = (std::max)(1, page); s->position = (std::clamp)(pos, 0, ScrollMax(*s)); InvalidateRect(h, nullptr, FALSE); }
@@ -779,7 +880,143 @@ namespace nocturne::editor
 
     void EditorShellV3::PopulateScene_()
     {
-        TreeClear(sceneTree_); TreeAdd(sceneTree_, L"Scene (Runtime World)", 0, Icon::World, true, true); const uint32_t alive = engine_ ? engine_->GetWorld().AliveCount() : 0; std::wstringstream ss; ss << L"Runtime Objects: " << alive; TreeAdd(sceneTree_, ss.str(), 1, Icon::Cube); TreeAdd(sceneTree_, L"Main Camera", 1, Icon::Camera); TreeAdd(sceneTree_, L"Environment", 1, Icon::Folder);
+        TreeClear(sceneTree_);
+        TreeAdd(
+            sceneTree_,
+            L"Scene (Runtime World)",
+            0,
+            Icon::World,
+            true,
+            true);
+
+        if (!engine_ || !session_)
+            return;
+
+        noc::World& world = engine_->GetWorld();
+
+        struct PendingRow
+        {
+            noc::EntityHandle entity{};
+            int depth = 1;
+        };
+
+        auto isAuthored = [&](noc::EntityHandle entity)
+        {
+            return entity.IsValid()
+                && world.IsAlive(entity)
+                && !session_->IsToolOwned(entity);
+        };
+
+        auto hasAuthoredChild = [&](noc::EntityHandle entity)
+        {
+            noc::EntityHandle child = world.FirstChildOf(entity);
+            while (child.IsValid())
+            {
+                if (isAuthored(child))
+                    return true;
+                child = world.NextSiblingOf(child);
+            }
+            return false;
+        };
+
+        auto displayName = [&](noc::EntityHandle entity)
+        {
+            const noc::NameComponent* name = world.GetName(entity);
+            if (name && name->value[0] != '\0')
+            {
+                const std::wstring converted =
+                    Utf8ToWide_(name->value);
+                if (!converted.empty())
+                    return converted;
+            }
+
+            std::wstringstream fallback;
+            fallback << L"Entity "
+                << entity.index
+                << L":"
+                << entity.generation;
+            return fallback.str();
+        };
+
+        auto iconFor = [&](noc::EntityHandle entity)
+        {
+            if (world.HasCamera(entity))
+                return Icon::Camera;
+            if (world.HasRenderable(entity))
+                return Icon::Cube;
+            return Icon::Hierarchy;
+        };
+
+        std::vector<noc::EntityHandle> roots;
+        roots.reserve(world.AliveCount());
+
+        for (uint32_t i = 0; i < world.EntityCapacity(); ++i)
+        {
+            const noc::EntityHandle entity =
+                world.EntityAtIndex(i);
+            if (!isAuthored(entity))
+                continue;
+
+            const noc::EntityHandle parent =
+                world.ParentOf(entity);
+
+            if (!isAuthored(parent))
+                roots.push_back(entity);
+        }
+
+        std::vector<PendingRow> stack;
+        stack.reserve(world.AliveCount());
+
+        for (auto it = roots.rbegin(); it != roots.rend(); ++it)
+            stack.push_back({ *it, 1 });
+
+        while (!stack.empty())
+        {
+            const PendingRow row = stack.back();
+            stack.pop_back();
+
+            TreeAdd(
+                sceneTree_,
+                displayName(row.entity),
+                row.depth,
+                iconFor(row.entity),
+                hasAuthoredChild(row.entity),
+                true,
+                row.entity);
+
+            std::vector<noc::EntityHandle> children;
+            noc::EntityHandle child =
+                world.FirstChildOf(row.entity);
+
+            while (child.IsValid())
+            {
+                if (isAuthored(child))
+                    children.push_back(child);
+                child = world.NextSiblingOf(child);
+            }
+
+            for (auto it = children.rbegin();
+                 it != children.rend();
+                 ++it)
+            {
+                stack.push_back({
+                    *it,
+                    row.depth + 1
+                });
+            }
+        }
+
+        SyncSceneSelection();
+    }
+
+    void EditorShellV3::SyncSceneSelection()
+    {
+        if (!sceneTree_ || !session_)
+            return;
+
+        TreeSelectEntity(
+            sceneTree_,
+            session_->SelectedEntity());
     }
 
     void EditorShellV3::PopulateContent_()
@@ -902,7 +1139,28 @@ namespace nocturne::editor
             if (reinterpret_cast<HWND>(lParam) == contentSearch_) { HDC dc = reinterpret_cast<HDC>(wParam); SetTextColor(dc, c.textPrimary); SetBkColor(dc, c.inputBg); result = reinterpret_cast<intptr_t>(editBrush_); return true; } break;
         case WM_COMMAND:
         {
-            const int id = LOWORD(wParam); HWND source = reinterpret_cast<HWND>(lParam);
+            const int id = LOWORD(wParam);
+            const int notification = HIWORD(wParam);
+            HWND source = reinterpret_cast<HWND>(lParam);
+
+            if (id == IdSceneTree
+                && notification == kTreeSelectionChanged
+                && session_)
+            {
+                const noc::EntityHandle entity =
+                    TreeSelectedEntity(sceneTree_);
+
+                if (entity.IsValid())
+                    (void)session_->SetSelection(entity);
+                else
+                    session_->ClearSelection();
+
+                SyncSceneSelection();
+                InvalidateRect(inspector_.body, nullptr, FALSE);
+                UpdateStatus_();
+                result = 0;
+                return true;
+            }
             if (id >= IdMenuFile && id <= IdMenuHelp) { ShowPopup_(id, source); result = 0; return true; }
             if (id == IDCANCEL) { if (window_) window_->RequestQuit(); result = 0; return true; }
             if ((id >= IdToolbarNew && id <= IdToolbarBuild) || id == IdPlay || id == IdBuild || id == IdContentListMode || id == IdContentGridMode || id == IdContentSettings || id == IdViewportPerspective || id == IdViewportLit || id == IdViewportShow) { HandleCommand_(id); result = 0; return true; }
