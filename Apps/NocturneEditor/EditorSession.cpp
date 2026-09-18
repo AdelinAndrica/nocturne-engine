@@ -209,7 +209,8 @@ namespace nocturne::editor
         return EditorCommandContext{
             *world_,
             *reflection_,
-            *allocator_
+            *allocator_,
+            toolCamera_
         };
     }
 

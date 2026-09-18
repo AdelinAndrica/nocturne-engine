@@ -194,7 +194,6 @@ namespace nocturne::editor
     void ReflectedComponentSnapshot::Clear() noexcept
     {
         properties_.clear();
-        properties_.shrink_to_fit();
         componentTypeId_ = noc::TypeId::Invalid();
         captured_ = false;
     }

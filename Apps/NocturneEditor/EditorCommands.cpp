@@ -70,6 +70,7 @@ namespace nocturne::editor
     {
         if (requestedParent_.IsValid()
             && (!context.world.IsAlive(requestedParent_)
+                || context.IsToolOwned(requestedParent_)
                 || !context.world.HasTransform(requestedParent_)))
         {
             return false;
@@ -107,7 +108,8 @@ namespace nocturne::editor
     {
         if (entity_.IsValid()
             || !newName
-            || !context.world.IsAlive(entity))
+            || !context.world.IsAlive(entity)
+            || context.IsToolOwned(entity))
         {
             return false;
         }
@@ -170,13 +172,104 @@ namespace nocturne::editor
                 value.c_str());
     }
 
+    bool DeleteEntityCommand::Init(
+        EditorCommandContext& context,
+        noc::EntityHandle entity)
+    {
+        return !context.IsToolOwned(entity)
+            && snapshot_.Capture(context, entity);
+    }
+
+    noc::EntityHandle DeleteEntityCommand::CurrentRoot() const noexcept
+    {
+        return snapshot_.CurrentRoot();
+    }
+
+    const char* DeleteEntityCommand::Label() const noexcept
+    {
+        return "Delete Entity";
+    }
+
+    std::size_t DeleteEntityCommand::MemoryCostBytes() const noexcept
+    {
+        return sizeof(*this) + snapshot_.MemoryCostBytes();
+    }
+
+    bool DeleteEntityCommand::Execute(EditorCommandContext& context)
+    {
+        return snapshot_.DestroyCurrent(context);
+    }
+
+    bool DeleteEntityCommand::Undo(EditorCommandContext& context)
+    {
+        return snapshot_.Instantiate(
+            context,
+            snapshot_.OriginalRootParent());
+    }
+
+    bool DeleteEntityCommand::Redo(EditorCommandContext& context)
+    {
+        return snapshot_.DestroyCurrent(context);
+    }
+
+    bool DuplicateEntityCommand::Init(
+        EditorCommandContext& context,
+        noc::EntityHandle entity)
+    {
+        if (context.IsToolOwned(entity)
+            || !snapshot_.Capture(context, entity))
+        {
+            return false;
+        }
+
+        rootParent_ =
+            snapshot_.OriginalRootParent();
+        snapshot_.ForgetCurrentInstances();
+        return true;
+    }
+
+    noc::EntityHandle DuplicateEntityCommand::CurrentRoot() const noexcept
+    {
+        return snapshot_.CurrentRoot();
+    }
+
+    const char* DuplicateEntityCommand::Label() const noexcept
+    {
+        return "Duplicate Entity";
+    }
+
+    std::size_t DuplicateEntityCommand::MemoryCostBytes() const noexcept
+    {
+        return sizeof(*this) + snapshot_.MemoryCostBytes();
+    }
+
+    bool DuplicateEntityCommand::Execute(EditorCommandContext& context)
+    {
+        return snapshot_.Instantiate(
+            context,
+            rootParent_);
+    }
+
+    bool DuplicateEntityCommand::Undo(EditorCommandContext& context)
+    {
+        return snapshot_.DestroyCurrent(context);
+    }
+
+    bool DuplicateEntityCommand::Redo(EditorCommandContext& context)
+    {
+        return snapshot_.Instantiate(
+            context,
+            rootParent_);
+    }
+
     bool AddComponentCommand::Init(
         EditorCommandContext& context,
         noc::EntityHandle entity,
         noc::TypeId componentTypeId)
     {
         if (entity_.IsValid()
-            || !context.world.IsAlive(entity))
+            || !context.world.IsAlive(entity)
+            || context.IsToolOwned(entity))
         {
             return false;
         }
@@ -265,7 +358,8 @@ namespace nocturne::editor
         noc::TypeId componentTypeId)
     {
         if (entity_.IsValid()
-            || !context.world.IsAlive(entity))
+            || !context.world.IsAlive(entity)
+            || context.IsToolOwned(entity))
         {
             return false;
         }
@@ -373,6 +467,7 @@ namespace nocturne::editor
     {
         if (entity_.IsValid()
             || !context.world.IsAlive(entity)
+            || context.IsToolOwned(entity)
             || !newValue.IsValid())
         {
             return false;
@@ -446,6 +541,7 @@ namespace nocturne::editor
     {
         if (entity_.IsValid()
             || !context.world.IsAlive(entity)
+            || context.IsToolOwned(entity)
             || !oldValue.IsValid()
             || !newValue.IsValid()
             || oldValue.typeId != newValue.typeId)

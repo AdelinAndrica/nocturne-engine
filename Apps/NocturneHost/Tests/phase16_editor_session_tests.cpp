@@ -411,6 +411,176 @@ bool RunPhase16EditorSessionTests()
         session.History().Clear();
     }
 
+    {
+        session.History().Clear();
+
+        const noc::EntityHandle parentEntity =
+            world.CreateEntity();
+        const noc::EntityHandle childEntity =
+            world.CreateEntity();
+
+        ok &= CheckEditorSession(
+            parentEntity.IsValid()
+                && childEntity.IsValid()
+                && world.AddName(parentEntity, "Delete Parent")
+                && world.AddTransform(parentEntity)
+                && world.AddName(childEntity, "Delete Child")
+                && world.AddTransform(childEntity)
+                && world.SetLocalTRS(
+                    childEntity,
+                    noc::Vec3{ 3.0f, 0.0f, 0.0f },
+                    noc::Quat::Identity(),
+                    noc::Vec3::One())
+                && world.SetParent(
+                    childEntity,
+                    parentEntity),
+            "Delete/duplicate subtree setup failed");
+
+        auto deleteCommand =
+            std::make_unique<
+                nocturne::editor::DeleteEntityCommand>();
+        auto* deleteRaw = deleteCommand.get();
+
+        ok &= CheckEditorSession(
+            deleteCommand->Init(
+                context,
+                parentEntity),
+            "DeleteEntityCommand snapshot capture failed");
+
+        ok &= CheckEditorSession(
+            session.History().Execute(
+                context,
+                std::move(deleteCommand))
+                && !world.IsAlive(parentEntity)
+                && !world.IsAlive(childEntity),
+            "DeleteEntityCommand did not delete subtree");
+
+        ok &= CheckEditorSession(
+            session.History().Undo(context),
+            "DeleteEntityCommand undo failed");
+
+        const noc::EntityHandle restoredParent =
+            deleteRaw->CurrentRoot();
+        const noc::EntityHandle restoredChild =
+            world.FirstChildOf(restoredParent);
+
+        ok &= CheckEditorSession(
+            restoredParent.IsValid()
+                && restoredChild.IsValid()
+                && world.IsAlive(restoredParent)
+                && world.IsAlive(restoredChild)
+                && restoredParent != parentEntity
+                && restoredChild != childEntity
+                && world.GetName(restoredParent)
+                && world.GetName(restoredChild)
+                && std::strcmp(
+                    world.GetName(restoredParent)->value,
+                    "Delete Parent") == 0
+                && std::strcmp(
+                    world.GetName(restoredChild)->value,
+                    "Delete Child") == 0
+                && world.ParentOf(restoredChild)
+                    == restoredParent
+                && world.GetTransform(restoredChild)
+                && world.GetTransform(restoredChild)
+                    ->localTranslation.x == 3.0f,
+            "Delete undo did not restore reflected subtree state");
+
+        ok &= CheckEditorSession(
+            session.History().Redo(context)
+                && !world.IsAlive(restoredParent)
+                && !world.IsAlive(restoredChild),
+            "DeleteEntityCommand redo failed");
+
+        ok &= CheckEditorSession(
+            session.History().Undo(context),
+            "DeleteEntityCommand second undo failed");
+
+        const noc::EntityHandle sourceRoot =
+            deleteRaw->CurrentRoot();
+        const noc::EntityHandle sourceChild =
+            world.FirstChildOf(sourceRoot);
+
+        session.History().Clear();
+
+        auto duplicateCommand =
+            std::make_unique<
+                nocturne::editor::DuplicateEntityCommand>();
+        auto* duplicateRaw =
+            duplicateCommand.get();
+
+        ok &= CheckEditorSession(
+            duplicateCommand->Init(
+                context,
+                sourceRoot),
+            "DuplicateEntityCommand snapshot capture failed");
+
+        ok &= CheckEditorSession(
+            session.History().Execute(
+                context,
+                std::move(duplicateCommand)),
+            "DuplicateEntityCommand execute failed");
+
+        const noc::EntityHandle duplicateRoot =
+            duplicateRaw->CurrentRoot();
+        const noc::EntityHandle duplicateChild =
+            world.FirstChildOf(duplicateRoot);
+
+        ok &= CheckEditorSession(
+            duplicateRoot.IsValid()
+                && duplicateChild.IsValid()
+                && duplicateRoot != sourceRoot
+                && duplicateChild != sourceChild
+                && world.IsAlive(sourceRoot)
+                && world.IsAlive(sourceChild)
+                && std::strcmp(
+                    world.GetName(duplicateRoot)->value,
+                    "Delete Parent") == 0
+                && std::strcmp(
+                    world.GetName(duplicateChild)->value,
+                    "Delete Child") == 0
+                && world.ParentOf(duplicateChild)
+                    == duplicateRoot,
+            "Duplicate subtree state mismatch");
+
+        ok &= CheckEditorSession(
+            session.History().Undo(context)
+                && !world.IsAlive(duplicateRoot)
+                && world.IsAlive(sourceRoot),
+            "DuplicateEntityCommand undo failed");
+
+        ok &= CheckEditorSession(
+            session.History().Redo(context),
+            "DuplicateEntityCommand redo failed");
+
+        const noc::EntityHandle duplicateRoot2 =
+            duplicateRaw->CurrentRoot();
+        const noc::EntityHandle duplicateChild2 =
+            world.FirstChildOf(duplicateRoot2);
+
+        ok &= CheckEditorSession(
+            duplicateRoot2.IsValid()
+                && duplicateRoot2 != duplicateRoot
+                && duplicateChild2.IsValid(),
+            "Duplicate redo reused stale runtime identity");
+
+        session.History().Clear();
+
+        ok &= CheckEditorSession(
+            world.DestroyEntity(duplicateChild2)
+                && world.DestroyEntity(duplicateRoot2)
+                && world.DestroyEntity(sourceChild)
+                && world.DestroyEntity(sourceRoot),
+            "Delete/duplicate test cleanup failed");
+
+        auto toolDelete =
+            std::make_unique<
+                nocturne::editor::DeleteEntityCommand>();
+        ok &= CheckEditorSession(
+            !toolDelete->Init(context, camera),
+            "Tool-owned editor camera accepted delete command");
+    }
+
     // Failed commands must not enter history.
     const uint32_t historyCountBeforeFailure =
         session.History().CommandCount();

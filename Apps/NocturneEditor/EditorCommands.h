@@ -2,6 +2,7 @@
 
 #include "EditorCommandHistory.h"
 #include "EditorReflectionSnapshot.h"
+#include "EditorEntitySnapshot.h"
 #include "Runtime/Entity.h"
 #include "Runtime/Reflection/ReflectedValue.h"
 #include "Runtime/Reflection/ReflectionIds.h"
@@ -62,6 +63,47 @@ namespace nocturne::editor
         noc::EntityHandle entity_{};
         std::string oldName_;
         std::string newName_;
+    };
+
+    class DeleteEntityCommand final : public IEditorCommand
+    {
+    public:
+        [[nodiscard]] bool Init(
+            EditorCommandContext& context,
+            noc::EntityHandle entity);
+
+        [[nodiscard]] noc::EntityHandle CurrentRoot() const noexcept;
+
+        [[nodiscard]] const char* Label() const noexcept override;
+        [[nodiscard]] std::size_t MemoryCostBytes() const noexcept override;
+
+        [[nodiscard]] bool Execute(EditorCommandContext& context) override;
+        [[nodiscard]] bool Undo(EditorCommandContext& context) override;
+        [[nodiscard]] bool Redo(EditorCommandContext& context) override;
+
+    private:
+        ReflectedEntitySubtreeSnapshot snapshot_;
+    };
+
+    class DuplicateEntityCommand final : public IEditorCommand
+    {
+    public:
+        [[nodiscard]] bool Init(
+            EditorCommandContext& context,
+            noc::EntityHandle entity);
+
+        [[nodiscard]] noc::EntityHandle CurrentRoot() const noexcept;
+
+        [[nodiscard]] const char* Label() const noexcept override;
+        [[nodiscard]] std::size_t MemoryCostBytes() const noexcept override;
+
+        [[nodiscard]] bool Execute(EditorCommandContext& context) override;
+        [[nodiscard]] bool Undo(EditorCommandContext& context) override;
+        [[nodiscard]] bool Redo(EditorCommandContext& context) override;
+
+    private:
+        ReflectedEntitySubtreeSnapshot snapshot_;
+        noc::EntityHandle rootParent_{};
     };
 
     class AddComponentCommand final : public IEditorCommand

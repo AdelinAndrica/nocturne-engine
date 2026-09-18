@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Runtime/Entity.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -19,6 +21,15 @@ namespace nocturne::editor
         noc::World& world;
         const noc::ReflectionRegistry& reflection;
         noc::IAllocator& allocator;
+        noc::EntityHandle toolOwnedEntity{};
+
+        [[nodiscard]] bool IsToolOwned(
+            noc::EntityHandle entity) const noexcept
+        {
+            return entity.IsValid()
+                && toolOwnedEntity.IsValid()
+                && entity == toolOwnedEntity;
+        }
     };
 
     class IEditorCommand
