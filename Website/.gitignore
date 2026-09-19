@@ -3,6 +3,7 @@ dist/
 .astro/
 .generated-docs.json
 public/nocturne-logo.png
+public/icons/
 
 # Generated from repository-root Docs/ by scripts/prepare.mjs.
 src/content/docs/docs/architecture/overview.md
