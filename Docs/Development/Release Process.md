@@ -30,6 +30,41 @@ A target becomes downloadable only after the pipeline has:
 
 This keeps the Downloads page aligned with actual artifacts rather than theoretical build configurations.
 
+## Current validation state
+
+Web 5 has validated the complete Ship build/package gate for:
+
+- Windows `x86_64`;
+- Windows `x86`.
+
+Validation run:
+
+`35468447675`
+
+Both matrix jobs completed:
+
+```text
+Build Ship outputs         SUCCESS
+Package release candidate  SUCCESS
+Upload packaged candidate  SUCCESS
+```
+
+Candidate artifact names:
+
+```text
+nocturne-release-0.0.0-pr2-windows-x86_64
+nocturne-release-0.0.0-pr2-windows-x86
+```
+
+Candidate package evidence:
+
+| Architecture | Archive | Bytes | SHA-256 |
+|---|---|---:|---|
+| `x86_64` | `nocturne-engine-0.0.0-pr2-windows-x86_64.zip` | 2,762,266 | `c3812e289db7e3fb78f050256ac4a26c3ca8f06628855a16b1dc7402811bfdd2` |
+| `x86` | `nocturne-engine-0.0.0-pr2-windows-x86.zip` | 2,555,997 | `77b123a464965002f4583ee7435f8bc092dc9d4a29ae74b061d97a3eef979869` |
+
+These are ephemeral PR validation artifacts, not public releases.
+
 ## Current public state
 
 There is currently no public Nocturne Engine release in the website manifest.
@@ -58,9 +93,13 @@ The workflow can run from:
 - manual `workflow_dispatch`;
 - semantic version tags beginning with `v`.
 
-The architecture matrix is a **validation request**, not a support declaration.
+The architecture matrix is a **validation request**, not a public-support declaration.
 
-An architecture is eligible only if its matrix job completes all build and packaging steps successfully.
+An architecture is build/package-capable only if its matrix job completes all build and packaging steps successfully.
+
+Web 5 currently proves this for `x86_64` and `x86`.
+
+Public Downloads still require a real tagged publication plus reviewed manifest promotion.
 
 ## Ship build
 
@@ -287,6 +326,21 @@ Downloads page
 Do not collapse these states into one "supported" label.
 
 This distinction is central to Web 5.
+
+## Build-configuration defects discovered by Web 5
+
+The first Ship validation runs exposed incomplete project configuration rather than runtime-feature defects.
+
+The release gate found and repaired:
+
+- missing C++20 language-standard / `NOC_SHIP` settings in the engine Ship configuration;
+- incomplete Ship settings in `NocturneHost`;
+- missing Unicode character-set configuration in the engine Ship configurations;
+- engine Ship targets defaulting to executable output instead of `StaticLibrary`.
+
+These were corrected in the existing Visual Studio project configuration so the Ship contract now matches the engine's actual C++20/static-library architecture.
+
+**Design choice (not directly from the book):** Web 5 treats a configuration that exists in the solution but cannot complete the release gate as not release-capable.
 
 ## Failure handling
 
