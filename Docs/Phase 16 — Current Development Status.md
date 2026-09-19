@@ -368,6 +368,12 @@ Automated editor-session tests cover begin, append, nested-begin rejection, comm
 
 The existing gizmo preview remains the contract-approved coalescing exception: preview state is transient and a completed drag records one SetTransformTRSCommand rather than one command per mouse event.
 
+### 11.1D Create/restore allocation rollback — IMPLEMENTED; CI PENDING
+
+Deterministic allocator-injection coverage now forces two partial-mutation risks: `CreateEntityCommand` fails after runtime entity creation but before required editor components can grow, and reflected snapshot `Instantiate()` fails after entity recreation but before component restoration can allocate. Both tests require unchanged `AliveCount`, invalid current command/snapshot identity, and no partial restored entity.
+
+**Design choice (not directly from the book):** a switchable allocator wrapper is test-only fault injection; production allocation policy is unchanged.
+
 ### 11.1B Transient snapshot source-to-current remap — IMPLEMENTED; CI PENDING
 
 `ReflectedEntitySubtreeSnapshot::CurrentEntityForSource()` exposes the source→current runtime mapping already maintained by snapshot nodes. This is transient editor bookkeeping only, never persistent identity. Automated coverage validates root and child mappings after destruction/reinstantiation.

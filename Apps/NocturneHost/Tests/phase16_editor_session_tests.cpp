@@ -60,6 +60,43 @@ namespace
         std::size_t remaining_ = 0;
     };
 
+    class SwitchableFailAllocator final
+        : public noc::IAllocator
+    {
+    public:
+        explicit SwitchableFailAllocator(
+            noc::IAllocator& backing) noexcept
+            : backing_(backing)
+        {
+        }
+
+        void SetFailAllocations(bool fail) noexcept
+        {
+            failAllocations_ = fail;
+        }
+
+        void* Allocate(
+            std::size_t size,
+            std::size_t alignment) override
+        {
+            if (failAllocations_)
+                return nullptr;
+
+            return backing_.Allocate(
+                size,
+                alignment);
+        }
+
+        void Deallocate(void* pointer) override
+        {
+            backing_.Deallocate(pointer);
+        }
+
+    private:
+        noc::IAllocator& backing_;
+        bool failAllocations_ = false;
+    };
+
     bool CheckEditorSession(bool condition, const char* message)
     {
         if (!condition)
@@ -2515,6 +2552,132 @@ bool RunPhase16EditorSessionTests()
 
         failedSnapshot.Clear();
         allocationWorld.Shutdown();
+    }
+
+    {
+        SwitchableFailAllocator switchableAllocator(
+            allocator);
+        noc::World rollbackWorld;
+
+        ok &= CheckEditorSession(
+            rollbackWorld.Init(
+                switchableAllocator,
+                reflection),
+            "Create/restore rollback World setup failed");
+
+        nocturne::editor::EditorCommandContext rollbackContext{
+            rollbackWorld,
+            reflection,
+            switchableAllocator,
+            noc::EntityHandle::Invalid()
+        };
+
+        std::vector<noc::EntityHandle> rollbackEntities;
+        rollbackEntities.reserve(65);
+
+        for (uint32_t i = 0; i < 65; ++i)
+        {
+            const noc::EntityHandle entity =
+                rollbackWorld.CreateEntity();
+
+            ok &= CheckEditorSession(
+                entity.IsValid(),
+                "Create/restore rollback filler entity creation failed");
+
+            if (!entity.IsValid())
+                break;
+
+            rollbackEntities.push_back(entity);
+
+            if (i < 64)
+            {
+                ok &= CheckEditorSession(
+                    rollbackWorld.AddName(
+                        entity,
+                        "Rollback Filler")
+                        && rollbackWorld.AddTransform(entity),
+                    "Create/restore rollback filler component setup failed");
+            }
+        }
+
+        ok &= CheckEditorSession(
+            rollbackEntities.size() == 65
+                && rollbackWorld.AliveCount() == 65,
+            "Create/restore rollback filler world mismatch");
+
+        nocturne::editor::CreateEntityCommand
+            failedCreateCommand;
+
+        ok &= CheckEditorSession(
+            failedCreateCommand.Init(
+                "Allocation Failure Entity"),
+            "Allocation-failure CreateEntityCommand init failed");
+
+        const uint32_t aliveBeforeCreateFailure =
+            rollbackWorld.AliveCount();
+
+        switchableAllocator.SetFailAllocations(true);
+
+        ok &= CheckEditorSession(
+            !failedCreateCommand.Execute(
+                rollbackContext)
+                && rollbackWorld.AliveCount()
+                    == aliveBeforeCreateFailure
+                && !failedCreateCommand
+                    .CurrentEntity()
+                    .IsValid(),
+            "CreateEntityCommand allocation failure left partial entity state");
+
+        switchableAllocator.SetFailAllocations(false);
+
+        const noc::EntityHandle snapshotSource =
+            rollbackEntities.front();
+        const noc::EntityHandle componentFiller =
+            rollbackEntities.back();
+
+        nocturne::editor::ReflectedEntitySubtreeSnapshot
+            failedRestoreSnapshot;
+
+        ok &= CheckEditorSession(
+            failedRestoreSnapshot.Capture(
+                rollbackContext,
+                snapshotSource)
+                && failedRestoreSnapshot.DestroyCurrent(
+                    rollbackContext),
+            "Restore allocation-failure snapshot setup failed");
+
+        // Refill Transform + Name dense storage to its original 64 entries
+        // using the previously component-less 65th entity. The destroyed
+        // source slot remains reusable by EntityRegistry, so Instantiate()
+        // can create an entity and then fail during reflected component growth.
+        ok &= CheckEditorSession(
+            rollbackWorld.AddName(
+                componentFiller,
+                "Restore Capacity Filler")
+                && rollbackWorld.AddTransform(
+                    componentFiller),
+            "Restore allocation-failure component capacity setup failed");
+
+        const uint32_t aliveBeforeRestoreFailure =
+            rollbackWorld.AliveCount();
+
+        switchableAllocator.SetFailAllocations(true);
+
+        ok &= CheckEditorSession(
+            !failedRestoreSnapshot.Instantiate(
+                rollbackContext,
+                noc::EntityHandle::Invalid())
+                && rollbackWorld.AliveCount()
+                    == aliveBeforeRestoreFailure
+                && !failedRestoreSnapshot
+                    .CurrentRoot()
+                    .IsValid(),
+            "Snapshot restore allocation failure left partial runtime state");
+
+        switchableAllocator.SetFailAllocations(false);
+
+        failedRestoreSnapshot.Clear();
+        rollbackWorld.Shutdown();
     }
 
     const noc::Vec3 first{ 1.0f, 2.0f, 3.0f };

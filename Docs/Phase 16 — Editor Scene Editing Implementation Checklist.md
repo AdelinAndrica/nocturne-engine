@@ -881,9 +881,9 @@ Dacă nu este implementat:
 
 - [ ] stale selected entity.
 - [ ] stale command target.
-- [ ] create allocation fail.
+- [x] create allocation fail.
 - [ ] snapshot allocation fail.
-- [ ] restore allocation fail.
+- [x] restore allocation fail.
 - [ ] duplicate component.
 - [ ] absent component remove.
 - [x] required component remove.
@@ -905,7 +905,7 @@ Fiecare caz are:
 - [ ] return/result policy.
 - [ ] log/assert policy.
 - [ ] user-visible diagnostic policy.
-- [ ] state integrity verification.
+- [x] state integrity verification.
 
 ---
 
