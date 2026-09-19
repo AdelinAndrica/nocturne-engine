@@ -25,6 +25,7 @@ jobs:
 
     defaults:
       run:
+        shell: powershell
         working-directory: Website
 
     steps:
@@ -48,7 +49,7 @@ jobs:
         run: npm run build
 
       - name: Verify website routes and canonical docs
-        shell: pwsh
+        shell: powershell
         run: |
           function Assert-File([string]$Path) {
             if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
@@ -108,7 +109,7 @@ jobs:
           Assert-Contains "dist/download/index.html" "Configuration is not the same as support"
           Assert-Contains "dist/download/index.html" "SHA-256"
       - name: Verify published-release rendering with ephemeral fixture
-        shell: pwsh
+        shell: powershell
         run: |
           function Assert-Contains([string]$Path, [string]$Text) {
             if (-not (Select-String -LiteralPath $Path -SimpleMatch -Pattern $Text -Quiet)) {
@@ -119,7 +120,7 @@ jobs:
           $backup = Join-Path $env:RUNNER_TEMP "nocturne-releases.json"
           Copy-Item -LiteralPath "src/data/releases.json" -Destination $backup -Force
           
-          @'
+          $fixtureJson = @'
           {
             "schemaVersion": 1,
             "latest": "9.9.9-ci",
@@ -145,7 +146,12 @@ jobs:
               }
             ]
           }
-          '@ | Set-Content -LiteralPath "src/data/releases.json" -Encoding utf8NoBOM
+          '@
+          [System.IO.File]::WriteAllText(
+            (Join-Path (Get-Location) "src/data/releases.json"),
+            $fixtureJson,
+            (New-Object System.Text.UTF8Encoding($false))
+          )
           
           npm run validate:releases
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

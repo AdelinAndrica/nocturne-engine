@@ -100,9 +100,12 @@ $releaseInfo = [ordered]@{
     sourceCommit = $SourceCommit
 }
 
-$releaseInfo |
-    ConvertTo-Json -Depth 8 |
-    Set-Content -Encoding UTF8 (Join-Path $stagePath "release-info.json")
+$releaseInfoJson = $releaseInfo | ConvertTo-Json -Depth 8
+[System.IO.File]::WriteAllText(
+    (Join-Path $stagePath "release-info.json"),
+    $releaseInfoJson,
+    (New-Object System.Text.UTF8Encoding($false))
+)
 
 Compress-Archive -Path (Join-Path $stagePath "*") -DestinationPath $archivePath -CompressionLevel Optimal
 
@@ -136,17 +139,20 @@ $releaseRecord = [ordered]@{
     )
 }
 
-$releaseRecord |
-    ConvertTo-Json -Depth 8 |
-    Set-Content -Encoding UTF8 $recordPath
+$releaseRecordJson = $releaseRecord | ConvertTo-Json -Depth 8
+[System.IO.File]::WriteAllText(
+    $recordPath,
+    $releaseRecordJson,
+    (New-Object System.Text.UTF8Encoding($false))
+)
 
 if ($env:GITHUB_OUTPUT) {
-    "artifact_path=$archivePath" >> $env:GITHUB_OUTPUT
-    "artifact_name=$artifactName" >> $env:GITHUB_OUTPUT
-    "checksum_path=$checksumPath" >> $env:GITHUB_OUTPUT
-    "record_path=$recordPath" >> $env:GITHUB_OUTPUT
-    "sha256=$sha256" >> $env:GITHUB_OUTPUT
-    "bytes=$($archive.Length)" >> $env:GITHUB_OUTPUT
+    "artifact_path=$archivePath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+    "artifact_name=$artifactName" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+    "checksum_path=$checksumPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+    "record_path=$recordPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+    "sha256=$sha256" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+    "bytes=$($archive.Length)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 }
 
 Write-Host "Packaged $artifactName"

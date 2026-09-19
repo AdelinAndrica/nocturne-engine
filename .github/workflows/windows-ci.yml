@@ -39,7 +39,7 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       - name: Build NocturneHost (Debug x64)
-        shell: pwsh
+        shell: powershell
         run: |
           $root = "$env:GITHUB_WORKSPACE\"
           $out = "$env:GITHUB_WORKSPACE\Build\CI\bin\"
@@ -57,13 +57,13 @@ jobs:
           }
 
       - name: Run Phase 15 foundation tests
-        shell: pwsh
+        shell: powershell
         run: |
           & "$env:GITHUB_WORKSPACE\Build\CI\bin\NocturneHost.exe" --phase15-tests
           exit $LASTEXITCODE
 
       - name: Build NocturneEditor regression target (Debug x64)
-        shell: pwsh
+        shell: powershell
         run: |
           msbuild "Ide\VS2026\NocturneEditor\NocturneEditor.vcxproj" `
             /m `
@@ -76,7 +76,7 @@ jobs:
           }
 
       - name: Build Development x64 projects
-        shell: pwsh
+        shell: powershell
         run: |
           $projects = @(
             "Ide\VS2026\NocturneEngine\NocturneEngine.vcxproj",
@@ -97,7 +97,7 @@ jobs:
           }
 
       - name: Build solution regression (Debug x64)
-        shell: pwsh
+        shell: powershell
         run: |
           $root = "$env:GITHUB_WORKSPACE\"
 
