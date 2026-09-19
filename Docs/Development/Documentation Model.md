@@ -90,6 +90,8 @@ Required canonical identity fields:
 | `source_files` | current implementation files relevant to the contract |
 | `source_docs` | supporting authored documentation |
 | `book_grounding` | book sections that ground concepts/terminology |
+| `aliases` | current alternate names useful to humans/search/AI |
+| `deprecated_aliases` | legacy names that must not be treated as the current canonical surface |
 
 System pages additionally declare:
 
@@ -115,7 +117,7 @@ Renaming a Markdown file must not change its semantic ID.
 
 The source synchronizer intentionally accepts a constrained flat frontmatter format.
 
-Arrays are authored inline:
+Arrays are authored inline, including terminology aliases:
 
 ```yaml
 ---
@@ -128,6 +130,8 @@ phase_introduced: 4
 source_files: ["Engine/Resources/ResourceManager.h"]
 source_docs: ["Docs/Phase 4 — Resource Manager.md"]
 book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §7.2"]
+aliases: ["Resources","Resource Manager","VFS"]
+deprecated_aliases: []
 ---
 ```
 
@@ -165,6 +169,133 @@ The preparation step also validates:
 - source frontmatter uses the supported flat syntax.
 
 Validation failures stop the website build.
+
+## AI / machine-readable knowledge layer
+
+Web 6 extends the same canonical documentation pass with machine-readable outputs.
+
+```text
+Docs/*.md
+   |
+   v
+Website/scripts/prepare.mjs
+   |
+   +--> Starlight canonical/history pages
+   +--> Knowledge/manifest.json
+   +--> Knowledge/terminology.json
+   +--> llms.txt
+   +--> llms-full.txt
+   +--> Website/public/raw/<noc.id>.md
+   +--> Website/public/ai/<noc.id>.md
+   +--> Website/public/knowledge/*
+   +--> Website/public/schemas/*
+```
+
+`Docs/` remains the authored source.
+
+`Knowledge/manifest.json`, `Knowledge/terminology.json`, `llms.txt` and `llms-full.txt` are generated artifacts. Do not hand-edit them as an alternate documentation source.
+
+### Knowledge manifest
+
+`Knowledge/manifest.json` contains only documents whose resolved metadata has:
+
+```text
+canonical = true
+id = noc.*
+```
+
+Each record exposes:
+
+- stable ID;
+- title;
+- document type/status/subsystem;
+- canonical authored source path;
+- website route;
+- raw Markdown route;
+- AI-normalized Markdown route;
+- description;
+- source files/docs;
+- book grounding;
+- aliases and deprecated aliases.
+
+Historical Phase/completion documents are intentionally absent as canonical manifest entries.
+
+### Terminology
+
+`Knowledge/terminology.json` is generated from canonical document titles/descriptions plus authored `aliases` / `deprecated_aliases`.
+
+This keeps terminology close to the document that owns the concept.
+
+For example, the current Editor page authors:
+
+```text
+aliases:
+  Editor
+  Nocturne Editor
+  EditorShellV3
+
+deprecated aliases:
+  EditorShell
+  EditorControls
+```
+
+The generated terminology file therefore does not need a second manually maintained glossary for these names.
+
+### LLM entry points
+
+`llms.txt` is the compact project entry point.
+
+It identifies:
+
+- canonical source precedence;
+- all current canonical documents;
+- stable `noc.*` IDs;
+- machine-readable entry points;
+- repository rules relevant to agents.
+
+`llms-full.txt` is a generated canonical-only aggregate.
+
+It does **not** concatenate historical Phase/completion documents as standalone truth.
+
+Historical paths may still appear inside canonical text/metadata as supporting references. That is not the same as including the historical document as a canonical export.
+
+### Raw vs AI-normalized Markdown
+
+For each canonical ID:
+
+```text
+/raw/<noc.id>.md
+/ai/<noc.id>.md
+```
+
+The raw route contains the authored repository Markdown.
+
+The AI route contains resolved canonical metadata plus an explicit source-precedence notice before the canonical document body.
+
+Canonical documentation pages expose:
+
+- View Markdown;
+- Copy Markdown;
+- Copy for AI.
+
+Historical pages do not receive the canonical Copy-for-AI affordance automatically.
+
+### Schema and stale-output validation
+
+Machine-readable contracts are versioned under `Schemas/`.
+
+Current Web 6 schemas:
+
+- `Schemas/knowledge-manifest.schema.json`;
+- `Schemas/terminology.schema.json`.
+
+The website build also validates the generated files through `Website/src/data/knowledge-schema.mjs`.
+
+CI regenerates knowledge and fails when tracked generated outputs differ from the committed versions.
+
+Therefore a canonical `Docs/` change cannot silently leave repository-level AI exports stale.
+
+**Design choice (not directly from the book):** the knowledge manifest format, terminology format, `llms.txt`, canonical-only aggregate, raw/AI endpoints and stale-generation policy are Nocturne tooling decisions.
 
 ## Search policy
 
