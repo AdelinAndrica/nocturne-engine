@@ -14,7 +14,7 @@
 >
 > **Primary architectural source:** Jason Gregory, *Game Engine Architecture (3rd Edition)*
 >
-> **Web implementation status:** Web 4 landing milestone implemented on `web-docs-foundation`; production landing layout, EditorShellV3-derived product visual, responsive behavior and landing-specific CI assertions validated.
+> **Web implementation status:** Web 5 Downloads milestone implemented on `web-docs-foundation`; release schema/validator, artifact-driven Downloads UI, reviewed manifest promotion and Windows Ship packaging for x86_64/x86 are validated. No public release has been published yet, so the production manifest remains intentionally empty.
 
 ---
 
@@ -1178,13 +1178,24 @@ No real editor screenshot asset currently exists in the repository or available 
 
 Scope:
 
-- release schema;
-- generated `releases.json`;
-- architecture/platform cards;
-- checksums;
-- channels;
-- release notes links;
-- build-pipeline integration.
+- [x] versioned `Schemas/release.schema.json`;
+- [x] executable release-manifest validation before dev/build;
+- [x] reviewed `releases.json` promotion workflow;
+- [x] artifact-driven architecture/platform rendering;
+- [x] exact byte size + SHA-256 metadata;
+- [x] development / preview / stable channels;
+- [x] release-notes links and source commit identity;
+- [x] supported / experimental / withdrawn artifact states;
+- [x] Windows Ship packaging workflow;
+- [x] x86_64 Ship build/package validation;
+- [x] x86 Ship build/package validation;
+- [x] tagged GitHub Release publication path;
+- [x] CI fixture exercising the non-empty Downloads rendering path;
+- [x] honest zero-artifact public state until a real tagged release is promoted.
+
+**Status:** COMPLETE. See `Docs/Web/Nocturne Website — Web 5 Implementation Report.md`.
+
+Current evidence proves that Windows `x86_64` and `x86` can both complete the Web 5 Ship build/package gate. This is **build/package capability**, not yet a claim that either architecture has a public release. `Website/src/data/releases.json` remains empty until a real published artifact is reviewed and promoted.
 
 ### Web 6 — AI knowledge layer
 
@@ -1240,7 +1251,7 @@ Before the Website track can be treated as a durable product surface:
 - [x] Final web design does not expose generic default Starlight styling as the primary brand.
 - [x] Documentation search works in the static build.
 - [x] Download page never exposes an architecture without a real release artifact.
-- [ ] Release metadata validates against a schema.
+- [x] Release metadata validates against a schema.
 - [ ] AI entry points identify canonical versus historical sources.
 - [ ] No private credentials/paths appear in static output.
 - [ ] Keyboard navigation and focus states are functional.
