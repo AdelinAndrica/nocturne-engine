@@ -9,6 +9,8 @@ description: "Canonical source-of-truth, metadata, precedence and generated-docu
 source_files: ["Website/scripts/prepare.mjs","Website/src/content.config.ts","Website/astro.config.mjs"]
 source_docs: ["Docs/nocturne_engine_architecture.md","Docs/Production Engineering Standard.md","Docs/Web/Nocturne Website — Design & Technical Specification.md"]
 book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §1.7 Tools and the Asset Pipeline"]
+aliases: ["Documentation Model","Canonical Documentation","Docs Model"]
+deprecated_aliases: []
 ---
 
 # Documentation Model
