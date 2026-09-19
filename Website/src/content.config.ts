@@ -1,7 +1,7 @@
 import { defineCollection } from 'astro:content';
 import { z } from 'astro/zod';
-import { docsLoader } from '@astrojs/starlight/loaders';
-import { docsSchema } from '@astrojs/starlight/schema';
+import { docsLoader, i18nLoader } from '@astrojs/starlight/loaders';
+import { docsSchema, i18nSchema } from '@astrojs/starlight/schema';
 
 const nocturneDocMetadata = z.object({
   id: z.string().regex(/^noc\.[a-z0-9][a-z0-9._-]*$/).optional(),
@@ -34,5 +34,9 @@ export const collections = {
     schema: docsSchema({
       extend: nocturneDocMetadata
     })
+  }),
+  i18n: defineCollection({
+    loader: i18nLoader(),
+    schema: i18nSchema()
   })
 };
