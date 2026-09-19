@@ -621,6 +621,16 @@ The tool-owned editor camera and non-authored renderer scaffolding are not expos
 
 ---
 
+
+### Refresh / invalidation policy
+
+**Design choice (not directly from the book):** Phase 16 uses explicit editor-mutation-boundary invalidation instead of introducing a new World event bus or structural-version counter solely for the editor.
+
+`EditorHierarchyModel` is a transient projection of authoritative World state. `EditorShellV3::PopulateScene_()` rebuilds after structural/editor authoring operations such as create, delete, duplicate, reparent, component mutation, rename where labels change, Undo/Redo, and New Scene. It is not rebuilt unconditionally every frame.
+
+The Phase 16 authoring contract assumes authored structural mutations enter through the editor command/session path. A future feature that permits independent external World structural mutation while the editor is open must add an explicit invalidation notification/version seam rather than silently polling/rebuilding every frame.
+
+Entities without Transform, Name, or other editor-facing components remain valid authored World entities. The hierarchy projects them deterministically as roots when no authored parent exists; presentation may fall back to handle-based labeling.
 ## 18. Command / transaction model
 
 Grounding: Bob Nystrom — **Command / Undo and Redo**.

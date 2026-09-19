@@ -640,6 +640,28 @@ bool RunPhase16EditorSessionTests()
                 && hierarchyModel.RowCount() == 0,
             "Hierarchy empty-world projection failed");
 
+        const noc::EntityHandle componentless =
+            hierarchyWorld.CreateEntity();
+
+        ok &= CheckEditorSession(
+            componentless.IsValid()
+                && hierarchyModel.Rebuild(
+                    hierarchyWorld)
+                && hierarchyModel.RowCount() == 1
+                && hierarchyModel.Rows()[0].entity
+                    == componentless
+                && hierarchyModel.Rows()[0].depth == 1
+                && !hierarchyModel.Rows()[0]
+                    .hasAuthoredChildren,
+            "Hierarchy component-less entity policy mismatch");
+
+        ok &= CheckEditorSession(
+            hierarchyWorld.DestroyEntity(componentless)
+                && hierarchyModel.Rebuild(
+                    hierarchyWorld)
+                && hierarchyModel.RowCount() == 0,
+            "Hierarchy component-less entity cleanup/stale-row refresh failed");
+
         const noc::EntityHandle rootA =
             hierarchyWorld.CreateEntity();
 
@@ -3095,6 +3117,19 @@ bool RunPhase16EditorSessionTests()
                 && world.HasCamera(authored),
             "Generic AddComponentCommand redo failed");
 
+        auto duplicateCameraAdd =
+            std::make_unique<
+                nocturne::editor::AddComponentCommand>();
+
+        ok &= CheckEditorSession(
+            !duplicateCameraAdd->Init(
+                context,
+                authored,
+                noc::TypeId{
+                    noc::kCameraComponentTypeId.value })
+                && world.HasCamera(authored),
+            "Duplicate reflected component add was accepted");
+
         ok &= CheckEditorSession(
             world.SetCameraPerspective(
                 authored,
@@ -3139,6 +3174,19 @@ bool RunPhase16EditorSessionTests()
             session.History().Redo(context)
                 && !world.HasCamera(authored),
             "Generic RemoveComponentCommand redo failed");
+
+        auto absentCameraRemove =
+            std::make_unique<
+                nocturne::editor::RemoveComponentCommand>();
+
+        ok &= CheckEditorSession(
+            !absentCameraRemove->Init(
+                context,
+                authored,
+                noc::TypeId{
+                    noc::kCameraComponentTypeId.value })
+                && !world.HasCamera(authored),
+            "Absent reflected component remove was accepted");
 
         session.History().Clear();
     }
@@ -3709,6 +3757,28 @@ bool RunPhase16EditorSessionTests()
         world.Update();
         const noc::Mat4 worldBefore =
             world.GetWorldMatrix(reparentChild);
+
+        auto selfParent =
+            std::make_unique<
+                nocturne::editor::ReparentEntityCommand>();
+        auto invalidParent =
+            std::make_unique<
+                nocturne::editor::ReparentEntityCommand>();
+
+        ok &= CheckEditorSession(
+            !selfParent->Init(
+                context,
+                reparentChild,
+                reparentChild)
+                && !invalidParent->Init(
+                    context,
+                    reparentChild,
+                    noc::EntityHandle{
+                        999999u,
+                        1u })
+                && world.ParentOf(reparentChild)
+                    == oldParent,
+            "Invalid/self parent target was accepted");
 
         auto reparent =
             std::make_unique<

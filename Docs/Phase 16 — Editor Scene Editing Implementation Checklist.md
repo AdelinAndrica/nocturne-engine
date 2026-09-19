@@ -340,18 +340,18 @@ Reflection milestone:
 
 # 7. Dynamic authored entity enumeration
 
-- [ ] Eliminăm `kValidationObjectCount` din authoring logic.
-- [ ] Eliminăm `validationObjects_[4]` din authoring authority.
-- [ ] World enumeration este sursa pentru authored entity discovery.
-- [ ] Tool-owned entities sunt filtrate explicit.
-- [ ] Deterministic iteration order este documentat.
-- [ ] Entity without required editor components are handled deterministically.
-- [ ] Hierarchy refresh suportă entity count 0.
-- [ ] Hierarchy refresh suportă 1 entity.
-- [ ] Hierarchy refresh suportă 10k entities.
-- [ ] Destroy during prior frame nu lasă stale rows.
-- [ ] Structural version/change notification strategy este definită.
-- [ ] Nu facem full rebuild inutil per-frame dacă nu există schimbare.
+- [x] Eliminăm `kValidationObjectCount` din authoring logic.
+- [x] Eliminăm `validationObjects_[4]` din authoring authority.
+- [x] World enumeration este sursa pentru authored entity discovery.
+- [x] Tool-owned entities sunt filtrate explicit.
+- [x] Deterministic iteration order este documentat.
+- [x] Entity without required editor components are handled deterministically.
+- [x] Hierarchy refresh suportă entity count 0.
+- [x] Hierarchy refresh suportă 1 entity.
+- [x] Hierarchy refresh suportă 10k entities.
+- [x] Destroy during prior frame nu lasă stale rows.
+- [x] Structural version/change notification strategy este definită.
+- [x] Nu facem full rebuild inutil per-frame dacă nu există schimbare.
 
 ---
 
@@ -879,26 +879,26 @@ Dacă nu este implementat:
 
 # 34. Error handling matrix
 
-- [ ] stale selected entity.
-- [ ] stale command target.
+- [x] stale selected entity.
+- [x] stale command target.
 - [x] create allocation fail.
 - [ ] snapshot allocation fail.
 - [x] restore allocation fail.
-- [ ] duplicate component.
-- [ ] absent component remove.
+- [x] duplicate component.
+- [x] absent component remove.
 - [x] required component remove.
-- [ ] invalid parent.
-- [ ] self parent.
-- [ ] cycle parent.
-- [ ] non-invertible parent transform.
-- [ ] TRS decomposition failure.
+- [x] invalid parent.
+- [x] self parent.
+- [x] cycle parent.
+- [x] non-invertible parent transform.
+- [x] TRS decomposition failure.
 - [ ] invalid name.
-- [ ] invalid numeric field.
-- [ ] invalid camera lens.
+- [x] invalid numeric field.
+- [x] invalid camera lens.
 - [ ] invalid asset/resource.
-- [ ] history budget failure.
-- [ ] compound rollback failure.
-- [ ] editor tool camera misuse.
+- [x] history budget failure.
+- [x] compound rollback failure.
+- [x] editor tool camera misuse.
 - [x] shutdown with active transaction.
 
 Fiecare caz are:
