@@ -494,30 +494,71 @@ async function generateTheme() {
   await fs.writeFile(generatedThemePath, css, 'utf8');
 }
 
-async function syncBrandAsset() {
-  const source = path.join(
+async function syncBrandAssets() {
+  const publicRoot = path.join(websiteRoot, 'public');
+  const logoSource = path.join(
     repoRoot,
     'Apps',
     'NocturneEditor',
     'Resources',
     'NocturneEngine-Logo.png'
   );
-  const target = path.join(websiteRoot, 'public', 'nocturne-logo.png');
+  const logoTarget = path.join(publicRoot, 'nocturne-logo.png');
+
+  const tablerSourceRoot = path.join(
+    repoRoot,
+    'ThirdParty',
+    'TablerIcons',
+    'icons',
+    'outline'
+  );
+  const iconTargetRoot = path.join(publicRoot, 'icons');
+  const icons = [
+    'box.svg',
+    'device-desktop.svg',
+    'world.svg',
+    'hierarchy-2.svg',
+    'layout-grid.svg',
+    'terminal-2.svg',
+    'file-text.svg'
+  ];
+
+  await fs.mkdir(publicRoot, { recursive: true });
+  await fs.mkdir(iconTargetRoot, { recursive: true });
+
+  let copiedLogo = false;
 
   try {
-    await fs.mkdir(path.dirname(target), { recursive: true });
-    await fs.copyFile(source, target);
-    return true;
+    await fs.copyFile(logoSource, logoTarget);
+    copiedLogo = true;
   } catch (error) {
-    if (error?.code === 'ENOENT') return false;
-    throw error;
+    if (error?.code !== 'ENOENT') throw error;
   }
+
+  for (const icon of icons) {
+    const source = path.join(tablerSourceRoot, icon);
+    const target = path.join(iconTargetRoot, icon);
+
+    try {
+      await fs.copyFile(source, target);
+    } catch (error) {
+      if (error?.code === 'ENOENT') {
+        throw new Error(`Required Tabler icon is missing: ${toPosix(path.relative(repoRoot, source))}`);
+      }
+      throw error;
+    }
+  }
+
+  return {
+    copiedLogo,
+    copiedIcons: icons.length
+  };
 }
 
 await generateTheme();
 const docs = await syncDocs();
-const copiedLogo = await syncBrandAsset();
+const brand = await syncBrandAssets();
 
 console.log(
-  `Prepared Nocturne website: ${docs.generatedCount} docs synchronized (${docs.canonicalCount} canonical IDs); logo ${copiedLogo ? 'copied' : 'not found'}.`
+  `Prepared Nocturne website: ${docs.generatedCount} docs synchronized (${docs.canonicalCount} canonical IDs); logo ${brand.copiedLogo ? 'copied' : 'not found'}; ${brand.copiedIcons} Tabler icons copied.`
 );
