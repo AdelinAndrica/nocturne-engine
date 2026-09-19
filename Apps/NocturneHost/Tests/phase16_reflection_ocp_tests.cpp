@@ -8,6 +8,8 @@
 #include "Core/Memory/Allocator.h"
 #include "Core/Memory/DebugAlloc.h"
 
+#include <cstring>
+
 namespace
 {
     struct ReflectionTestComponent
@@ -29,6 +31,49 @@ namespace
     };
 
     TestComponentStore gStore;
+
+    struct OcpSchemaDumpProbe
+    {
+        bool sawComponent = false;
+        bool sawSpeed = false;
+        bool sawEnabled = false;
+    };
+
+    bool ProbeOcpSchemaDump(
+        void* userData,
+        const char* line) noexcept
+    {
+        if (!userData || !line)
+            return false;
+
+        auto& probe =
+            *static_cast<OcpSchemaDumpProbe*>(userData);
+
+        if (std::strstr(
+                line,
+                "component owner=Nocturne.Tests.ReflectionTestComponent"))
+        {
+            probe.sawComponent = true;
+        }
+
+        if (std::strstr(
+                line,
+                "property owner=Nocturne.Tests.ReflectionTestComponent")
+            && std::strstr(line, "name=speed"))
+        {
+            probe.sawSpeed = true;
+        }
+
+        if (std::strstr(
+                line,
+                "property owner=Nocturne.Tests.ReflectionTestComponent")
+            && std::strstr(line, "name=enabled"))
+        {
+            probe.sawEnabled = true;
+        }
+
+        return true;
+    }
 
     bool CheckOcp(bool condition, const char* message)
     {
@@ -187,6 +232,16 @@ bool RunPhase16ReflectionOcpTests()
     ok &= CheckOcp(
         registry.Freeze(),
         "Synthetic component registry Freeze failed");
+
+    OcpSchemaDumpProbe schemaProbe{};
+    ok &= CheckOcp(
+        registry.DumpSchema(
+            &ProbeOcpSchemaDump,
+            &schemaProbe)
+            && schemaProbe.sawComponent
+            && schemaProbe.sawSpeed
+            && schemaProbe.sawEnabled,
+        "Synthetic component was not visible in generic reflection schema dump");
 
     ok &= CheckOcp(
         registry.ComponentTypeCount() == 1,

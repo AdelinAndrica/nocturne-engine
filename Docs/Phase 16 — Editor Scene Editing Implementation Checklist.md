@@ -273,7 +273,7 @@ OCP acceptance:
 - [ ] schema registration only pentru generic fields.
 - [ ] generic Inspector model îl vede.
 - [ ] generic property command îl poate edita.
-- [ ] debug reflection dump îl vede.
+- [x] debug reflection dump îl vede.
 - [ ] NU modificăm central Inspector switch.
 - [ ] NU modificăm central property-command switch.
 - [ ] NU introducem serializer/scripting schema paralelă.
