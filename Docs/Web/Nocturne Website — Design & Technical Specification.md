@@ -14,7 +14,7 @@
 >
 > **Primary architectural source:** Jason Gregory, *Game Engine Architecture (3rd Edition)*
 >
-> **Web implementation status:** Web 5 Downloads milestone implemented on `web-docs-foundation`; release schema/validator, artifact-driven Downloads UI, reviewed manifest promotion and Windows Ship packaging for x86_64/x86 are validated. No public release has been published yet, so the production manifest remains intentionally empty.
+> **Web implementation status:** Web 6 AI Knowledge Layer implemented on `web-docs-foundation`; stable canonical IDs now feed generated `Knowledge/`, terminology, `llms.txt`, canonical-only `llms-full.txt`, per-document raw/AI Markdown exports and schema/stale-output validation. Web 5 Downloads remains artifact-driven and the production release manifest remains intentionally empty.
 
 ---
 
@@ -1201,14 +1201,22 @@ Current evidence proves that Windows `x86_64` and `x86` can both complete the We
 
 Scope:
 
-- stable IDs;
-- `Knowledge/`;
-- manifest;
-- terminology;
-- `llms.txt`;
-- `llms-full.txt`;
-- raw/copy-for-AI affordances;
-- schema validation.
+- [x] stable `noc.*` IDs reused as machine identity;
+- [x] generated repository-root `Knowledge/`;
+- [x] versioned canonical document manifest;
+- [x] generated terminology with aliases/deprecated aliases;
+- [x] generated `llms.txt`;
+- [x] generated canonical-only `llms-full.txt`;
+- [x] per-document `/raw/<noc.id>.md` exports;
+- [x] per-document `/ai/<noc.id>.md` normalized exports;
+- [x] View Markdown / Copy Markdown / Copy for AI affordances;
+- [x] JSON Schema + executable validation;
+- [x] repository-level stale generated-output detection;
+- [x] canonical-vs-history precedence preserved for machine consumers.
+
+**Status:** COMPLETE. See `Docs/Web/Nocturne Website — Web 6 Implementation Report.md`.
+
+The machine-readable layer is generated from the same canonical `Docs/` metadata pass that feeds Starlight. `Knowledge/*.json` and `llms*.txt` are generated artifacts, not a second manually maintained documentation source.
 
 ### Web 7 — C++ API reference
 
@@ -1252,7 +1260,7 @@ Before the Website track can be treated as a durable product surface:
 - [x] Documentation search works in the static build.
 - [x] Download page never exposes an architecture without a real release artifact.
 - [x] Release metadata validates against a schema.
-- [ ] AI entry points identify canonical versus historical sources.
+- [x] AI entry points identify canonical versus historical sources.
 - [ ] No private credentials/paths appear in static output.
 - [ ] Keyboard navigation and focus states are functional.
 - [ ] Responsive docs remain readable at narrow widths.
@@ -1304,18 +1312,19 @@ All twelve items above are **Design choice (not directly from the book)** except
 
 ## 23. Next implementation handoff
 
-Start Web 5 with:
+Start Web 7 with:
 
-> Implement **Web 5 — Downloads** from `Docs/Web/Nocturne Website — Design & Technical Specification.md` on top of the validated Web 4 landing and Web 3 canonical documentation model. Define and validate the release metadata schema, make `/download` render only real published artifacts, add checksum/channel/version/release-note fields, and connect the page to the repository build/release pipeline without claiming unsupported architectures. Keep the current empty-state honest until a real release artifact exists. Do not merge draft PR #2 automatically and do not make the website an engine/runtime dependency.
+> Implement **Web 7 — C++ API Reference** on branch `web-docs-foundation` on top of the validated Web 6 AI Knowledge Layer. Add a repository-owned Doxygen configuration for the current public/internal C++ headers, generate HTML for human API browsing and XML for tooling, integrate API navigation into the Nocturne documentation surface, and connect conceptual canonical pages to relevant C++ symbols without replacing the existing `Docs/` architecture/system explanations. Treat exact Doxygen/web integration details as **Design choice (not directly from the book)**. Preserve the existing canonical-vs-history precedence, keep Website independent from engine/runtime dependencies, and do not merge draft PR #2 automatically.
 
 Bring:
 
 - this specification;
-- `Docs/Web/Nocturne Website — Web 3 Implementation Report.md`;
-- `Docs/Web/Nocturne Website — Web 4 Implementation Report.md`;
-- current `Website/src/pages/download.astro`;
-- current `Website/src/data/releases.json`;
-- current GitHub Actions workflows;
-- current Windows build configuration/CI evidence;
+- `Docs/Web/Nocturne Website — Web 6 Implementation Report.md`;
+- `Docs/Development/Documentation Model.md`;
+- current canonical `Docs/Systems/` pages;
+- current `Knowledge/manifest.json`;
+- current `Website/scripts/prepare.mjs`;
+- current public engine/editor headers;
 - `Docs/Production Engineering Standard.md`;
-- current canonical `Docs/Systems/` pages.
+- Jason Gregory sections used by the relevant subsystem docs.
+
