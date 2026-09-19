@@ -14,7 +14,7 @@
 >
 > **Primary architectural source:** Jason Gregory, *Game Engine Architecture (3rd Edition)*
 >
-> **Web implementation status:** Web 2 foundation implemented on `web-docs-foundation`; Astro/Starlight static build validated by CI.
+> **Web implementation status:** Web 3 documentation foundation implemented on `web-docs-foundation`; canonical metadata, Nocturne Starlight shell and static documentation routes validated by CI.
 
 ---
 
@@ -1141,14 +1141,19 @@ Acceptance:
 
 Scope:
 
-- Nocturne Starlight shell;
-- docs sidebar/TOC;
-- Pagefind search;
-- code highlighting;
-- current existing docs ingestion;
-- canonical/history visual distinction;
-- first Architecture/System canonical pages;
-- frontmatter validation.
+- [x] Nocturne Starlight shell;
+- [x] curated docs sidebar/TOC;
+- [x] Pagefind static search;
+- [x] code highlighting retained through Starlight/Expressive Code;
+- [x] current repository-root docs ingestion;
+- [x] canonical/history visual distinction;
+- [x] first canonical Architecture/System pages;
+- [x] stable Nocturne document IDs;
+- [x] frontmatter/schema validation;
+- [x] deterministic target/ID collision validation;
+- [x] canonical route/ID CI checks.
+
+**Status:** COMPLETE. See `Docs/Web/Nocturne Website — Web 3 Implementation Report.md`.
 
 ### Web 4 — Landing
 
@@ -1215,25 +1220,25 @@ Scope:
 
 Before the Website track can be treated as a durable product surface:
 
-- [ ] `Website/` builds independently of engine compilation.
-- [ ] Engine/editor builds do not depend on the website toolchain.
-- [ ] `Docs/` remains the human-authored documentation source.
-- [ ] Generated Starlight docs are deterministic and not manually edited.
-- [ ] Current canonical docs are distinguishable from phase history.
-- [ ] Landing, Download and Docs share the same Nocturne visual tokens.
-- [ ] Website colors match the audited editor palette.
-- [ ] Typography follows the Nocturne font vocabulary with safe local/system fallbacks.
-- [ ] Tabler remains the shared generic icon vocabulary.
-- [ ] Final web design does not expose generic default Starlight styling as the primary brand.
-- [ ] Documentation search works in the static build.
-- [ ] Download page never exposes an architecture without a real release artifact.
+- [x] `Website/` builds independently of engine compilation.
+- [x] Engine/editor builds do not depend on the website toolchain.
+- [x] `Docs/` remains the human-authored documentation source.
+- [x] Generated Starlight docs are deterministic and not manually edited.
+- [x] Current canonical docs are distinguishable from phase history.
+- [x] Landing, Download and Docs share the same Nocturne visual tokens.
+- [x] Website colors match the audited editor palette.
+- [x] Typography follows the Nocturne font vocabulary with safe local/system fallbacks.
+- [x] Tabler remains the shared generic icon vocabulary.
+- [x] Final web design does not expose generic default Starlight styling as the primary brand.
+- [x] Documentation search works in the static build.
+- [x] Download page never exposes an architecture without a real release artifact.
 - [ ] Release metadata validates against a schema.
 - [ ] AI entry points identify canonical versus historical sources.
 - [ ] No private credentials/paths appear in static output.
 - [ ] Keyboard navigation and focus states are functional.
 - [ ] Responsive docs remain readable at narrow widths.
 - [ ] Broken internal docs links fail validation.
-- [ ] Build output is static and deployable without a permanent application server.
+- [x] Build output is static and deployable without a permanent application server.
 
 ---
 
@@ -1280,17 +1285,18 @@ All twelve items above are **Design choice (not directly from the book)** except
 
 ## 23. Next implementation handoff
 
-Start Web 3 with:
+Start Web 4 with:
 
-> Implement **Web 3 — Documentation Foundation** from `Docs/Web/Nocturne Website — Design & Technical Specification.md` on top of the validated Web 2 skeleton. Preserve `Docs/` as canonical authored documentation. Build the Nocturne-specific Starlight shell, canonical-vs-history presentation, documentation navigation, search UX, first canonical Architecture/System pages and validated frontmatter metadata. Do not destructively reorganize all Phase documents, do not modify engine runtime dependencies, and do not present historical Phase text as current subsystem truth.
+> Implement **Web 4 — Landing** from `Docs/Web/Nocturne Website — Design & Technical Specification.md` on top of the validated Web 3 documentation foundation. Preserve the audited Nocturne editor visual vocabulary and the canonical documentation model. Polish the public landing page into a production product surface using only capabilities supported by current code/completion evidence. Use real Nocturne editor/logo imagery, complete responsive/accessibility polish, and keep direct routes to Documentation and Downloads. Do not advertise roadmap systems as shipped and do not change engine/runtime dependencies.
 
 Bring:
 
 - this specification;
-- current `Apps/NocturneEditor/EditorTheme.*`;
-- current `Apps/NocturneEditor/EditorShellV3.*`;
-- current `Apps/NocturneEditor/EditorIconRenderer.*`;
-- Phase 13 completion/fidelity docs;
-- Phase 14 completion report;
-- current `Docs/nocturne_engine_architecture.md`;
+- `Docs/Web/Nocturne Website — Web 2 Implementation Report.md`;
+- `Docs/Web/Nocturne Website — Web 3 Implementation Report.md`;
+- `Design/nocturne-theme.json`;
+- current `Website/src/pages/index.astro`;
+- current `Apps/NocturneEditor/EditorShellV3.*` and `EditorTheme.*`;
+- current canonical `Docs/Systems/` pages;
+- `Docs/nocturne_engine_architecture.md`;
 - `Docs/Production Engineering Standard.md`.
