@@ -87,3 +87,48 @@ Do not add an architecture manually merely because a Visual Studio configuration
 Canonical process:
 
 `Docs/Development/Release Process.md`
+
+
+## AI / machine-readable documentation
+
+The authored source remains repository-root `Docs/`.
+
+Run:
+
+```powershell
+npm run sync
+```
+
+This regenerates and validates:
+
+```text
+../Knowledge/manifest.json
+../Knowledge/terminology.json
+../llms.txt
+../llms-full.txt
+
+public/knowledge/...
+public/schemas/...
+public/raw/<noc.id>.md
+public/ai/<noc.id>.md
+```
+
+Public static entry points after build:
+
+```text
+/llms.txt
+/llms-full.txt
+/knowledge/manifest.json
+/knowledge/terminology.json
+/schemas/knowledge-manifest.schema.json
+/schemas/terminology.schema.json
+/raw/noc.runtime.md
+/ai/noc.runtime.md
+...
+```
+
+Do not hand-edit `Knowledge/*.json` or `llms*.txt`.
+
+CI regenerates them and fails if the committed repository-level outputs are stale relative to canonical `Docs/`.
+
+Canonical documentation pages expose **View Markdown**, **Copy Markdown** and **Copy for AI**. Historical Phase pages remain searchable but are not exported as canonical AI truth.
