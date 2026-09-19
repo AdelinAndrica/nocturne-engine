@@ -696,6 +696,8 @@ The authoring command rejects and diagnoses:
 
 The operation is atomic/undoable.
 
+**Design choice (not directly from the book):** finite degenerate local scale (including a zero component) remains legal authored local TRS in Phase 16. Runtime `World::SetLocalTRS()` rejects non-finite values but does not invent a non-zero-scale constraint. Operations that require matrix inversion/decomposition, including preserve-world reparent, reject singular/non-representable cases atomically. Scale gizmo authoring remains Local-only; arbitrary World scale is not claimed because it can require shear.
+
 ---
 
 ## 21. Generic Inspector architecture
@@ -723,6 +725,12 @@ World
 No central per-component `if Transform / else Camera / ...` switch is accepted.
 
 Custom UI may extend special types/components but is keyed by reflection identity and cannot redefine the canonical schema.
+
+**Design choice (not directly from the book):** Phase 16 keeps the generic reflected component layout as the only component-inspector authority. A future component-level override must be keyed by `TypeId`, remain presentation-only, and may not redefine canonical property/component schema. No component-specific override registry is required by the current Phase 16 scope.
+
+The property-presentation extension seam is already exercised by Transform quaternion rotation: `InspectorPresentationFor()` maps reflected Transform rotation identity + reflected Quat type to the Euler-degrees axis presentation without changing reflected storage/schema. Other presentations are selected from reflected TypeId/attributes.
+
+Editor controls follow normal Win32 creation/tab order through `WS_TABSTOP`. Read-only reflected values render as presentation text rather than editable controls. **Design choice (not directly from the book):** invalid edits revert/resync to the last authoritative reflected value and emit a Console diagnostic; Phase 16 does not retain a persistent inline red/error decoration after the invalid input is rejected.
 
 ---
 

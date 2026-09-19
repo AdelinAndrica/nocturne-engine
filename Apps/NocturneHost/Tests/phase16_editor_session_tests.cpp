@@ -3289,11 +3289,11 @@ bool RunPhase16EditorSessionTests()
                 && remapChild.IsValid()
                 && remapWorld.AddName(
                     remapRoot,
-                    "Remap Root")
+                    "Duplicate Snapshot Name")
                 && remapWorld.AddTransform(remapRoot)
                 && remapWorld.AddName(
                     remapChild,
-                    "Remap Child")
+                    "Duplicate Snapshot Name")
                 && remapWorld.AddTransform(remapChild)
                 && remapWorld.SetParent(
                     remapChild,
@@ -3329,9 +3329,17 @@ bool RunPhase16EditorSessionTests()
                 && remappedChild != remapChild
                 && remapWorld.ParentOf(remappedChild)
                     == remappedRoot
+                && remapWorld.GetName(remappedRoot)
+                && remapWorld.GetName(remappedChild)
+                && std::strcmp(
+                    remapWorld.GetName(remappedRoot)->value,
+                    "Duplicate Snapshot Name") == 0
+                && std::strcmp(
+                    remapWorld.GetName(remappedChild)->value,
+                    "Duplicate Snapshot Name") == 0
                 && !remapSnapshot.CurrentEntityForSource(
                     noc::EntityHandle::Invalid()).IsValid(),
-            "Snapshot source-to-current remap mismatch");
+            "Snapshot source-to-current remap/duplicate-name restore mismatch");
 
         ok &= CheckEditorSession(
             remapSnapshot.DestroyCurrent(remapContext),
@@ -3817,6 +3825,8 @@ bool RunPhase16EditorSessionTests()
             world.CreateEntity();
         const noc::EntityHandle reparentChild =
             world.CreateEntity();
+        const noc::EntityHandle deepGrandChild =
+            world.CreateEntity();
 
         const float halfAngle = 0.25f * 3.14159265358979323846f;
         const noc::Quat z90{
@@ -3830,9 +3840,11 @@ bool RunPhase16EditorSessionTests()
             oldParent.IsValid()
                 && newParent.IsValid()
                 && reparentChild.IsValid()
+                && deepGrandChild.IsValid()
                 && world.AddTransform(oldParent)
                 && world.AddTransform(newParent)
                 && world.AddTransform(reparentChild)
+                && world.AddTransform(deepGrandChild)
                 && world.SetLocalTRS(
                     oldParent,
                     noc::Vec3{ 10.0f, 0.0f, 0.0f },
@@ -3848,14 +3860,24 @@ bool RunPhase16EditorSessionTests()
                     noc::Vec3{ 2.0f, 1.0f, 0.0f },
                     z90,
                     noc::Vec3::One())
+                && world.SetLocalTRS(
+                    deepGrandChild,
+                    noc::Vec3{ 0.5f, 1.25f, -0.75f },
+                    noc::Quat::Identity(),
+                    noc::Vec3::One())
                 && world.SetParent(
                     reparentChild,
-                    oldParent),
+                    oldParent)
+                && world.SetParent(
+                    deepGrandChild,
+                    reparentChild),
             "Reparent test setup failed");
 
         world.Update();
         const noc::Mat4 worldBefore =
             world.GetWorldMatrix(reparentChild);
+        const noc::Mat4 deepWorldBefore =
+            world.GetWorldMatrix(deepGrandChild);
 
         auto selfParent =
             std::make_unique<
@@ -3900,6 +3922,24 @@ bool RunPhase16EditorSessionTests()
 
         const noc::Mat4 worldAfter =
             world.GetWorldMatrix(reparentChild);
+        const noc::Mat4 deepWorldAfter =
+            world.GetWorldMatrix(deepGrandChild);
+
+        bool deepWorldPreserved = true;
+        for (uint32_t i = 0; i < 16; ++i)
+        {
+            deepWorldPreserved &=
+                std::fabs(
+                    deepWorldAfter.m[i]
+                        - deepWorldBefore.m[i])
+                < 1.0e-3f;
+        }
+
+        ok &= CheckEditorSession(
+            deepWorldPreserved
+                && world.ParentOf(deepGrandChild)
+                    == reparentChild,
+            "Deep hierarchy descendant world pose changed during reparent");
 
         ok &= CheckEditorSession(
             std::fabs(
@@ -3924,6 +3964,25 @@ bool RunPhase16EditorSessionTests()
 
         const noc::Mat4 worldUndo =
             world.GetWorldMatrix(reparentChild);
+        const noc::Mat4 deepWorldUndo =
+            world.GetWorldMatrix(deepGrandChild);
+
+        bool deepUndoPreserved = true;
+        for (uint32_t i = 0; i < 16; ++i)
+        {
+            deepUndoPreserved &=
+                std::fabs(
+                    deepWorldUndo.m[i]
+                        - deepWorldBefore.m[i])
+                < 1.0e-3f;
+        }
+
+        ok &= CheckEditorSession(
+            deepUndoPreserved
+                && world.ParentOf(deepGrandChild)
+                    == reparentChild,
+            "Deep hierarchy descendant world pose changed during reparent undo");
+
         ok &= CheckEditorSession(
             std::fabs(
                 worldUndo.m[12]
@@ -4026,7 +4085,8 @@ bool RunPhase16EditorSessionTests()
             "Non-representable shear reparent was accepted");
 
         ok &= CheckEditorSession(
-            world.DestroyEntity(reparentChild)
+            world.DestroyEntity(deepGrandChild)
+                && world.DestroyEntity(reparentChild)
                 && world.DestroyEntity(newParent)
                 && world.DestroyEntity(oldParent),
             "Reparent test cleanup failed");

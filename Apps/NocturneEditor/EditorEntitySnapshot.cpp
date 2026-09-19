@@ -1,5 +1,6 @@
 #include "EditorEntitySnapshot.h"
 
+#include "Core/Log.h"
 #include "Runtime/Reflection/ReflectionRegistry.h"
 #include "Runtime/World.h"
 
@@ -157,6 +158,24 @@ namespace nocturne::editor
         }
 
         captured_ = !nodes_.empty();
+
+        if (captured_)
+        {
+            uint32_t componentCount = 0;
+            for (const Node& node : nodes_)
+            {
+                componentCount +=
+                    static_cast<uint32_t>(
+                        node.components.size());
+            }
+
+            NOC_LOG_INFO(
+                "EditorSnapshot",
+                "Captured transient subtree: entities=%u components=%u",
+                static_cast<uint32_t>(nodes_.size()),
+                componentCount);
+        }
+
         return captured_;
     }
 

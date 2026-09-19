@@ -327,6 +327,7 @@ namespace nocturne::editor
             inspectorEnumButtons_;
         HWND inspectorAddComponent_ = nullptr;
         EditorHierarchyModel hierarchyModel_;
+        bool hierarchyInvalidUtf8Reported_ = false;
         bool inspectorControlsRefreshing_ = false;
         int inspectorScrollY_ = 0;
 

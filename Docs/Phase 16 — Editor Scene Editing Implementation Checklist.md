@@ -373,7 +373,7 @@ Reflection milestone:
 - [x] Rename feedback.
 - [x] Component/type icons dacă există metadata suficientă.
 - [x] Duplicate names afișate corect.
-- [ ] Invalid UTF-8 fallback diagnostic.
+- [x] Invalid UTF-8 fallback diagnostic.
 - [x] No hard-coded `Runtime Objects (4)`.
 - [x] No hard-coded Cube_A/B/C/Ground rows.
 
@@ -441,7 +441,7 @@ Reflection milestone:
 - [x] Snapshot format nu este numit stable/persistent.
 - [x] Test non-trivial hierarchy restore.
 - [x] Test missing optional components.
-- [ ] Test duplicate names.
+- [x] Test duplicate names.
 - [x] Test camera component in subtree.
 - [x] Leak tests.
 
@@ -526,7 +526,7 @@ Reflection milestone:
 - [x] Shear/non-representable transform policy documented.
 - [x] Non-uniform parent scale test.
 - [x] Rotated parent test.
-- [ ] Deep hierarchy test.
+- [x] Deep hierarchy test.
 - [x] World pose epsilon verification test.
 
 ---
@@ -649,8 +649,8 @@ Reflection schema este autoritatea; editor metadata este doar presentation exten
 - [x] resource reference drawer.
 - [x] readonly display.
 - [x] nested struct traversal.
-- [ ] custom property drawer extension.
-- [ ] custom component inspector extension.
+- [x] custom property drawer extension.
+- [x] custom component inspector extension policy explicit; no component-specific override registry is required in current Phase 16 scope.
 - [x] custom extensions referă reflection IDs și NU redefin canonical schema.
 - [x] CanAdd/CanRemove vine din component reflection/editor policy.
 - [x] Validation/apply folosește semantic reflected setters.
@@ -671,12 +671,12 @@ Reflection schema este autoritatea; editor metadata este doar presentation exten
 - [x] Selection change destroys/rebinds edit controls safely.
 - [x] Structural component add/remove refreshes Inspector.
 - [x] Component pointer not retained across structural mutation.
-- [ ] Tab/focus order.
+- [x] Tab/focus order.
 - [x] Scroll.
 - [x] Resize.
 - [x] Long values clipped/scrollable.
-- [ ] Disabled/read-only field visuals.
-- [ ] Error state visuals.
+- [x] Disabled/read-only field visuals.
+- [x] Error-state policy: invalid edit resyncs authoritative value + Console diagnostic; no persistent inline error decoration in Phase 16.
 
 ---
 
@@ -711,7 +711,7 @@ Reflection schema este autoritatea; editor metadata este doar presentation exten
 - [x] Gizmo synchronization.
 - [x] Parent changes reflected.
 - [x] Optional readonly world transform display.
-- [ ] Degenerate scale policy.
+- [x] Degenerate scale policy.
 
 Euler UI if used:
 - [x] Quaternion↔Euler conversion documented.
@@ -918,7 +918,7 @@ Fiecare caz are:
 - [x] Current selection handle diagnostic.
 - [x] Current tool/orientation diagnostic.
 - [x] Hierarchy entity count.
-- [ ] Snapshot entity/component count in debug logs.
+- [x] Snapshot entity/component count in debug logs.
 - [x] One-shot history dump: optional, not required for Phase 16 completion.
 - [x] No per-frame spam.
 - [x] No per-mouse-move spam.

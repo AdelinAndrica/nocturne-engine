@@ -1661,6 +1661,8 @@ namespace nocturne::editor
             return;
         }
 
+        bool invalidUtf8Detected = false;
+
         auto displayName = [&](noc::EntityHandle entity)
         {
             const noc::NameComponent* name =
@@ -1668,11 +1670,24 @@ namespace nocturne::editor
 
             if (name && name->value[0] != '\0')
             {
-                const std::wstring converted =
-                    Utf8ToWide_(name->value);
+                // NameComponent payload is bounded, so a fixed buffer avoids
+                // temporary conversion allocations and lets the hierarchy
+                // distinguish invalid UTF-8 from an intentionally empty name.
+                wchar_t converted[128]{};
+                const int convertedCount =
+                    MultiByteToWideChar(
+                        CP_UTF8,
+                        MB_ERR_INVALID_CHARS,
+                        name->value,
+                        -1,
+                        converted,
+                        static_cast<int>(
+                            std::size(converted)));
 
-                if (!converted.empty())
-                    return converted;
+                if (convertedCount > 1)
+                    return std::wstring(converted);
+
+                invalidUtf8Detected = true;
             }
 
             std::wstringstream fallback;
@@ -1707,6 +1722,16 @@ namespace nocturne::editor
                     true),
                 row.entity);
         }
+
+        if (invalidUtf8Detected
+            && !hierarchyInvalidUtf8Reported_)
+        {
+            AppendConsole_(
+                L"Scene Hierarchy: invalid UTF-8 entity name; using EntityHandle fallback label.");
+        }
+
+        hierarchyInvalidUtf8Reported_ =
+            invalidUtf8Detected;
 
         SyncSceneSelection();
     }

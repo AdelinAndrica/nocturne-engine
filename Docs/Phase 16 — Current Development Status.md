@@ -629,6 +629,20 @@ Implementation/test evidence has now been reconciled across EditorSession owners
 
 Remaining unchecked items are intentionally limited to specific proof/policy gaps and manual validation rather than representing missing core subsystems. Manual UI fidelity/feel, Phase 13/14/15 regression, soak, Completion Report and Phase 17 transition remain completion gates.
 
+### 11.13 Last headless technical gates — IMPLEMENTED; CI PENDING
+
+The remaining non-manual Phase 16 checklist gaps are now closed in code/policy:
+
+- Scene Hierarchy performs strict UTF-8 name decoding, falls back to EntityHandle labeling, and emits a one-shot Console diagnostic for invalid UTF-8;
+- reflected subtree snapshots log captured entity/component counts;
+- snapshot restore explicitly proves duplicate entity names remain distinct by EntityHandle while preserving identical Name values;
+- preserve-world reparent now has a deep descendant world-pose proof across execute and undo;
+- Inspector property/component extension policy is explicit without adding an unused parallel schema/override subsystem;
+- Win32 tab/read-only/error presentation policy is documented against the implemented control behavior;
+- finite degenerate local scale is explicitly allowed, while inverse/decomposition-dependent operations reject singular cases atomically.
+
+After this pass, the only intentionally unchecked implementation item outside final documentation should be the subjective "Existing Phase 14 feel preserved" check, which belongs to manual regression.
+
 ## 12. Current development sequence
 
 The implementation sequence completed so far is:
