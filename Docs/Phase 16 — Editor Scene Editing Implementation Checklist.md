@@ -397,7 +397,7 @@ Reflection milestone:
 - [ ] Allocation failure nu produce partial entity.
 - [ ] Component-init failure rollback-ează entity.
 - [ ] Tool camera nu este afectată.
-- [ ] Test create 1/100/10k.
+- [x] Test create 1/100/10k.
 
 ---
 
@@ -433,7 +433,7 @@ Reflection milestone:
 - [ ] Snapshot nu păstrează runtime EntityHandle drept persistent identity.
 - [ ] Internal snapshot references folosesc snapshot-local IDs/indices.
 - [ ] Snapshot poate restaura subtree cu handles noi.
-- [ ] Snapshot produce old→new remap.
+- [x] Snapshot produce old→new remap.
 - [ ] Snapshot excludes tool-owned entities.
 - [ ] Snapshot allocation failure este explicit.
 - [ ] Snapshot destructor/lifetime testat.
@@ -1008,9 +1008,9 @@ Măsurăm, nu ghicim:
 - [x] create.
 - [x] create under parent.
 - [x] rename.
-- [ ] duplicate leaf.
+- [x] duplicate leaf.
 - [x] duplicate subtree.
-- [ ] delete leaf.
+- [x] delete leaf.
 - [x] delete subtree.
 - [x] undo delete.
 - [x] redo delete.
@@ -1023,7 +1023,7 @@ Măsurăm, nu ghicim:
 - [x] undo component add/remove.
 - [x] inspector transform edit.
 - [x] inspector camera validation.
-- [ ] asset assignment.
+- [x] asset assignment.
 - [x] selection invalidation.
 - [x] tool camera protection.
 

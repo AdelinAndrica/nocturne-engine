@@ -353,6 +353,22 @@ namespace nocturne::editor
             : nodes_.front().currentEntity;
     }
 
+    noc::EntityHandle
+    ReflectedEntitySubtreeSnapshot::CurrentEntityForSource(
+        noc::EntityHandle sourceEntity) const noexcept
+    {
+        if (!sourceEntity.IsValid())
+            return noc::EntityHandle::Invalid();
+
+        for (const Node& node : nodes_)
+        {
+            if (node.sourceEntity == sourceEntity)
+                return node.currentEntity;
+        }
+
+        return noc::EntityHandle::Invalid();
+    }
+
     std::size_t
     ReflectedEntitySubtreeSnapshot::MemoryCostBytes() const noexcept
     {

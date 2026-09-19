@@ -584,6 +584,86 @@ namespace
         return ok;
     }
 
+    bool RunCreateScale(
+        noc::IAllocator& allocator,
+        const noc::ReflectionRegistry& reflection,
+        uint32_t entityCount)
+    {
+        noc::World world;
+        nocturne::editor::EditorSession session;
+        bool ok = true;
+
+        const uint32_t historyCount =
+            entityCount + 16u;
+        const std::size_t historyBytes =
+            (std::max)(
+                std::size_t{ 8u * 1024u * 1024u },
+                static_cast<std::size_t>(entityCount)
+                    * 256u);
+
+        ok &= CheckEditorPerf(
+            world.Init(allocator, reflection)
+                && session.Init(
+                    world,
+                    reflection,
+                    allocator,
+                    historyCount,
+                    historyBytes),
+            "Create scale setup failed");
+
+        if (!ok)
+        {
+            session.Shutdown();
+            world.Shutdown();
+            return false;
+        }
+
+        auto context =
+            session.CommandContext();
+
+        const auto begin = Clock::now();
+
+        for (uint32_t i = 0;
+             i < entityCount;
+             ++i)
+        {
+            auto command =
+                std::make_unique<
+                    nocturne::editor::CreateEntityCommand>();
+
+            if (!command->Init(
+                    "Create Scale Entity")
+                || !session.History().Execute(
+                    context,
+                    std::move(command)))
+            {
+                ok &= CheckEditorPerf(
+                    false,
+                    "Create scale command workload failed");
+                break;
+            }
+        }
+
+        const auto end = Clock::now();
+
+        ok &= CheckEditorPerf(
+            world.AliveCount() == entityCount
+                && session.History().CommandCount()
+                    == entityCount,
+            "Create scale post-state mismatch");
+
+        NOC_LOG_INFO(
+            "Phase16EditorPerf",
+            "editor_create_scale: entities=%u time_us=%lld retained_history_bytes=%zu",
+            entityCount,
+            Micros(begin, end),
+            session.History().UsedBytes());
+
+        session.Shutdown();
+        world.Shutdown();
+        return ok;
+    }
+
     bool RunSelectionAndCreateBaseline(
         noc::IAllocator& allocator,
         const noc::ReflectionRegistry& reflection)
@@ -1171,6 +1251,14 @@ bool RunPhase16EditorPerfTests()
         ok &= RunInspectorRefreshBaseline(
             allocator,
             reflection);
+        ok &= RunCreateScale(
+            allocator,
+            reflection,
+            100);
+        ok &= RunCreateScale(
+            allocator,
+            reflection,
+            10000);
         ok &= RunSelectionAndCreateBaseline(
             allocator,
             reflection);

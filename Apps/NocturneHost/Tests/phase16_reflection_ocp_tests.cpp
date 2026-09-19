@@ -332,37 +332,42 @@ bool RunPhase16ReflectionOcpTests()
     const float newSpeed = 7.5f;
     const bool newEnabled = false;
 
-    nocturne::editor::SetReflectedPropertyCommand
-        genericPropertyCommand;
+    {
+        // Keep the command in a bounded scope so its allocator-backed
+        // OwnedReflectedValue snapshots are destroyed before the final
+        // allocator leak assertion.
+        nocturne::editor::SetReflectedPropertyCommand
+            genericPropertyCommand;
 
-    const float commandSpeed = 4.25f;
-    ok &= CheckOcp(
-        genericPropertyCommand.Init(
-            editorContext,
-            entity,
-            kReflectionTestTypeId,
-            syntheticSpeedPropertyId,
-            noc::ReflectedConstValueView{
-                noc::BuiltinTypeIds::Float32,
-                &commandSpeed })
-            && genericPropertyCommand.Execute(
-                editorContext)
-            && component
-            && component->speed == commandSpeed
-            && genericPropertyCommand.Undo(
-                editorContext)
-            && component->speed == 1.0f
-            && genericPropertyCommand.Redo(
-                editorContext)
-            && component->speed == commandSpeed,
-        "Generic SetReflectedPropertyCommand did not edit synthetic component");
+        const float commandSpeed = 4.25f;
+        ok &= CheckOcp(
+            genericPropertyCommand.Init(
+                editorContext,
+                entity,
+                kReflectionTestTypeId,
+                syntheticSpeedPropertyId,
+                noc::ReflectedConstValueView{
+                    noc::BuiltinTypeIds::Float32,
+                    &commandSpeed })
+                && genericPropertyCommand.Execute(
+                    editorContext)
+                && component
+                && component->speed == commandSpeed
+                && genericPropertyCommand.Undo(
+                    editorContext)
+                && component->speed == 1.0f
+                && genericPropertyCommand.Redo(
+                    editorContext)
+                && component->speed == commandSpeed,
+            "Generic SetReflectedPropertyCommand did not edit synthetic component");
 
-    // Reset the command-authored value before the lower-level semantic
-    // reflected-value checks below.
-    ok &= CheckOcp(
-        genericPropertyCommand.Undo(editorContext)
-            && component->speed == 1.0f,
-        "Generic synthetic property command cleanup failed");
+        // Reset before leaving the scope; destruction then releases the
+        // command-owned old/new reflected snapshots.
+        ok &= CheckOcp(
+            genericPropertyCommand.Undo(editorContext)
+                && component->speed == 1.0f,
+            "Generic synthetic property command cleanup failed");
+    }
 
     ok &= CheckOcp(
         speed

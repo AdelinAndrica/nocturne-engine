@@ -2983,6 +2983,148 @@ bool RunPhase16EditorSessionTests()
     {
         session.History().Clear();
 
+        if (!world.HasRenderable(authored))
+        {
+            ok &= CheckEditorSession(
+                world.AddRenderable(authored),
+                "Asset assignment Renderable setup failed");
+        }
+
+        const noc::ResourceHandle oldMesh{
+            7u,
+            3u
+        };
+        const noc::ResourceHandle newMesh{
+            11u,
+            5u
+        };
+
+        ok &= CheckEditorSession(
+            world.SetRenderableMesh(
+                authored,
+                oldMesh),
+            "Asset assignment initial mesh setup failed");
+
+        auto meshCommand =
+            std::make_unique<
+                nocturne::editor::SetReflectedPropertyCommand>();
+
+        ok &= CheckEditorSession(
+            meshCommand->Init(
+                context,
+                authored,
+                noc::TypeId{
+                    noc::kRenderableComponentTypeId.value },
+                noc::MakePropertyId(
+                    "Nocturne.Renderable.mesh"),
+                noc::ReflectedConstValueView{
+                    noc::BuiltinTypeIds::ResourceHandle,
+                    &newMesh })
+                && session.History().Execute(
+                    context,
+                    std::move(meshCommand))
+                && world.GetRenderable(authored)
+                && world.GetRenderable(authored)->mesh
+                    == newMesh,
+            "Reflected mesh ResourceHandle assignment failed");
+
+        ok &= CheckEditorSession(
+            session.History().Undo(context)
+                && world.GetRenderable(authored)
+                && world.GetRenderable(authored)->mesh
+                    == oldMesh,
+            "Reflected mesh assignment undo failed");
+
+        ok &= CheckEditorSession(
+            session.History().Redo(context)
+                && world.GetRenderable(authored)
+                && world.GetRenderable(authored)->mesh
+                    == newMesh,
+            "Reflected mesh assignment redo failed");
+
+        session.History().Clear();
+    }
+
+    {
+        noc::World remapWorld;
+        ok &= CheckEditorSession(
+            remapWorld.Init(
+                allocator,
+                reflection),
+            "Snapshot remap World init failed");
+
+        nocturne::editor::EditorCommandContext remapContext{
+            remapWorld,
+            reflection,
+            allocator,
+            noc::EntityHandle::Invalid()
+        };
+
+        const noc::EntityHandle remapRoot =
+            remapWorld.CreateEntity();
+        const noc::EntityHandle remapChild =
+            remapWorld.CreateEntity();
+
+        ok &= CheckEditorSession(
+            remapRoot.IsValid()
+                && remapChild.IsValid()
+                && remapWorld.AddName(
+                    remapRoot,
+                    "Remap Root")
+                && remapWorld.AddTransform(remapRoot)
+                && remapWorld.AddName(
+                    remapChild,
+                    "Remap Child")
+                && remapWorld.AddTransform(remapChild)
+                && remapWorld.SetParent(
+                    remapChild,
+                    remapRoot),
+            "Snapshot remap setup failed");
+
+        nocturne::editor::ReflectedEntitySubtreeSnapshot remapSnapshot;
+
+        ok &= CheckEditorSession(
+            remapSnapshot.Capture(
+                remapContext,
+                remapRoot)
+                && remapSnapshot.DestroyCurrent(
+                    remapContext)
+                && remapSnapshot.Instantiate(
+                    remapContext,
+                    noc::EntityHandle::Invalid()),
+            "Snapshot remap capture/reinstantiate failed");
+
+        const noc::EntityHandle remappedRoot =
+            remapSnapshot.CurrentEntityForSource(
+                remapRoot);
+        const noc::EntityHandle remappedChild =
+            remapSnapshot.CurrentEntityForSource(
+                remapChild);
+
+        ok &= CheckEditorSession(
+            remappedRoot.IsValid()
+                && remappedChild.IsValid()
+                && remappedRoot
+                    == remapSnapshot.CurrentRoot()
+                && remappedRoot != remapRoot
+                && remappedChild != remapChild
+                && remapWorld.ParentOf(remappedChild)
+                    == remappedRoot
+                && !remapSnapshot.CurrentEntityForSource(
+                    noc::EntityHandle::Invalid()).IsValid(),
+            "Snapshot source-to-current remap mismatch");
+
+        ok &= CheckEditorSession(
+            remapSnapshot.DestroyCurrent(remapContext),
+            "Snapshot remap cleanup failed");
+
+        remapSnapshot.Clear();
+        remapWorld.Shutdown();
+    }
+
+    {
+        session.History().Clear();
+
         const noc::EntityHandle parentEntity =
             world.CreateEntity();
         const noc::EntityHandle childEntity =
@@ -3270,6 +3412,82 @@ bool RunPhase16EditorSessionTests()
         ok &= CheckEditorSession(
             !toolDelete->Init(context, camera),
             "Tool-owned editor camera accepted delete command");
+    }
+
+    {
+        session.History().Clear();
+
+        const noc::EntityHandle leaf =
+            world.CreateEntity();
+
+        ok &= CheckEditorSession(
+            leaf.IsValid()
+                && world.AddName(
+                    leaf,
+                    "Leaf Entity")
+                && world.AddTransform(leaf),
+            "Leaf delete/duplicate setup failed");
+
+        auto duplicateLeaf =
+            std::make_unique<
+                nocturne::editor::DuplicateEntityCommand>();
+        auto* duplicateLeafRaw =
+            duplicateLeaf.get();
+
+        ok &= CheckEditorSession(
+            duplicateLeaf->Init(
+                context,
+                leaf)
+                && session.History().Execute(
+                    context,
+                    std::move(duplicateLeaf)),
+            "Duplicate leaf failed");
+
+        const noc::EntityHandle leafCopy =
+            duplicateLeafRaw->CurrentRoot();
+
+        ok &= CheckEditorSession(
+            leafCopy.IsValid()
+                && leafCopy != leaf
+                && world.IsAlive(leaf)
+                && world.IsAlive(leafCopy)
+                && !world.FirstChildOf(leafCopy).IsValid(),
+            "Duplicate leaf produced invalid state");
+
+        session.History().Clear();
+
+        auto deleteLeaf =
+            std::make_unique<
+                nocturne::editor::DeleteEntityCommand>();
+        auto* deleteLeafRaw =
+            deleteLeaf.get();
+
+        ok &= CheckEditorSession(
+            deleteLeaf->Init(
+                context,
+                leafCopy)
+                && session.History().Execute(
+                    context,
+                    std::move(deleteLeaf))
+                && !world.IsAlive(leafCopy),
+            "Delete leaf failed");
+
+        ok &= CheckEditorSession(
+            session.History().Undo(context)
+                && deleteLeafRaw->CurrentRoot().IsValid()
+                && world.IsAlive(
+                    deleteLeafRaw->CurrentRoot()),
+            "Delete leaf undo failed");
+
+        const noc::EntityHandle restoredLeaf =
+            deleteLeafRaw->CurrentRoot();
+
+        session.History().Clear();
+
+        ok &= CheckEditorSession(
+            world.DestroyEntity(restoredLeaf)
+                && world.DestroyEntity(leaf),
+            "Leaf delete/duplicate cleanup failed");
     }
 
     {

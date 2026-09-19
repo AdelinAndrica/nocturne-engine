@@ -368,6 +368,16 @@ Automated editor-session tests cover begin, append, nested-begin rejection, comm
 
 The existing gizmo preview remains the contract-approved coalescing exception: preview state is transient and a completed drag records one SetTransformTRSCommand rather than one command per mouse event.
 
+### 11.1B Transient snapshot source-to-current remap — IMPLEMENTED; CI PENDING
+
+`ReflectedEntitySubtreeSnapshot::CurrentEntityForSource()` exposes the source→current runtime mapping already maintained by snapshot nodes. This is transient editor bookkeeping only, never persistent identity. Automated coverage validates root and child mappings after destruction/reinstantiation.
+
+### 11.1C Leaf operations, asset command path and create-scale coverage — IMPLEMENTED; CI PENDING
+
+Headless coverage now explicitly tests single-leaf duplicate/delete, reflected Renderable mesh `ResourceHandle` assignment with Undo/Redo, and command-backed create workloads at 100 and 10k entities.
+
+Resource decode/type/missing-asset validation remains in the editor ResourceManager picker path because `World::SetRenderableMesh` intentionally does not own ResourceManager knowledge. The headless asset test validates the reflected authoring/history seam rather than pretending to validate live asset loading.
+
 ### 11.2 Required-component policy — IMPLEMENTED
 
 **Design choice (not directly from the book):** \`ComponentReflectionFlags::Required\` is an authoring removal-protection policy, not a declaration that every runtime Entity must contain that component.

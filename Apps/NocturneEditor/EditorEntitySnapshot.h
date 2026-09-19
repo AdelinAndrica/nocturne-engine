@@ -56,6 +56,12 @@ namespace nocturne::editor
         [[nodiscard]] uint32_t EntityCount() const noexcept;
         [[nodiscard]] noc::EntityHandle OriginalRootParent() const noexcept;
         [[nodiscard]] noc::EntityHandle CurrentRoot() const noexcept;
+
+        // Transient source->current remap for editor undo/duplicate bookkeeping.
+        // This is runtime identity only and is never a persistent entity ID.
+        [[nodiscard]] noc::EntityHandle CurrentEntityForSource(
+            noc::EntityHandle sourceEntity) const noexcept;
+
         [[nodiscard]] std::size_t MemoryCostBytes() const noexcept;
 
     private:
