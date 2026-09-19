@@ -1,472 +1,461 @@
 ---
 import SiteLayout from '../layouts/SiteLayout.astro';
+import '../styles/landing.css';
+
+const capabilities = [
+  {
+    number: '01',
+    title: 'Runtime',
+    id: 'noc.runtime',
+    icon: '/icons/terminal-2.svg',
+    href: '/docs/systems/runtime/',
+    description:
+      'One engine-owned lifecycle coordinates configuration, jobs, input, resources, world updates and frame execution.'
+  },
+  {
+    number: '02',
+    title: 'Resources',
+    id: 'noc.resources',
+    icon: '/icons/file-text.svg',
+    href: '/docs/systems/resources/',
+    description:
+      'Virtual paths, loose/archive mounts, asynchronous requests and typed loaders share one runtime resource boundary.'
+  },
+  {
+    number: '03',
+    title: 'Rendering',
+    id: 'noc.render',
+    icon: '/icons/device-desktop.svg',
+    href: '/docs/systems/rendering/',
+    description:
+      'A DirectX 12 backend consumes explicit frame data extracted from the runtime world instead of owning gameplay state.'
+  },
+  {
+    number: '04',
+    title: 'World & ECS',
+    id: 'noc.world',
+    icon: '/icons/world.svg',
+    href: '/docs/systems/world-ecs/',
+    description:
+      'Generational entity identity and component-owned Transform, Renderable, Camera and Name data form the current world model.'
+  },
+  {
+    number: '05',
+    title: 'Editor',
+    id: 'noc.editor',
+    icon: '/icons/layout-grid.svg',
+    href: '/docs/systems/editor/',
+    description:
+      'EditorShellV3 is a native Windows authoring surface layered on the same runtime, world and renderer used by the engine.'
+  }
+];
+
+const architecture = [
+  { label: 'Application policy', detail: 'config / content roots' },
+  { label: 'Engine Runtime', detail: 'lifecycle / frame' },
+  { label: 'World & ECS', detail: 'authoritative state' },
+  { label: 'Render Queue', detail: 'frame extraction' },
+  { label: 'DirectX 12', detail: 'GPU / present' }
+];
 ---
 
 <SiteLayout
-  title="Nocturne Engine"
-  description="Nocturne Engine — a custom Windows C++20+ game engine for first-person survival horror."
+  title="Nocturne Engine — Windows C++ Game Engine"
+  description="Nocturne Engine is a custom Windows C++20+ game engine and native editor for a first-person survival horror game, with DirectX 12 rendering and canonical technical documentation."
 >
-  <section class="hero shell">
+  <section class="hero shell" aria-labelledby="hero-title">
     <div class="hero-copy">
       <div class="eyebrow">
         <span class="status-dot" aria-hidden="true"></span>
         NOCTURNE / ENGINE
       </div>
-      <h1>Built for the dark.</h1>
+
+      <h1 id="hero-title">
+        Built for
+        <span>the dark.</span>
+      </h1>
+
       <p class="lede">
-        A custom C++ game engine and editor built for a first-person survival horror game,
-        with a Windows-first runtime and DirectX 12 renderer.
+        A custom Windows game engine and native editor built in C++20+ for a
+        first-person survival horror game. One runtime, one world model and one
+        editor, with DirectX 12 rendering and documentation that tracks the code.
       </p>
 
-      <div class="actions">
-        <a class="button primary" href="/docs">Documentation</a>
+      <div class="hero-actions" aria-label="Primary actions">
+        <a class="button primary" href="/docs/">
+          Explore documentation
+          <span aria-hidden="true">→</span>
+        </a>
         <a class="button" href="/download">Downloads</a>
       </div>
 
-      <div class="tech-line" aria-label="Core technology">
-        <span>Windows</span>
-        <span>C++20+</span>
-        <span>DirectX 12</span>
-      </div>
+      <dl class="hero-facts" aria-label="Nocturne Engine technology">
+        <div>
+          <dt>Platform</dt>
+          <dd>Windows</dd>
+        </div>
+        <div>
+          <dt>Language</dt>
+          <dd>C++20+</dd>
+        </div>
+        <div>
+          <dt>Renderer</dt>
+          <dd>DirectX 12</dd>
+        </div>
+      </dl>
     </div>
 
-    <div class="editor-surface" aria-label="Nocturne Engine technical overview">
-      <div class="surface-toolbar">
-        <span class="surface-title">NOCTURNE</span>
-        <span class="surface-state"><i></i> Runtime ready</span>
-      </div>
-      <div class="surface-body">
-        <div class="surface-sidebar">
-          <span>SCENE</span>
-          <b>Runtime World</b>
-          <span>Resources</span>
-          <span>Renderer</span>
-          <span>Editor</span>
+    <figure class="editor-figure">
+      <figcaption>
+        <span>EditorShellV3</span>
+        <span>Interface schematic · derived from the current editor layout</span>
+      </figcaption>
+
+      <div class="editor-window" aria-label="EditorShellV3 interface schematic">
+        <div class="editor-menu">
+          <div class="editor-brand">
+            <img src="/nocturne-logo.png" alt="" />
+            <span>NOCTURNE</span>
+          </div>
+          <div class="menu-items" aria-hidden="true">
+            <span>File</span>
+            <span>Edit</span>
+            <span>View</span>
+            <span>Tools</span>
+            <span>Build</span>
+          </div>
+          <span class="window-title">Nocturne Editor</span>
         </div>
-        <div class="viewport">
-          <div class="viewport-grid"></div>
-          <img src="/nocturne-logo.png" alt="" />
-          <strong>NOCTURNE ENGINE</strong>
-          <small>Runtime · Rendering · Tools</small>
+
+        <div class="editor-toolbar" aria-hidden="true">
+          <div class="tool-cluster">
+            <span class="tool active">Select</span>
+            <span class="tool">Move</span>
+            <span class="tool">Rotate</span>
+            <span class="tool">Scale</span>
+          </div>
+          <div class="tool-cluster">
+            <span class="tool success">Play</span>
+          </div>
         </div>
-        <div class="surface-inspector">
-          <span>STATUS</span>
-          <dl>
-            <div><dt>Runtime</dt><dd>Ready</dd></div>
-            <div><dt>Renderer</dt><dd>DX12</dd></div>
-            <div><dt>Editor</dt><dd>Active</dd></div>
-          </dl>
+
+        <div class="editor-workspace">
+          <section class="editor-panel hierarchy-panel" aria-label="Scene Hierarchy schematic">
+            <div class="panel-title">
+              <span class="panel-icon hierarchy-icon" aria-hidden="true"></span>
+              <span>Scene Hierarchy</span>
+            </div>
+            <div class="tree">
+              <div class="tree-row root selected">
+                <span class="chevron">⌄</span>
+                <span class="tree-dot world"></span>
+                <b>Runtime World</b>
+              </div>
+              <div class="tree-row child">
+                <span></span>
+                <span class="tree-dot camera"></span>
+                <span>Editor Camera</span>
+              </div>
+              <div class="tree-row child">
+                <span></span>
+                <span class="tree-dot mesh"></span>
+                <span>Cube_A</span>
+              </div>
+              <div class="tree-row child">
+                <span></span>
+                <span class="tree-dot mesh"></span>
+                <span>Cube_B</span>
+              </div>
+              <div class="tree-row child">
+                <span></span>
+                <span class="tree-dot mesh"></span>
+                <span>Cube_C</span>
+              </div>
+              <div class="tree-row child">
+                <span></span>
+                <span class="tree-dot mesh"></span>
+                <span>Ground</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="viewport-panel" aria-label="Rendering viewport schematic">
+            <div class="panel-title viewport-title">
+              <span class="panel-icon viewport-icon" aria-hidden="true"></span>
+              <span>Viewport</span>
+              <span class="viewport-mode">Perspective</span>
+            </div>
+            <div class="viewport-scene">
+              <div class="sky-glow"></div>
+              <div class="viewport-grid"></div>
+              <div class="cube cube-a"><i></i><b></b></div>
+              <div class="cube cube-b"><i></i><b></b></div>
+              <div class="cube cube-c selected-cube"><i></i><b></b></div>
+              <div class="gizmo" aria-hidden="true">
+                <span class="axis axis-x"></span>
+                <span class="axis axis-y"></span>
+                <span class="axis axis-z"></span>
+              </div>
+              <div class="viewport-overlay">
+                <span>DX12</span>
+                <span>Camera · Perspective</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="editor-panel inspector-panel" aria-label="Inspector schematic">
+            <div class="panel-title">
+              <span class="panel-icon inspector-icon" aria-hidden="true"></span>
+              <span>Inspector</span>
+            </div>
+            <div class="inspector-content">
+              <div class="object-name">Cube_C</div>
+              <div class="component">
+                <div class="component-title">Transform</div>
+                <div class="property"><span>Position</span><code>1.8 · 0.8 · 1.2</code></div>
+                <div class="property"><span>Rotation</span><code>0 · 0 · 0</code></div>
+                <div class="property"><span>Scale</span><code>1 · 1 · 1</code></div>
+              </div>
+              <div class="component">
+                <div class="component-title">Renderable</div>
+                <div class="property"><span>Enabled</span><code>true</code></div>
+                <div class="property"><span>Mesh</span><code>Cube</code></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="editor-panel content-panel-schematic" aria-label="Content Browser schematic">
+            <div class="panel-title">
+              <span class="panel-icon content-icon" aria-hidden="true"></span>
+              <span>Content Browser</span>
+              <span class="panel-meta">Data/</span>
+            </div>
+            <div class="asset-row">
+              <span class="asset active"><i></i>Meshes</span>
+              <span class="asset"><i></i>Textures</span>
+              <span class="asset"><i></i>Shaders</span>
+              <span class="asset"><i></i>Materials</span>
+            </div>
+          </section>
+
+          <section class="editor-panel console-panel" aria-label="Console schematic">
+            <div class="panel-title">
+              <span class="panel-icon console-icon" aria-hidden="true"></span>
+              <span>Console</span>
+            </div>
+            <div class="console-lines">
+              <span><b>[Render]</b> DX12 viewport ready</span>
+              <span><b>[World]</b> Runtime world active</span>
+              <span><b>[Editor]</b> Selection synchronized</span>
+            </div>
+          </section>
+        </div>
+
+        <div class="editor-status">
+          <span><i></i> Ready</span>
+          <span>World · 5 entities</span>
+          <span>EditorShellV3</span>
         </div>
       </div>
-      <div class="surface-status">
-        <span><i></i> Ready</span>
-        <span>Nocturne Engine</span>
+    </figure>
+  </section>
+
+  <section class="status-strip" aria-label="Current development foundation">
+    <div class="shell status-strip-inner">
+      <div>
+        <span class="status-label">CURRENT FOUNDATION</span>
+        <strong>Phases 1–15 implemented</strong>
       </div>
+      <div class="status-divider" aria-hidden="true"></div>
+      <div>
+        <span class="status-label">ACTIVE ENGINE WORK</span>
+        <strong>Scene editing + runtime reflection</strong>
+      </div>
+      <a href="/docs/architecture/overview/">View roadmap →</a>
     </div>
   </section>
 
-  <section class="capabilities shell" aria-labelledby="capabilities-title">
-    <div class="section-heading">
-      <span class="eyebrow">CURRENT FOUNDATION</span>
-      <h2 id="capabilities-title">One engine. One editor. Explicit systems.</h2>
+  <section class="section shell capabilities" aria-labelledby="capabilities-title">
+    <header class="section-heading">
+      <span class="eyebrow">IMPLEMENTED SYSTEMS</span>
+      <h2 id="capabilities-title">A foundation with explicit ownership.</h2>
       <p>
-        The site documents the current implementation rather than presenting planned
-        roadmap systems as finished features.
+        These are current engine contracts backed by implementation and canonical
+        documentation — not planned roadmap features presented as finished work.
       </p>
-    </div>
+    </header>
 
     <div class="capability-grid">
-      <article>
-        <span class="index">01</span>
-        <h3>Runtime</h3>
-        <p>Explicit subsystem lifetime, main-loop ownership and production engineering contracts.</p>
-      </article>
-      <article>
-        <span class="index">02</span>
-        <h3>Rendering</h3>
-        <p>DirectX 12 renderer foundation with editor viewport integration and GPU resource infrastructure.</p>
-      </article>
-      <article>
-        <span class="index">03</span>
-        <h3>Resources</h3>
-        <p>Virtual file system, resource management and an asset import/cook pipeline designed for tooling.</p>
-      </article>
-      <article>
-        <span class="index">04</span>
-        <h3>Editor</h3>
-        <p>A native Windows authoring surface built on the same runtime rather than a second engine.</p>
-      </article>
+      {capabilities.map((item) => (
+        <a class="capability-card" href={item.href}>
+          <div class="capability-top">
+            <span
+              class="capability-icon"
+              style={`--icon: url("${item.icon}")`}
+              aria-hidden="true"
+            ></span>
+            <span class="capability-number">{item.number}</span>
+          </div>
+          <div class="capability-copy">
+            <div class="capability-title-row">
+              <h3>{item.title}</h3>
+              <span class="implemented">Implemented</span>
+            </div>
+            <p>{item.description}</p>
+            <code>{item.id}</code>
+          </div>
+          <span class="card-arrow" aria-hidden="true">↗</span>
+        </a>
+      ))}
     </div>
   </section>
 
-  <section class="docs-cta shell">
-    <div>
-      <span class="eyebrow">DOCUMENTATION</span>
-      <h2>Architecture that stays inspectable.</h2>
-      <p>
-        Read the architectural contract, implementation history, production engineering
-        standard and current system documentation from one searchable surface.
-      </p>
+  <section class="section architecture-section" aria-labelledby="architecture-title">
+    <div class="shell">
+      <header class="section-heading architecture-heading">
+        <span class="eyebrow">ARCHITECTURE</span>
+        <h2 id="architecture-title">Policy flows down. Data flows across explicit seams.</h2>
+        <p>
+          The application supplies policy. Runtime coordinates execution. World owns
+          authoritative entity/component state. Rendering consumes extracted frame data.
+        </p>
+      </header>
+
+      <div class="architecture-card">
+        <div class="architecture-flow" aria-label="Nocturne Engine high-level data flow">
+          {architecture.map((node, index) => (
+            <>
+              <div class="architecture-node">
+                <span class="node-index">{String(index + 1).padStart(2, '0')}</span>
+                <strong>{node.label}</strong>
+                <small>{node.detail}</small>
+              </div>
+              {index < architecture.length - 1 && (
+                <span class="flow-arrow" aria-hidden="true">→</span>
+              )}
+            </>
+          ))}
+        </div>
+
+        <div class="service-rail">
+          <span>Engine services</span>
+          <div>
+            <a href="/docs/systems/resources/">Resources / VFS</a>
+            <span>Jobs</span>
+            <span>Input</span>
+            <a href="/docs/systems/editor/">Editor client</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="architecture-link">
+        <a href="/docs/architecture/overview/">Read the architectural contract →</a>
+      </div>
     </div>
-    <a class="button primary" href="/docs">Open documentation →</a>
+  </section>
+
+  <section class="section shell docs-showcase" aria-labelledby="docs-title">
+    <div class="docs-copy">
+      <span class="eyebrow">CANONICAL DOCUMENTATION</span>
+      <h2 id="docs-title">Readable by humans. Structured for tools.</h2>
+      <p>
+        Current architecture and system pages are explicitly separated from historical
+        phase records. Stable <code>noc.*</code> IDs, source references and book grounding
+        make the current authority easy to locate.
+      </p>
+
+      <ul class="docs-points">
+        <li><span>01</span> Canonical vs. historical source precedence</li>
+        <li><span>02</span> Static Pagefind search across generated documentation</li>
+        <li><span>03</span> Stable semantic IDs independent of filenames</li>
+      </ul>
+
+      <a class="text-link" href="/docs/">Open Nocturne Docs →</a>
+    </div>
+
+    <div class="docs-preview" aria-label="Nocturne documentation interface preview">
+      <div class="docs-preview-bar">
+        <div class="preview-brand">
+          <img src="/nocturne-logo.png" alt="" />
+          <span>NOCTURNE</span>
+          <i></i>
+          <span>DOCS</span>
+        </div>
+        <div class="preview-search">
+          <span>Search Nocturne docs</span>
+          <kbd>Ctrl K</kbd>
+        </div>
+      </div>
+
+      <div class="docs-preview-body">
+        <aside aria-label="Documentation navigation preview">
+          <span class="nav-heading">SYSTEMS</span>
+          <span>Runtime</span>
+          <span>Resources</span>
+          <span class="active">Rendering</span>
+          <span>World & ECS</span>
+          <span>Editor</span>
+          <span class="nav-heading history">HISTORY</span>
+          <span>Development History</span>
+        </aside>
+
+        <article>
+          <div class="doc-badges">
+            <span>CANONICAL</span>
+            <span>RENDERING</span>
+            <span>IMPLEMENTED</span>
+          </div>
+          <h3>Rendering</h3>
+          <code>noc.render</code>
+          <p>
+            The Rendering layer owns GPU interaction and presentation. It consumes
+            frame data produced by runtime/world systems.
+          </p>
+          <div class="doc-code">
+            <span>World / ECS</span>
+            <b>→</b>
+            <span>RenderQueue</span>
+            <b>→</b>
+            <span>DX12</span>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section shell release-section" aria-labelledby="release-title">
+    <div class="release-card">
+      <div class="release-copy">
+        <span class="eyebrow">DOWNLOADS</span>
+        <h2 id="release-title">Artifacts only when they are real.</h2>
+        <p>
+          The current development target is Windows x86_64. The public Downloads page
+          intentionally stays artifact-driven and will not invent ARM64, x86 or release
+          packages that the pipeline has not produced.
+        </p>
+        <a class="button" href="/download">View downloads</a>
+      </div>
+
+      <div class="release-status">
+        <div class="release-status-head">
+          <span>PUBLIC RELEASE</span>
+          <strong>Not published</strong>
+        </div>
+        <dl>
+          <div>
+            <dt>Development target</dt>
+            <dd>Windows · x86_64</dd>
+          </div>
+          <div>
+            <dt>Engine language</dt>
+            <dd>C++20+</dd>
+          </div>
+          <div>
+            <dt>Graphics backend</dt>
+            <dd>DirectX 12</dd>
+          </div>
+        </dl>
+      </div>
+    </div>
   </section>
 </SiteLayout>
-
-<style>
-  .shell {
-    width: min(1180px, calc(100% - 2rem));
-    margin-inline: auto;
-  }
-
-  .hero {
-    display: grid;
-    grid-template-columns: minmax(0, 0.9fr) minmax(480px, 1.1fr);
-    align-items: center;
-    gap: clamp(2rem, 6vw, 6rem);
-    padding-block: clamp(4.5rem, 9vw, 8rem);
-  }
-
-  .eyebrow {
-    color: var(--noc-text-muted);
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-  }
-
-  .status-dot {
-    display: inline-block;
-    width: 0.46rem;
-    height: 0.46rem;
-    margin-right: 0.45rem;
-    border-radius: 999px;
-    background: var(--noc-accent);
-    box-shadow: 0 0 16px color-mix(in srgb, var(--noc-accent) 60%, transparent);
-  }
-
-  h1 {
-    margin: 0.8rem 0 1rem;
-    font-family: var(--noc-font-display);
-    font-size: clamp(3.4rem, 7vw, 6.4rem);
-    line-height: 0.94;
-    letter-spacing: -0.055em;
-  }
-
-  .lede {
-    max-width: 42rem;
-    color: var(--noc-text-muted);
-    font-size: clamp(1rem, 1.8vw, 1.17rem);
-    line-height: 1.7;
-  }
-
-  .actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.65rem;
-    margin-top: 1.6rem;
-  }
-
-  .button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 2.55rem;
-    padding: 0 1rem;
-    border: 1px solid var(--noc-border);
-    border-radius: var(--noc-radius-md);
-    background: var(--noc-button-bg);
-    color: var(--noc-text-primary);
-    text-decoration: none;
-    font-size: 0.84rem;
-    font-weight: 650;
-  }
-
-  .button:hover {
-    border-color: color-mix(in srgb, var(--noc-border) 55%, var(--noc-text-muted));
-    background: var(--noc-button-hover);
-  }
-
-  .button.primary {
-    border-color: var(--noc-accent);
-    background: var(--noc-accent);
-    color: #f7fbff;
-  }
-
-  .button.primary:hover {
-    border-color: var(--noc-accent-hover);
-    background: var(--noc-accent-hover);
-  }
-
-  .tech-line {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.45rem;
-    margin-top: 1.35rem;
-  }
-
-  .tech-line span {
-    padding: 0.3rem 0.5rem;
-    border: 1px solid var(--noc-border);
-    border-radius: 4px;
-    background: var(--noc-input-bg);
-    color: var(--noc-text-muted);
-    font-family: var(--noc-font-mono);
-    font-size: 0.72rem;
-  }
-
-  .editor-surface {
-    overflow: hidden;
-    border: 1px solid var(--noc-border);
-    border-radius: 8px;
-    background: var(--noc-panel-bg);
-    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.34);
-  }
-
-  .surface-toolbar,
-  .surface-status {
-    min-height: 2.1rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    padding-inline: 0.75rem;
-    background: var(--noc-toolbar-bg);
-    color: var(--noc-text-muted);
-    font-size: 0.66rem;
-  }
-
-  .surface-toolbar {
-    border-bottom: 1px solid var(--noc-border);
-  }
-
-  .surface-status {
-    border-top: 1px solid var(--noc-border);
-  }
-
-  .surface-title {
-    color: var(--noc-text-primary);
-    font-weight: 700;
-    letter-spacing: 0.11em;
-  }
-
-  .surface-state i,
-  .surface-status i {
-    display: inline-block;
-    width: 0.42rem;
-    height: 0.42rem;
-    margin-right: 0.32rem;
-    border-radius: 50%;
-    background: var(--noc-success);
-  }
-
-  .surface-body {
-    min-height: 330px;
-    display: grid;
-    grid-template-columns: 108px 1fr 124px;
-    gap: 1px;
-    background: var(--noc-border);
-  }
-
-  .surface-sidebar,
-  .surface-inspector {
-    display: flex;
-    flex-direction: column;
-    gap: 0.65rem;
-    padding: 0.8rem;
-    background: var(--noc-panel-bg);
-    color: var(--noc-text-muted);
-    font-size: 0.62rem;
-  }
-
-  .surface-sidebar > span:first-child,
-  .surface-inspector > span:first-child {
-    color: var(--noc-text-muted);
-    font-size: 0.57rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-  }
-
-  .surface-sidebar b {
-    color: var(--noc-text-primary);
-    font-size: 0.65rem;
-  }
-
-  .viewport {
-    position: relative;
-    display: grid;
-    place-items: center;
-    align-content: center;
-    overflow: hidden;
-    min-width: 0;
-    background:
-      radial-gradient(circle at 50% 38%, rgba(25, 132, 236, 0.09), transparent 9rem),
-      var(--noc-viewport-bg);
-  }
-
-  .viewport-grid {
-    position: absolute;
-    inset: 45% -30% -50%;
-    opacity: 0.45;
-    transform: perspective(360px) rotateX(62deg);
-    transform-origin: top;
-    background-image:
-      linear-gradient(var(--noc-border) 1px, transparent 1px),
-      linear-gradient(90deg, var(--noc-border) 1px, transparent 1px);
-    background-size: 30px 30px;
-  }
-
-  .viewport img {
-    position: relative;
-    z-index: 1;
-    width: 54px;
-    height: 54px;
-    object-fit: contain;
-    opacity: 0.82;
-  }
-
-  .viewport strong,
-  .viewport small {
-    position: relative;
-    z-index: 1;
-  }
-
-  .viewport strong {
-    margin-top: 0.7rem;
-    font-family: var(--noc-font-display);
-    font-size: 0.8rem;
-    letter-spacing: 0.1em;
-  }
-
-  .viewport small {
-    margin-top: 0.35rem;
-    color: var(--noc-text-muted);
-    font-size: 0.62rem;
-  }
-
-  dl,
-  dl div {
-    margin: 0;
-  }
-
-  dl div {
-    display: flex;
-    justify-content: space-between;
-    gap: 0.6rem;
-    padding-block: 0.42rem;
-    border-bottom: 1px solid var(--noc-border);
-  }
-
-  dt,
-  dd {
-    margin: 0;
-  }
-
-  dd {
-    color: var(--noc-text-primary);
-  }
-
-  .capabilities {
-    padding-block: 2rem 6rem;
-  }
-
-  .section-heading {
-    max-width: 46rem;
-    margin-bottom: 2rem;
-  }
-
-  .section-heading h2,
-  .docs-cta h2 {
-    margin: 0.55rem 0 0.7rem;
-    font-family: var(--noc-font-display);
-    font-size: clamp(1.9rem, 4vw, 3rem);
-    letter-spacing: -0.035em;
-  }
-
-  .section-heading p,
-  .docs-cta p {
-    color: var(--noc-text-muted);
-    line-height: 1.7;
-  }
-
-  .capability-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: var(--noc-panel-gap);
-  }
-
-  .capability-grid article {
-    min-height: 165px;
-    padding: 1rem;
-    border: 1px solid var(--noc-border);
-    border-radius: var(--noc-radius-md);
-    background: var(--noc-panel-bg);
-  }
-
-  .index {
-    color: var(--noc-accent);
-    font-family: var(--noc-font-mono);
-    font-size: 0.7rem;
-  }
-
-  .capability-grid h3 {
-    margin: 1.8rem 0 0.5rem;
-    font-size: 0.95rem;
-  }
-
-  .capability-grid p {
-    margin: 0;
-    color: var(--noc-text-muted);
-    font-size: 0.82rem;
-    line-height: 1.65;
-  }
-
-  .docs-cta {
-    display: flex;
-    align-items: end;
-    justify-content: space-between;
-    gap: 2rem;
-    margin-bottom: 5rem;
-    padding: clamp(1.4rem, 4vw, 2.4rem);
-    border: 1px solid var(--noc-border);
-    border-radius: 8px;
-    background:
-      linear-gradient(120deg, rgba(25, 132, 236, 0.08), transparent 42%),
-      var(--noc-panel-bg);
-  }
-
-  .docs-cta > div {
-    max-width: 45rem;
-  }
-
-  @media (max-width: 940px) {
-    .hero {
-      grid-template-columns: 1fr;
-    }
-
-    .capability-grid {
-      grid-template-columns: repeat(2, 1fr);
-    }
-  }
-
-  @media (max-width: 620px) {
-    .hero {
-      padding-top: 3.25rem;
-    }
-
-    .surface-body {
-      grid-template-columns: 82px 1fr;
-    }
-
-    .surface-inspector {
-      display: none;
-    }
-
-    .capability-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .docs-cta {
-      align-items: start;
-      flex-direction: column;
-    }
-  }
-</style>
