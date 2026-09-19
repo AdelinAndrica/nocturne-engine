@@ -44,9 +44,27 @@ jobs:
       - name: Build static website
         run: npm run build
 
-      - name: Verify primary routes
+      - name: Verify website routes and canonical docs
         shell: bash
         run: |
           test -f dist/index.html
           test -f dist/download/index.html
           test -f dist/docs/index.html
+          test -f dist/404.html
+
+          test -f dist/docs/architecture/overview/index.html
+          test -f dist/docs/systems/runtime/index.html
+          test -f dist/docs/systems/resources/index.html
+          test -f dist/docs/systems/rendering/index.html
+          test -f dist/docs/systems/world-ecs/index.html
+          test -f dist/docs/systems/editor/index.html
+          test -f dist/docs/development/documentation-model/index.html
+          test -f dist/docs/development/production-engineering-standard/index.html
+          test -f dist/docs/development/website-specification/index.html
+          test -f dist/docs/history/index.html
+
+          grep -q "noc.runtime" dist/docs/systems/runtime/index.html
+          grep -q "noc.resources" dist/docs/systems/resources/index.html
+          grep -q "noc.render" dist/docs/systems/rendering/index.html
+          grep -q "noc.world" dist/docs/systems/world-ecs/index.html
+          grep -q "noc.editor" dist/docs/systems/editor/index.html
