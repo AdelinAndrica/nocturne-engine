@@ -6,9 +6,9 @@
 >
 > **Branch:** \`phase-16-editor-scene-editing\`
 >
-> **Implementation code baseline:** \`eb16b5eb\` — \`phase16: close build and repository hygiene gate\`
+> **Implementation code baseline:** \`e2e09a1962b497d9c309a65107c7ec1933a2e3a4\` — \`phase16: close final headless authoring gates\`
 >
-> **Date:** 2026-09-18
+> **Date:** 2026-09-19
 >
 > This report documents the implemented Phase 16 architecture and code. It is not the Phase 16 Completion Report.
 
@@ -571,14 +571,14 @@ These remain assigned to their later phases.
 
 The non-manual Phase 16 implementation is present on the branch.
 
-The remaining completion gates are validation/documentation gates, not missing core architecture:
+Automated implementation/validation hardening is closed on `e2e09a19`; Nocturne Windows CI run `35443924446` passed the Phase 15 regression suite, Phase 16 aggregate tests, Editor Debug, Development project builds and solution Debug build.
 
-1. complete Windows CI validation of the final code/hygiene baseline;
-2. run the preserved Phase 13/14/15 manual editor regression;
-3. run the 15+ minute edit-session soak;
-4. reconcile the final checklist against evidence;
-5. finalize the Test and CI Validation Report;
-6. issue the Completion Report only if every required gate passes;
-7. finalize the Phase 17 handoff and roadmap transition.
+The remaining completion gates are manual/finalization gates, not missing core architecture:
 
-Until those gates pass, Phase 16 remains **IN DEVELOPMENT / COMPLETION HARDENING**, not COMPLETE.
+1. run the preserved Phase 13/14/15 manual editor regression;
+2. run the 15+ minute edit-session soak;
+3. reconcile the remaining manual-only checklist items against recorded evidence;
+4. issue the Completion Report only if every required manual gate passes;
+5. finalize the Phase 17 handoff and roadmap transition.
+
+Until those manual/finalization gates pass, Phase 16 remains **IN DEVELOPMENT / COMPLETION HARDENING**, not COMPLETE.

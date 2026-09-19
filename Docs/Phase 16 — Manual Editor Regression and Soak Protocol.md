@@ -6,7 +6,11 @@
 >
 > **Target branch:** \`phase-16-editor-scene-editing\`
 >
-> **Date:** 2026-09-18
+> **Code baseline under manual test:** \`e2e09a1962b497d9c309a65107c7ec1933a2e3a4\` — \`phase16: close final headless authoring gates\`
+>
+> **Required green CI evidence:** run \`35443924446\`, job \`105899491478\`
+>
+> **Date:** 2026-09-19
 
 ---
 
@@ -27,7 +31,7 @@ Do not mark Phase 16 COMPLETE from CI alone.
 
 ## 2. Build/run target
 
-Use the current Phase 16 branch and launch the Debug x64 NocturneEditor built from that branch.
+Use code baseline `e2e09a19` from the Phase 16 branch and launch the Debug x64 NocturneEditor built from that baseline. Documentation-only commits after `e2e09a19` do not change the executable under test.
 
 Before starting:
 

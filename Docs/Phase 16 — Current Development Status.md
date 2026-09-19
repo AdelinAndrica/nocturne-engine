@@ -6,17 +6,17 @@
 >
 > **Branch:** phase-16-editor-scene-editing
 >
-> **Implementation baseline audited:** e71445605af987773566df687be3c2db3eb60fb2
+> **Implementation baseline audited:** e2e09a1962b497d9c309a65107c7ec1933a2e3a4
 >
-> **Baseline commit:** phase16: cover editor history failure and budget semantics
+> **Baseline commit:** phase16: close final headless authoring gates
 >
 > **Compared against:** phase-15-entity-component-system
 >
-> **Branch delta at audit baseline:** 72 commits ahead, 0 behind
+> **Branch delta at audit baseline:** 102 commits ahead, 0 behind
 >
-> **CI at audit baseline:** Nocturne Windows CI — PASS
+> **CI at automated completion baseline:** Nocturne Windows CI run `35443924446` — PASS
 >
-> **Date:** 2026-09-18
+> **Date:** 2026-09-19
 >
 > **This is a development-status snapshot, not a Completion Report. Phase 16 is not COMPLETE.**
 
@@ -239,7 +239,7 @@ Implemented:
 
 ## 8. CI and automated tests
 
-At implementation baseline e71445605af987773566df687be3c2db3eb60fb2, Nocturne Windows CI passed.
+At automated completion baseline e2e09a1962b497d9c309a65107c7ec1933a2e3a4, Nocturne Windows CI run `35443924446` passed.
 
 Validated CI steps include:
 
@@ -341,7 +341,7 @@ Keyboard shortcuts, Actor menu actions, hierarchy drag/drop and hierarchy contex
 
 ## 11. Remaining structural work in detail
 
-### 11.1A Selection remap after history recreation — IMPLEMENTED; CI PENDING
+### 11.1A Selection remap after history recreation — IMPLEMENTED; CI VERIFIED — `e2e09a19` / run `35443924446`
 
 `EditorCommandHistory` exposes a type-agnostic `LastSelectionHint()`. Create/Delete/Duplicate commands provide fresh runtime handles after operations that create or recreate authored entities. `EditorShellV3` validates current selection after Undo/Redo and applies the hint when present.
 
@@ -368,21 +368,21 @@ Automated editor-session tests cover begin, append, nested-begin rejection, comm
 
 The existing gizmo preview remains the contract-approved coalescing exception: preview state is transient and a completed drag records one SetTransformTRSCommand rather than one command per mouse event.
 
-### 11.1D Create/restore allocation rollback — IMPLEMENTED; CI PENDING
+### 11.1D Create/restore allocation rollback — IMPLEMENTED; CI VERIFIED — `e2e09a19` / run `35443924446`
 
 Deterministic allocator-injection coverage now forces two partial-mutation risks: `CreateEntityCommand` fails after runtime entity creation but before required editor components can grow, and reflected snapshot `Instantiate()` fails after entity recreation but before component restoration can allocate. Both tests require unchanged `AliveCount`, invalid current command/snapshot identity, and no partial restored entity.
 
 **Design choice (not directly from the book):** a switchable allocator wrapper is test-only fault injection; production allocation policy is unchanged.
 
-### 11.1E Optional component subtree snapshot proof — IMPLEMENTED; CI PENDING
+### 11.1E Optional component subtree snapshot proof — IMPLEMENTED; CI VERIFIED — `e2e09a19` / run `35443924446`
 
 Delete/undo and duplicate subtree coverage now includes a Camera on the root and a Renderable on the child, with semantic camera lens/enabled state and renderable ResourceHandle/local bounds/enabled state verified after restore/duplicate. This proves the reflection-backed snapshot does not only handle Name + Transform.
 
-### 11.1B Transient snapshot source-to-current remap — IMPLEMENTED; CI PENDING
+### 11.1B Transient snapshot source-to-current remap — IMPLEMENTED; CI VERIFIED — `e2e09a19` / run `35443924446`
 
 `ReflectedEntitySubtreeSnapshot::CurrentEntityForSource()` exposes the source→current runtime mapping already maintained by snapshot nodes. This is transient editor bookkeeping only, never persistent identity. Automated coverage validates root and child mappings after destruction/reinstantiation.
 
-### 11.1C Leaf operations, asset command path and create-scale coverage — IMPLEMENTED; CI PENDING
+### 11.1C Leaf operations, asset command path and create-scale coverage — IMPLEMENTED; CI VERIFIED — `e2e09a19` / run `35443924446`
 
 Headless coverage now explicitly tests single-leaf duplicate/delete, reflected Renderable mesh `ResourceHandle` assignment with Undo/Redo, and command-backed create workloads at 100 and 10k entities.
 
@@ -536,7 +536,7 @@ The Phase 16 allocation gate now has both corrective changes and evidence:
 
 This closes the Phase 16 allocation-discipline gate without claiming that `DebugAlloc` observes unrelated CRT or Win32 internal allocations.
 
-### 11.6A Generic direct-member component property access — IMPLEMENTED; CI PENDING
+### 11.6A Generic direct-member component property access — IMPLEMENTED; CI VERIFIED — `e2e09a19` / run `35443924446`
 
 The OCP editor-consumer proof exposed a real gap: editor property contexts previously populated only `userContext`, which supported Nocturne foundation semantic adapters but not newly registered components using ordinary direct-member reflected properties.
 
@@ -623,13 +623,13 @@ Before completion, validate the preserved editor baseline plus new authoring ope
 
 `Docs/Phase 16 — Implementation Report.md` records the implemented runtime reflection/editor architecture, milestone chronology, ownership, threading, performance/allocation hardening, transient prototype boundary and deliberate deferrals. It explicitly does not declare Phase 16 complete.
 
-### 11.12 Checklist evidence reconciliation pass — ACTIVE
+### 11.12 Checklist evidence reconciliation pass — VERIFIED / CLOSED
 
 Implementation/test evidence has now been reconciled across EditorSession ownership, tool-camera protection, EntityHandle selection, create/rename/delete/duplicate, reflected snapshots, command/history, gizmo/orientation, Name/Renderable/Camera Inspector flows, component add/remove, asset assignment, dirty/New Scene, shortcuts, threading and command-history tests.
 
-Remaining unchecked items are intentionally limited to specific proof/policy gaps and manual validation rather than representing missing core subsystems. Manual UI fidelity/feel, Phase 13/14/15 regression, soak, Completion Report and Phase 17 transition remain completion gates.
+Remaining unchecked items are now limited to manual UI fidelity/feel, Phase 13/14/15 regression, soak, Completion Report and the post-manual Phase 17/roadmap transition. No non-manual Phase 16 implementation checkbox remains open.
 
-### 11.13 Last headless technical gates — IMPLEMENTED; CI PENDING
+### 11.13 Last headless technical gates — VERIFIED / CLOSED
 
 The remaining non-manual Phase 16 checklist gaps are now closed in code/policy:
 
@@ -641,7 +641,7 @@ The remaining non-manual Phase 16 checklist gaps are now closed in code/policy:
 - Win32 tab/read-only/error presentation policy is documented against the implemented control behavior;
 - finite degenerate local scale is explicitly allowed, while inverse/decomposition-dependent operations reject singular cases atomically.
 
-After this pass, the only intentionally unchecked implementation item outside final documentation should be the subjective "Existing Phase 14 feel preserved" check, which belongs to manual regression.
+Windows CI run `35443924446` validates this pass on `e2e09a19`. The only intentionally unchecked implementation item outside final documentation is the subjective "Existing Phase 14 feel preserved" check, which belongs to manual regression.
 
 ## 12. Current development sequence
 
@@ -675,19 +675,17 @@ Runtime Reflection Core
 Audited implementation baseline:
 
 ~~~text
-e7144560 — phase16: cover editor history failure and budget semantics
+e2e09a19 — phase16: close final headless authoring gates
 ~~~
 
 ---
 
 ## 13. Recommended next implementation order
 
-1. Run full manual Phase 13/14/15 regression plus 15+ minute edit-session soak.
-2. Reconcile every remaining unchecked checklist gate with evidence or an explicit defer.
-3. Produce Phase 16 Implementation Report.
-4. Produce Phase 16 Test and CI Validation Report.
-5. Produce Phase 16 Completion Report only after all completion gates pass.
-6. Finalize the Phase 17 handoff draft and update roadmap.
+1. Run full manual Phase 13/14/15 regression plus 15+ minute edit-session soak on code baseline `e2e09a19`.
+2. Reconcile the remaining manual-only checklist gates with the recorded protocol evidence.
+3. Produce Phase 16 Completion Report only after all manual completion gates pass.
+4. Finalize the Phase 17 handoff draft and update roadmap.
 
 ---
 
@@ -699,6 +697,6 @@ Current state:
 
 **Authoring feature core: implemented.**
 
-**Completion hardening/evidence: in progress.**
+**Automated completion hardening/evidence: closed on `e2e09a19`; manual regression/soak: pending.**
 
 Phase 17 should consume this authoring/reflection foundation and add persistent scene serialization on top of it; it should not replace the Phase 16 authoring core.

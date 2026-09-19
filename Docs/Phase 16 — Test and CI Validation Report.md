@@ -4,15 +4,15 @@
 >
 > **Phase:** 16 — Editor Scene Editing + Runtime Reflection
 >
-> **Validated code baseline:** \`eb16b5ebba3b4b602928e485c0476d7d12276d19\`
+> **Validated code baseline:** \`e2e09a1962b497d9c309a65107c7ec1933a2e3a4\`
 >
-> **Commit:** \`phase16: close build and repository hygiene gate\`
+> **Commit:** \`phase16: close final headless authoring gates\`
 >
-> **Windows CI run:** \`35363788827\`
+> **Windows CI run:** \`35443924446\`
 >
-> **CI job:** \`105661197490\`
+> **CI job:** \`105899491478\`
 >
-> **Date:** 2026-09-18
+> **Date:** 2026-09-19
 >
 > This report validates the automated Phase 16 code/build/test gates. It does not replace the required manual editor regression and 15+ minute soak.
 
@@ -20,7 +20,7 @@
 
 ## 1. Validation result
 
-The complete Windows CI workflow for the final Phase 16 code/hygiene baseline completed successfully.
+The complete Windows CI workflow for the final Phase 16 automated code baseline completed successfully.
 
 All required automated build and test steps passed:
 
@@ -105,7 +105,7 @@ The Phase 16 aggregate covers:
 - transient prototype behavior;
 - editor stress/performance.
 
-The aggregate passed on \`eb16b5eb\`.
+The aggregate passed on \`e2e09a19\`.
 
 ---
 
@@ -144,20 +144,20 @@ Final-baseline observations include:
 
 | Workload | Observation |
 |---|---:|
-| Register/freeze 100 synthetic types | 448 µs |
-| Property lookup 10k @ 100 types | 948 µs |
-| Property read 100k | 734 µs |
-| TypeId lookup 100k @ 100 types | 6,706 µs |
-| Canonical-name lookup 10k @ 100 types | 13,271 µs |
-| Property enumeration 100k @ 100 types | 7,291 µs |
-| Function lookup 100k | 7,507 µs |
-| Raw reflected function invoke 100k | 4,406 µs |
-| Generic reflected invoke 10k | 5,135 µs |
-| Register/freeze 1k synthetic types | 6,348 µs |
-| TypeId lookup 100k @ 1k types | 10,759 µs |
-| Canonical-name lookup 10k @ 1k types | 61,198 µs |
-| Property enumeration 100k @ 1k types | 15,146 µs |
-| Reflected component enumeration 100k | 127,358 µs |
+| Register/freeze 100 synthetic types | 326 µs |
+| Property lookup 10k @ 100 types | 767 µs |
+| Property read 100k | 497 µs |
+| TypeId lookup 100k @ 100 types | 5,572 µs |
+| Canonical-name lookup 10k @ 100 types | 10,793 µs |
+| Property enumeration 100k @ 100 types | 6,276 µs |
+| Function lookup 100k | 6,404 µs |
+| Raw reflected function invoke 100k | 3,612 µs |
+| Generic reflected invoke 10k | 4,730 µs |
+| Register/freeze 1k synthetic types | 5,335 µs |
+| TypeId lookup 100k @ 1k types | 10,620 µs |
+| Canonical-name lookup 10k @ 1k types | 40,188 µs |
+| Property enumeration 100k @ 1k types | 11,414 µs |
+| Reflected component enumeration 100k | 135,127 µs |
 
 Frozen hot lookup/enumeration/raw-invoke paths preserve their allocation invariants. Generic invocation intentionally reports the allocator-backed \`OwnedReflectedValue\` cost separately.
 
@@ -315,24 +315,26 @@ Final Windows Debug x64 observations:
 
 | Workload | Observation |
 |---|---:|
-| Hierarchy rebuild 100 | 187 µs |
-| Hierarchy rebuild 1k | 1,329 µs |
-| Hierarchy rebuild 10k | 13,170 µs |
-| Hierarchy wide 1k | 1,450 µs |
-| Hierarchy deep 1k | 1,625 µs |
-| History 10k push | 5,104 µs |
-| History 10k Undo | 518 µs |
-| History 10k Redo | 546 µs |
-| Inspector refresh x1000 | 71,771 µs |
-| Create 1k | 1,778 µs |
-| Selection x100k | 6,560 µs |
-| Reparent commit | 29 µs |
-| Gizmo preview x10k | 81,230 µs |
-| Gizmo commit | 16 µs |
-| Delete subtree 1k | 11,162 µs |
-| Undo delete subtree 1k | 5,321 µs |
-| Duplicate subtree 1k | 15,449 µs |
-| Undo duplicate subtree 1k | 975 µs |
+| Hierarchy rebuild 100 | 206 µs |
+| Hierarchy rebuild 1k | 2,175 µs |
+| Hierarchy rebuild 10k | 13,720 µs |
+| Hierarchy wide 1k | 1,500 µs |
+| Hierarchy deep 1k | 1,589 µs |
+| History 10k push | 5,072 µs |
+| History 10k Undo | 360 µs |
+| History 10k Redo | 434 µs |
+| Inspector refresh x1000 | 61,663 µs |
+| Create 100 | 289 µs |
+| Create 1k | 1,502 µs |
+| Create 10k | 18,832 µs |
+| Selection x100k | 6,718 µs |
+| Reparent commit | 19 µs |
+| Gizmo preview x10k | 112,960 µs |
+| Gizmo commit | 7 µs |
+| Delete subtree 1k | 14,359 µs |
+| Undo delete subtree 1k | 7,614 µs |
+| Duplicate subtree 1k | 20,350 µs |
+| Undo duplicate subtree 1k | 1,448 µs |
 
 These values are diagnostic observations, not hard CI time budgets.
 
@@ -407,7 +409,7 @@ These remain **OPEN**.
 
 ## 18. Validation conclusion
 
-The Phase 16 **automated code/build/test/CI gates PASS** on \`eb16b5eb\`.
+The Phase 16 **automated code/build/test/CI gates PASS** on \`e2e09a19\`.
 
 The implementation is ready for the manual editor regression and soak gate.
 

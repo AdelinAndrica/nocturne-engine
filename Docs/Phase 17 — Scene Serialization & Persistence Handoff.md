@@ -4,7 +4,9 @@
 >
 > **Purpose:** capture the reusable Phase 16 seams now; finalize this handoff only after the Phase 16 Completion Report passes.
 >
-> **Date:** 2026-09-18
+> **Phase 16 reusable code baseline:** `e2e09a1962b497d9c309a65107c7ec1933a2e3a4` — automated CI run `35443924446` PASS
+>
+> **Date:** 2026-09-19
 
 ---
 

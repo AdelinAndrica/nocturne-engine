@@ -4,6 +4,8 @@
 >
 > **Current development status:** `Docs/Phase 16 — Current Development Status.md`
 >
+> **Final automated code baseline:** `e2e09a1962b497d9c309a65107c7ec1933a2e3a4` — CI run `35443924446` PASS
+>
 > **Standard global:** `Docs/Production Engineering Standard.md`
 >
 > **Contract specific:** `Docs/Phase 16 — Professional Grade Implementation Contract.md`
