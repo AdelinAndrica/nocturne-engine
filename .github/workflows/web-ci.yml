@@ -15,7 +15,7 @@ on:
       - ".github/workflows/web-ci.yml"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   static-site:
@@ -29,28 +29,17 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Configure Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: Website/package-lock.json
 
       - name: Install website dependencies
-        run: npm install --no-audit --no-fund
-
-      - name: Commit generated dependency lock once
-        if: github.event_name == 'push' && github.ref_name == 'web-docs-foundation'
-        working-directory: .
-        shell: bash
-        run: |
-          if [ -n "$(git status --porcelain -- Website/package-lock.json)" ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add Website/package-lock.json
-            git commit -m "web: lock website dependencies"
-            git push origin HEAD:web-docs-foundation
-          fi
+        run: npm ci --no-audit --no-fund
 
       - name: Build static website
         run: npm run build
