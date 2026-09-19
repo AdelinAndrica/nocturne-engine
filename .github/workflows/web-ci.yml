@@ -95,3 +95,47 @@ jobs:
           grep -q "0 published artifacts" dist/download/index.html
           grep -q "Configuration is not the same as support" dist/download/index.html
           grep -q "SHA-256" dist/download/index.html
+
+      - name: Verify published-release rendering with ephemeral fixture
+        shell: bash
+        run: |
+          cp src/data/releases.json /tmp/nocturne-releases.json
+
+          cat > src/data/releases.json <<'JSON'
+          {
+            "schemaVersion": 1,
+            "latest": "9.9.9-ci",
+            "releases": [
+              {
+                "version": "9.9.9-ci",
+                "channel": "development",
+                "publishedAt": "2026-09-19",
+                "notesUrl": "https://example.invalid/nocturne/release-notes",
+                "sourceCommit": "0000000000000000000000000000000000000000",
+                "builds": [
+                  {
+                    "platform": "windows",
+                    "architecture": "x86_64",
+                    "configuration": "ship",
+                    "status": "supported",
+                    "file": "nocturne-engine-9.9.9-ci-windows-x86_64.zip",
+                    "bytes": 1048576,
+                    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+                    "url": "https://example.invalid/nocturne/nocturne-engine-9.9.9-ci-windows-x86_64.zip"
+                  }
+                ]
+              }
+            ]
+          }
+          JSON
+
+          npm run validate:releases
+          npm run build
+
+          grep -q "v9.9.9-ci" dist/download/index.html
+          grep -q "x86_64" dist/download/index.html
+          grep -q "1.00 MB" dist/download/index.html
+          grep -q "nocturne-engine-9.9.9-ci-windows-x86_64.zip" dist/download/index.html
+
+          mv /tmp/nocturne-releases.json src/data/releases.json
+
