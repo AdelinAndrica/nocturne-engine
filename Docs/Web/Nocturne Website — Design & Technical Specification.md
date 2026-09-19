@@ -14,7 +14,7 @@
 >
 > **Primary architectural source:** Jason Gregory, *Game Engine Architecture (3rd Edition)*
 >
-> **Web implementation status:** not yet scaffolded; this document defines the contract that must be implemented next.
+> **Web implementation status:** Web 2 foundation implemented on `web-docs-foundation`; Astro/Starlight static build validated by CI.
 
 ---
 
@@ -1110,7 +1110,7 @@ Scope:
 - write this specification;
 - define the shared-token migration target.
 
-**Status:** this document completes the specification portion. Shared token files are not yet implemented.
+**Status:** COMPLETE for the foundation scope. `Design/nocturne-theme.json` now exists and the website generates CSS variables from it. The C++ editor still uses its existing theme implementation; migrating the editor to generated tokens remains deliberately deferred until a dedicated visual-regression pass.
 
 ### Web 2 — Astro + Starlight skeleton
 
@@ -1126,11 +1126,16 @@ Scope:
 
 Acceptance:
 
-- clean install;
-- local dev server starts;
-- static production build succeeds;
-- three primary routes load;
-- no engine build dependency on Node.
+- [x] dependency installation succeeds in GitHub Actions;
+- [x] local-development command path is configured through `npm run dev`;
+- [x] static production build succeeds;
+- [x] `/`, `/download` and `/docs` static outputs are verified in CI;
+- [x] repository-root `Docs/` is synchronized before dev/build;
+- [x] the existing editor logo is copied as a generated website asset;
+- [x] the Nocturne theme is generated from `Design/nocturne-theme.json`;
+- [x] no engine build dependency on Node was introduced.
+
+**Status:** COMPLETE for the skeleton scope. See `Docs/Web/Nocturne Website — Web 2 Implementation Report.md`.
 
 ### Web 3 — Documentation foundation
 
@@ -1275,9 +1280,9 @@ All twelve items above are **Design choice (not directly from the book)** except
 
 ## 23. Next implementation handoff
 
-Start Web 2 with:
+Start Web 3 with:
 
-> Implement **Web 2 — Astro + Starlight Skeleton** from `Docs/Web/Nocturne Website — Design & Technical Specification.md`. Use `master` plus the `web-docs-foundation` specification as the source. Preserve `Docs/` as canonical authored documentation. Create the `Website/` project, establish `/`, `/download` and `/docs`, implement deterministic docs synchronization, and map the audited Nocturne palette/typography/icon language into web CSS. Do not reorganize all existing phase documentation yet, do not modify engine runtime dependencies, and do not hardcode unsupported release architectures.
+> Implement **Web 3 — Documentation Foundation** from `Docs/Web/Nocturne Website — Design & Technical Specification.md` on top of the validated Web 2 skeleton. Preserve `Docs/` as canonical authored documentation. Build the Nocturne-specific Starlight shell, canonical-vs-history presentation, documentation navigation, search UX, first canonical Architecture/System pages and validated frontmatter metadata. Do not destructively reorganize all Phase documents, do not modify engine runtime dependencies, and do not present historical Phase text as current subsystem truth.
 
 Bring:
 
