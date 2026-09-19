@@ -30,11 +30,8 @@ function yamlString(value) {
 }
 
 function stripFrontmatter(markdown) {
-  if (!markdown.startsWith('---')) return markdown;
-  const end = markdown.indexOf('\n---', 3);
-  if (end === -1) return markdown;
-  const after = markdown.indexOf('\n', end + 4);
-  return after === -1 ? '' : markdown.slice(after + 1);
+  const match = markdown.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
+  return match ? markdown.slice(match[0].length) : markdown;
 }
 
 function extractTitle(markdown, fallback) {
@@ -48,7 +45,8 @@ function removeFirstH1(markdown) {
 
 async function walkMarkdown(directory) {
   const result = [];
-  const entries = await fs.readdir(directory, { withFileTypes: true });
+  const entries = (await fs.readdir(directory, { withFileTypes: true }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'en'));
 
   for (const entry of entries) {
     const absolute = path.join(directory, entry.name);
@@ -90,6 +88,7 @@ async function cleanPreviousGeneratedDocs() {
   try {
     const raw = await fs.readFile(manifestPath, 'utf8');
     const previous = JSON.parse(raw);
+
     for (const relative of previous.files ?? []) {
       const absolute = path.resolve(contentRoot, relative);
       if (!absolute.startsWith(contentRoot + path.sep)) {
@@ -107,11 +106,21 @@ async function syncDocs() {
 
   const sourceFiles = await walkMarkdown(docsRoot);
   const generated = [];
+  const claimedTargets = new Map();
+  const historicalPages = [];
 
   for (const source of sourceFiles) {
     const relativeSource = path.relative(docsRoot, source);
     const relativeTarget = mapDoc(relativeSource);
     if (!relativeTarget) continue;
+
+    const existing = claimedTargets.get(relativeTarget);
+    if (existing) {
+      throw new Error(
+        `Generated documentation collision: ${existing} and ${toPosix(relativeSource)} both map to ${relativeTarget}`
+      );
+    }
+    claimedTargets.set(relativeTarget, toPosix(relativeSource));
 
     const target = path.join(contentRoot, relativeTarget);
     const raw = await fs.readFile(source, 'utf8');
@@ -139,7 +148,39 @@ async function syncDocs() {
     await fs.mkdir(path.dirname(target), { recursive: true });
     await fs.writeFile(target, frontmatter + sourceNote + body + '\n', 'utf8');
     generated.push(toPosix(path.relative(contentRoot, target)));
+
+    if (historical) {
+      historicalPages.push({
+        title,
+        slug: path.basename(relativeTarget, '.md')
+      });
+    }
   }
+
+  historicalPages.sort((a, b) => a.title.localeCompare(b.title, 'en'));
+
+  const historyIndexRelative = 'docs/history/index.md';
+  const historyIndex = path.join(contentRoot, historyIndexRelative);
+  const historyBody = [
+    '---',
+    'title: Development History',
+    'description: Historical phase and implementation documents synchronized from the Nocturne repository.',
+    'tableOfContents: false',
+    '---',
+    '',
+    'These pages preserve the implementation history of Nocturne Engine.',
+    '',
+    '> Historical documents do not override current canonical Architecture/System documentation.',
+    '',
+    '## Synchronized documents',
+    '',
+    ...historicalPages.map((page) => `- [${page.title}](/docs/history/${page.slug}/)`),
+    ''
+  ].join('\n');
+
+  await fs.mkdir(path.dirname(historyIndex), { recursive: true });
+  await fs.writeFile(historyIndex, historyBody, 'utf8');
+  generated.push(historyIndexRelative);
 
   await fs.writeFile(
     manifestPath,
