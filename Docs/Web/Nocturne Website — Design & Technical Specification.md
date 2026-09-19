@@ -14,7 +14,7 @@
 >
 > **Primary architectural source:** Jason Gregory, *Game Engine Architecture (3rd Edition)*
 >
-> **Web implementation status:** Web 3 documentation foundation implemented on `web-docs-foundation`; canonical metadata, Nocturne Starlight shell and static documentation routes validated by CI.
+> **Web implementation status:** Web 4 landing milestone implemented on `web-docs-foundation`; production landing layout, EditorShellV3-derived product visual, responsive behavior and landing-specific CI assertions validated.
 
 ---
 
@@ -1159,12 +1159,20 @@ Scope:
 
 Scope:
 
-- production landing layout;
-- current editor/logo visual;
-- capability sections;
-- responsive behavior;
-- CTA routes;
-- no unsupported feature claims.
+- [x] production landing layout;
+- [x] current Nocturne logo and EditorShellV3-derived visual language;
+- [x] implemented capability sections linked to canonical system docs;
+- [x] responsive behavior for desktop/tablet/mobile breakpoints;
+- [x] Documentation and Downloads CTA routes;
+- [x] accessibility shell improvements (skip link, focus path, active navigation state);
+- [x] shared vendored Tabler icon vocabulary;
+- [x] explicit artifact-honest Downloads status;
+- [x] no unsupported roadmap feature claims;
+- [x] landing-specific CI assertions.
+
+**Status:** COMPLETE. See `Docs/Web/Nocturne Website — Web 4 Implementation Report.md`.
+
+No real editor screenshot asset currently exists in the repository or available Project image context. Web 4 therefore uses the real Nocturne logo plus an explicitly labeled **EditorShellV3 interface schematic** derived from the audited current editor layout. It is not represented as a screenshot.
 
 ### Web 5 — Downloads
 
@@ -1285,18 +1293,18 @@ All twelve items above are **Design choice (not directly from the book)** except
 
 ## 23. Next implementation handoff
 
-Start Web 4 with:
+Start Web 5 with:
 
-> Implement **Web 4 — Landing** from `Docs/Web/Nocturne Website — Design & Technical Specification.md` on top of the validated Web 3 documentation foundation. Preserve the audited Nocturne editor visual vocabulary and the canonical documentation model. Polish the public landing page into a production product surface using only capabilities supported by current code/completion evidence. Use real Nocturne editor/logo imagery, complete responsive/accessibility polish, and keep direct routes to Documentation and Downloads. Do not advertise roadmap systems as shipped and do not change engine/runtime dependencies.
+> Implement **Web 5 — Downloads** from `Docs/Web/Nocturne Website — Design & Technical Specification.md` on top of the validated Web 4 landing and Web 3 canonical documentation model. Define and validate the release metadata schema, make `/download` render only real published artifacts, add checksum/channel/version/release-note fields, and connect the page to the repository build/release pipeline without claiming unsupported architectures. Keep the current empty-state honest until a real release artifact exists. Do not merge draft PR #2 automatically and do not make the website an engine/runtime dependency.
 
 Bring:
 
 - this specification;
-- `Docs/Web/Nocturne Website — Web 2 Implementation Report.md`;
 - `Docs/Web/Nocturne Website — Web 3 Implementation Report.md`;
-- `Design/nocturne-theme.json`;
-- current `Website/src/pages/index.astro`;
-- current `Apps/NocturneEditor/EditorShellV3.*` and `EditorTheme.*`;
-- current canonical `Docs/Systems/` pages;
-- `Docs/nocturne_engine_architecture.md`;
-- `Docs/Production Engineering Standard.md`.
+- `Docs/Web/Nocturne Website — Web 4 Implementation Report.md`;
+- current `Website/src/pages/download.astro`;
+- current `Website/src/data/releases.json`;
+- current GitHub Actions workflows;
+- current Windows build configuration/CI evidence;
+- `Docs/Production Engineering Standard.md`;
+- current canonical `Docs/Systems/` pages.
