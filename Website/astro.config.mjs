@@ -20,7 +20,9 @@ export default defineConfig({
         },
         {
           label: 'Documentation',
-          autogenerate: { directory: 'docs', collapsed: true }
+          items: [
+            { autogenerate: { directory: 'docs', collapsed: true } }
+          ]
         }
       ]
     })
