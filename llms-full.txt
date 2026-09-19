@@ -27,6 +27,7 @@ book_grounding: []
 aliases: ["Nocturne Engine","Architecture Overview","Engine Architecture"]
 deprecated_aliases: []
 ---
+
 > **Canonical AI context.** This export represents current Nocturne documentation. Canonical Architecture/System/Development contracts outrank historical Phase documents for current behavior. Inspect the referenced source files when exact implementation behavior matters.
 
 # Nocturne Engine — Architecture Overview
@@ -577,6 +578,7 @@ book_grounding: []
 aliases: ["Production Engineering Standard","Production Standard"]
 deprecated_aliases: []
 ---
+
 > **Canonical AI context.** This export represents current Nocturne documentation. Canonical Architecture/System/Development contracts outrank historical Phase documents for current behavior. Inspect the referenced source files when exact implementation behavior matters.
 
 # Nocturne Engine — Production Engineering Standard
@@ -978,6 +980,7 @@ book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §1.7 To
 aliases: ["Release Process","Downloads Pipeline","Release Packaging"]
 deprecated_aliases: []
 ---
+
 > **Canonical AI context.** This export represents current Nocturne documentation. Canonical Architecture/System/Development contracts outrank historical Phase documents for current behavior. Inspect the referenced source files when exact implementation behavior matters.
 
 # Release Process
@@ -1360,6 +1363,7 @@ book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §1.7 To
 aliases: ["Documentation Model","Canonical Documentation","Docs Model"]
 deprecated_aliases: []
 ---
+
 > **Canonical AI context.** This export represents current Nocturne documentation. Canonical Architecture/System/Development contracts outrank historical Phase documents for current behavior. Inspect the referenced source files when exact implementation behavior matters.
 
 # Documentation Model
@@ -1692,6 +1696,7 @@ book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §15.4 T
 aliases: ["Editor","Nocturne Editor","EditorShellV3"]
 deprecated_aliases: ["EditorShell","EditorControls"]
 ---
+
 > **Canonical AI context.** This export represents current Nocturne documentation. Canonical Architecture/System/Development contracts outrank historical Phase documents for current behavior. Inspect the referenced source files when exact implementation behavior matters.
 
 # Editor
@@ -1849,6 +1854,7 @@ book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §11.2 T
 aliases: ["Rendering","Renderer","Render System","DirectX 12 Renderer"]
 deprecated_aliases: []
 ---
+
 > **Canonical AI context.** This export represents current Nocturne documentation. Canonical Architecture/System/Development contracts outrank historical Phase documents for current behavior. Inspect the referenced source files when exact implementation behavior matters.
 
 # Rendering
@@ -2012,6 +2018,7 @@ book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §7.2 Th
 aliases: ["Resources","Resource Manager","VFS","Virtual File System"]
 deprecated_aliases: []
 ---
+
 > **Canonical AI context.** This export represents current Nocturne documentation. Canonical Architecture/System/Development contracts outrank historical Phase documents for current behavior. Inspect the referenced source files when exact implementation behavior matters.
 
 # Resources
@@ -2173,6 +2180,7 @@ book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §8.2 Th
 aliases: ["Runtime","Engine Runtime","Main Loop"]
 deprecated_aliases: []
 ---
+
 > **Canonical AI context.** This export represents current Nocturne documentation. Canonical Architecture/System/Development contracts outrank historical Phase documents for current behavior. Inspect the referenced source files when exact implementation behavior matters.
 
 # Runtime
@@ -2337,6 +2345,7 @@ book_grounding: []
 aliases: ["Website Specification","Nocturne Website"]
 deprecated_aliases: []
 ---
+
 > **Canonical AI context.** This export represents current Nocturne documentation. Canonical Architecture/System/Development contracts outrank historical Phase documents for current behavior. Inspect the referenced source files when exact implementation behavior matters.
 
 # Nocturne Website — Design & Technical Specification
@@ -3693,6 +3702,7 @@ book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §16.2.1
 aliases: ["World","ECS","Entity Component System","World & ECS"]
 deprecated_aliases: []
 ---
+
 > **Canonical AI context.** This export represents current Nocturne documentation. Canonical Architecture/System/Development contracts outrank historical Phase documents for current behavior. Inspect the referenced source files when exact implementation behavior matters.
 
 # World & ECS
