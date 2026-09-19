@@ -6,12 +6,20 @@ on:
       - "Website/**"
       - "Design/**"
       - "Docs/**"
+      - "Knowledge/**"
+      - "Schemas/**"
+      - "llms.txt"
+      - "llms-full.txt"
       - ".github/workflows/web-ci.yml"
   pull_request:
     paths:
       - "Website/**"
       - "Design/**"
       - "Docs/**"
+      - "Knowledge/**"
+      - "Schemas/**"
+      - "llms.txt"
+      - "llms-full.txt"
       - ".github/workflows/web-ci.yml"
 
 permissions:
@@ -78,12 +86,29 @@ jobs:
           Assert-File "dist/docs/development/production-engineering-standard/index.html"
           Assert-File "dist/docs/development/website-specification/index.html"
           Assert-File "dist/docs/history/index.html"
+
+          Assert-File "dist/llms.txt"
+          Assert-File "dist/llms-full.txt"
+          Assert-File "dist/knowledge/manifest.json"
+          Assert-File "dist/knowledge/terminology.json"
+          Assert-File "dist/schemas/knowledge-manifest.schema.json"
+          Assert-File "dist/schemas/terminology.schema.json"
+          Assert-File "dist/raw/noc.runtime.md"
+          Assert-File "dist/ai/noc.runtime.md"
           
           Assert-Contains "dist/docs/systems/runtime/index.html" "noc.runtime"
           Assert-Contains "dist/docs/systems/resources/index.html" "noc.resources"
           Assert-Contains "dist/docs/systems/rendering/index.html" "noc.render"
           Assert-Contains "dist/docs/systems/world-ecs/index.html" "noc.world"
           Assert-Contains "dist/docs/systems/editor/index.html" "noc.editor"
+          Assert-Contains "dist/docs/systems/runtime/index.html" "View Markdown"
+          Assert-Contains "dist/docs/systems/runtime/index.html" "Copy Markdown"
+          Assert-Contains "dist/docs/systems/runtime/index.html" "Copy for AI"
+          Assert-Contains "dist/knowledge/manifest.json" "noc.runtime"
+          Assert-Contains "dist/knowledge/terminology.json" "EditorShellV3"
+          Assert-Contains "dist/knowledge/terminology.json" "EditorControls"
+          Assert-Contains "dist/llms.txt" "Historical Phase documents must not override current canonical behavior."
+          Assert-Contains "dist/llms-full.txt" "Document ID: noc.runtime"
           
           Assert-File "dist/icons/box.svg"
           Assert-File "dist/icons/device-desktop.svg"
@@ -165,3 +190,13 @@ jobs:
           Assert-Contains "dist/download/index.html" "nocturne-engine-9.9.9-ci-windows-x86_64.zip"
           
           Move-Item -LiteralPath $backup -Destination "src/data/releases.json" -Force
+
+      - name: Verify generated AI knowledge is committed
+        shell: powershell
+        working-directory: .
+        run: |
+          git diff --exit-code -- Knowledge llms.txt llms-full.txt
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Generated AI knowledge outputs are stale. Run 'cd Website; npm run sync' and commit Knowledge/, llms.txt and llms-full.txt."
+            exit $LASTEXITCODE
+          }
