@@ -1,0 +1,3708 @@
+# Nocturne Engine — Canonical Documentation Export
+
+> Generated from current canonical Docs sources only. Historical Phase/completion documents are intentionally excluded from this aggregate.
+
+Source precedence: canonical documentation -> current source code -> completion evidence -> historical Phase documents.
+
+---
+
+## Nocturne Engine — Architecture Overview
+
+Document ID: noc.architecture.overview
+Canonical source: Docs/nocturne_engine_architecture.md
+Web route: /docs/architecture/overview/
+
+---
+id: "noc.architecture.overview"
+title: "Nocturne Engine — Architecture Overview"
+doc_type: "architecture"
+canonical: true
+status: "active"
+subsystem: "Architecture"
+description: "Canonical layered/subsystem architecture, dependency direction, ownership and engine/application policy boundary."
+source_path: "Docs/nocturne_engine_architecture.md"
+source_files: []
+source_docs: []
+book_grounding: []
+aliases: ["Nocturne Engine","Architecture Overview","Engine Architecture"]
+deprecated_aliases: []
+---
+> **Canonical AI context.** This export represents current Nocturne documentation. Canonical Architecture/System/Development contracts outrank historical Phase documents for current behavior. Inspect the referenced source files when exact implementation behavior matters.
+
+# Nocturne Engine — Architecture Overview
+
+> Target: Windows | Language: Modern C++ (C++20+)
+>
+> Genre Target: First-Person Survival Horror
+>
+> Primary Source of Truth: *Game Engine Architecture (3rd Edition)* — Jason Gregory
+
+---
+
+## 1. Architectural Philosophy
+
+Nocturne Engine is a **layered, subsystem-oriented game engine**. Each subsystem has a clearly defined responsibility, explicit ownership rules, and a deterministic initialization and shutdown order.
+
+Key principles:
+
+- Clear separation between **engine code** and **game code**
+- Explicit **platform abstraction**
+- Engine **owns the main loop**
+- Subsystems communicate through **well-defined interfaces**, not global state
+- Gameplay is **data-driven where possible**, code-driven where necessary
+- **Asynchronous, non-blocking systems by default** (I/O, resource loading)
+
+---
+
+## 2. High-Level Layering
+
+```
+
+Nocturne/
+├── Engine/
+│   ├── Core/
+│   ├── Platform/
+│   ├── Runtime/
+│   ├── Resources/
+│   ├── Render/
+│   ├── Audio/
+│   ├── Physics/
+│   ├── Input/
+│   └── Gameplay/
+│
+├── Game/
+│   └── HorrorGame/
+│
+└── Tools/
+
+```
+
+---
+
+## 3. Engine Layers
+
+### 3.1 Engine/Core
+
+**Purpose:** Provide low-level foundational systems used by all other engine modules.
+
+Responsibilities:
+
+- Memory allocation (global allocator, arenas, pools)
+- Math library (vectors, matrices, quaternions)
+- Time system (high-resolution timing, frame delta)
+- Logging and assertions
+- Engine-wide type definitions and utilities
+
+Rules:
+
+- No dependency on platform-specific APIs
+- No dependency on rendering, physics, resources, or gameplay
+
+---
+
+### 3.2 Engine/Platform
+
+**Purpose:** Isolate operating-system-specific functionality.
+
+Responsibilities:
+
+- Window creation and management (Win32)
+- OS message pump
+- High-resolution timers (QueryPerformanceCounter)
+- File system primitives
+- Raw input acquisition
+
+Rules:
+
+- Platform code is never included directly by gameplay
+- Exposes abstract interfaces to higher layers
+
+---
+
+### 3.3 Engine/Runtime
+
+**Purpose:** Coordinate engine execution and subsystem lifetimes.
+
+Responsibilities:
+
+- Engine startup and shutdown sequencing
+- Subsystem registration and dependency ordering
+- Main game loop ownership
+- Frame lifecycle management
+- Multi-rate subsystem scheduling
+
+Canonical loop structure (conceptual):
+
+```
+
+while (engineRunning)
+{
+processOSMessages();
+pollInput();
+serviceScheduledSystems();   // multi-rate stepping
+renderStage();
+}
+
+```
+
+#### Multi-Rate Update Model (Locked)
+
+Nocturne does not introduce a single monolithic “scheduler subsystem.” Instead, once the Job System exists, individual engine systems declare their update cadence and are serviced accordingly within the engine frame lifecycle.
+
+
+Examples:
+
+- Input is sampled once per frame.
+- Physics may run at a fixed timestep (potentially multiple steps per frame) with interpolation.
+- Animation, AI, audio, and gameplay may run at their own cadences if needed.
+
+Multi-rate simulation is an emergent property of system design coordinated by Engine/Runtime, not a standalone phase.
+
+Gameplay and physics simulation use fixed timesteps where determinism is required; rendering interpolates between simulation states.
+
+---
+
+Notes:
+
+- The **game loop is the master loop**.
+- Subsystems may be serviced at different frequencies (e.g., physics > animation > AI).
+- Rendering is a **stage within** the master loop, not a separate owner of execution.
+
+
+---
+
+### 3.3.1 Engine Configuration Model (Boot-Time)
+
+The engine exposes an **engine-owned configuration model** used to control
+boot-time behavior.
+
+Key rules:
+
+- The engine defines its own configuration structures (e.g. `EngineConfig`)
+- Configuration provides **mechanisms**, not policies
+- The application (game/editor/host) may override configuration values
+- Configuration is **consumed during engine initialization**
+
+#### Configuration Lifecycle
+
+- Engine configuration is **mutable only before `Engine::Init()`**
+- Once initialization begins, configuration is considered **frozen**
+- Modifying configuration after initialization is explicitly disallowed
+
+Rationale:
+
+Many engine subsystems (Virtual File System, memory, job system, rendering)
+depend on configuration values during startup. Supporting mutation after
+initialization would require teardown and reinitialization paths and is
+out of scope for the core engine architecture.
+
+This model ensures deterministic startup, clear ownership, and predictable
+runtime behavior.
+
+
+---
+
+### 3.4 Engine/Resources
+
+**Purpose:** Unified resource access, loading, and lifetime management.
+
+Responsibilities:
+
+- Virtual File System (VFS)
+  - Mount loose directories (development)
+  - Mount packed archives (ZIP/composite files)
+- Virtual path namespace shared across all resource types
+- Resource identification via virtual paths (string + hash)
+- Asynchronous resource loading from day one
+- Resource lifetime tracking and single-instance guarantees
+- Composite resource handling (e.g., models referencing meshes, textures, animations)
+- Post-load initialization and tear-down hooks per resource type
+
+Rules:
+
+- Runtime supports **read-only** access to packed archives
+- Archive creation and asset packaging are handled by **Tools**
+- No direct dependency on rendering or gameplay logic
+
+#### Content Root & File System Policy
+
+The engine does **not** infer or discover where content lives on disk.
+
+Rules:
+
+- The application/build environment defines **physical content layout**
+- Physical content roots are supplied to the engine via configuration
+- The engine mounts exactly the paths it is given
+- Paths may be absolute or relative to the process working directory
+- Relative paths are resolved deterministically; no guessing is performed
+
+The engine owns the **Virtual File System mechanism**, while the application
+owns the **content layout policy**.
+
+The runtime engine never:
+- queries executable paths
+- assumes content is located next to the executable
+- embeds platform-specific directory rules
+
+This separation ensures portability, testability, and predictable behavior
+across development, tools, and shipping builds.
+
+---
+
+### 3.5 Engine/Render
+
+**Purpose:** All rendering and GPU interaction.
+
+Responsibilities:
+
+- Rendering API abstraction (Direct3D 12)
+- GPU resource management
+- Pipeline state management
+- Frame graph / submission
+- Consumption of immutable render data produced by gameplay
+
+Rules:
+
+- No gameplay logic
+- Rendering is driven by data produced by gameplay systems
+
+---
+
+### 3.6 Engine/Audio
+
+**Purpose:** Audio playback and spatial sound simulation.
+
+Responsibilities:
+
+- Audio device management
+- Sound effect playback
+- Music playback and transitions
+- 3D spatialization
+
+---
+
+### 3.7 Engine/Physics
+
+**Purpose:** Physical simulation and collision queries.
+
+Responsibilities:
+
+- Collision detection
+- Rigid body simulation
+- Character controller support
+- Spatial queries (raycasts, sweeps)
+
+Notes:
+
+- May integrate third-party middleware
+- Engine maintains abstraction boundary regardless of implementation
+
+---
+
+### 3.8 Engine/Input
+
+**Purpose:** Unified human interface device handling.
+
+Responsibilities:
+
+- Keyboard, mouse, controller input
+- Per-frame input state buffering
+- Action mapping (logical actions decoupled from physical devices)
+
+Rules:
+
+- Input is polled and buffered once per frame
+- Gameplay consumes input data produced by this system
+
+---
+
+### 3.8.5 Engine/Camera
+
+**Purpose:** View representation and control.
+
+Responsibilities:
+
+- Camera transforms and projection parameters
+- First-person, third-person, and cinematic camera models
+- Camera controllers driven by gameplay or editor
+- View data production for rendering
+
+Rules:
+
+- Cameras are data producers only
+- Rendering consumes camera view data
+- Gameplay may control cameras but does not render directly
+
+---
+
+### 3.9 Engine/Gameplay
+
+**Purpose:** Gameplay foundation layer shared by all games built on the engine.
+
+**Responsibilities**:
+
+- Game object model
+- Component system
+- World representation
+- Messaging and events
+- Gameplay-level systems
+- Scripting integration (future)
+
+**Notes**:
+
+- Serialization is shared by both runtime and tools/editor workflows:
+  - Runtime: save/load game state.
+  - Tools/Editor: scenes, prefabs, component data, and authored configurations.
+- The engine must not maintain separate “editor serializer” and “runtime serializer.”
+
+**Rules**:
+
+- Depends on engine systems
+- Never depends on Game/* code
+
+---
+
+## 4. Game Layer
+
+### Game/HorrorGame
+
+**Purpose:** Game-specific code and content.
+
+Responsibilities:
+
+- Player mechanics
+- Enemy logic
+- Horror-specific systems
+- Game rules and progression
+
+Rules:
+
+- Can depend on Engine modules
+- Must not modify Engine internals
+
+---
+
+## 5. Tools Layer
+
+**Purpose:** Offline and development tools.
+
+**Editor philosophy**:
+
+- The editor shares the same engine modules as the game runtime (resources, rendering, physics, audio, gameplay foundation).
+- Editor-only features are layered on top (panels, inspectors, gizmos, asset preview, PIE bridges).
+- The editor does not become a second engine; it is a client of the engine plus authoring UI.
+
+**Responsibilities**:
+
+- Asset importers
+- Resource linker / packager (build ZIP/composite archives)
+- Build and cook pipeline
+- Debug and profiling tools
+- Editor (authoring tool built on the runtime engine)
+
+Notes:
+
+- Tools are responsible for **writing** packed archives
+- Runtime engine is responsible only for **reading** them
+
+### Editor ↔ Runtime Boundary (Locked)
+
+The editor is a tool built on top of the runtime engine. The runtime retains ownership of the main loop and system orchestration.
+
+Rules:
+
+- The editor may embed and drive an instance of the runtime engine.
+- The editor must not replace or fork the engine loop; it can only provide hooks (e.g., pause/step, inspection, gizmos).
+- Play-In-Editor runs the same runtime loop with editor-provided bridges, not a separate “editor loop.”
+
+---
+
+## 6. Dependency Rules (Non-Negotiable)
+
+- Core → used by everything
+- Platform → used by Runtime, Input, File I/O
+- Runtime → orchestrates all systems
+- Resources → used by Render, Audio, Physics, Gameplay
+- Render / Physics / Audio → independent of gameplay
+- Gameplay → depends on engine systems
+- Game → depends on Gameplay + Engine
+
+No upward dependencies are allowed.
+
+---
+
+### 6.1 Policy vs Mechanism Ownership (Locked)
+
+Architectural rule:
+
+- The engine provides **mechanisms**
+- The application provides **policies**
+
+Examples:
+
+- Engine provides: Virtual File System, resource loading, rendering APIs
+- Application decides: where content lives, which archives are mounted,
+  which systems are enabled
+
+The engine must never embed application- or project-specific policy decisions.
+All such decisions are expressed via configuration or higher-level systems.
+
+This rule preserves correct dependency direction and prevents platform or
+project assumptions from leaking into engine code.
+
+---
+
+## 7. Naming and Code Conventions
+
+- Engine namespace: `noc::`
+- Game namespace: `game::`
+- No STL types in public engine headers
+- Explicit ownership (no hidden globals)
+
+---
+
+## 8. What This Document Is
+
+- A **living architectural contract**
+- The reference used before adding any new system
+- The baseline against which refactors are judged
+- The roadmap authority for phase boundaries
+
+### 8.1 Production Engineering Standard — LOCKED FROM PHASE 15
+
+Starting with Phase 15, all implementation work is governed by:
+
+`Docs/Production Engineering Standard.md`
+
+Nocturne Engine is being developed as a commercial-quality product, not as a tutorial/prototype codebase.
+
+The standard requires production-grade implementation **within the scope of each phase**: explicit ownership, robust failure handling, invariants, diagnostics, regression coverage, measured hot-path behavior where relevant, accurate documentation and no hidden structural shortcuts.
+
+This quality policy is a **Design choice (not directly from the book)**. Architectural concepts and subsystem decisions remain grounded in the provided books.
+
+Professional-grade does not mean phase-scope expansion. Future features remain in their assigned phases unless a documented dependency makes earlier foundation work necessary.
+
+---
+
+## 9. Roadmap (Phase-Based)
+
+### Completed foundation
+
+Phases 1–15 constitute the current implemented foundation. Their individual phase/completion documents remain the authority for exactly what was delivered.
+
+Phase 15 completed the production runtime entity/component foundation: generational runtime identity, component lifecycle/storage, transform/render/camera/name components, metadata/versioning seams, deterministic world queries, render extraction, editor/runtime single source of truth, stress/performance baselines, and CI/build regression coverage.
+
+### Active
+
+16. **Phase 16 — Editor Scene Editing + Runtime Reflection**  
+    Full engine-wide runtime reflection for registered Nocturne types (stable type/property/function identity, type/property/enum/function/container metadata, lifecycle/type operations, semantic access, component reflection and deterministic registry), then real scene-authoring workflows over the Phase 15 object model: create/delete/duplicate/reparent entities, reflection-driven component/property editing, robust selection synchronization, transactions, undo/redo, prefab prototype and editor diagnostics. Phase 17 must reuse this reflection schema for serialization/prefabs; Phase 24 must reuse it for scripting. No scene-file persistence in Phase 16.
+
+### Future roadmap — production-grade scope
+
+17. **Phase 17 — Serialization & Save / Load**  
+    Versioned persistence for scenes, prefabs and savegame-relevant state: stable entity/component identity, reference fixups, deterministic output where required, compatibility/version checks, malformed-data diagnostics, transactional/atomic save behavior where applicable, round-trip tests and migration/rejection policy.
+
+18. **Phase 18 — Physics & Collision**  
+    Production physics integration boundary: collision shapes/filtering, broadphase/narrowphase or middleware integration, rigid bodies, fixed-step simulation, scene queries, character-controller foundation, lifecycle synchronization with entities/components, debug visualization, invalid-shape handling and stress/performance validation.
+
+19. **Phase 19 — Animation System**  
+    Runtime animation foundation: skeletons, clips, sampling, blending/state-machine layer, skinning integration, root-motion policy, animation events, retargeting baseline, resource lifetime rules, deterministic update ordering and representative CPU/GPU performance validation.
+
+20. **Phase 20 — Audio System**  
+    Production audio runtime: device/voice ownership, buses/mixing, 2D/3D spatialization, streaming, resource lifetime, concurrency limits/voice policy, pause/focus behavior, diagnostics and failure recovery for missing/invalid audio resources.
+
+21. **Phase 21 — Lighting & Post-Processing**  
+    Production lighting/post foundation integrated with the existing renderer: chosen lighting architecture, shadow lifecycle, HDR/linear workflow, tone mapping, fog and bloom, resize/resource correctness, GPU diagnostics and measured frame cost. The chosen architecture must be documented before implementation.
+
+22. **Phase 22 — Materials & PBR Workflow**  
+    Production material system: material assets/instances, parameter typing, texture-set binding, PBR conventions, shader/permutation policy, color-space correctness, fallback/error materials, editor integration, GPU binding efficiency and versionable material data.
+
+23. **Phase 23 — Editor Asset Previewers**  
+    Reliable isolated preview workflows for mesh/animation/texture/audio assets: async-safe loading, preview-world isolation, error states, reimport hooks, resource refresh, camera/control behavior and no mutation of the authored runtime scene.
+
+24. **Phase 24 — Scripting & Gameplay Runtime Layer**  
+    Production gameplay extension boundary: scripting/binding architecture selected and documented, safe entity/component references, lifecycle hooks, events/triggers, error containment, deterministic ownership, debugging facilities and a gameplay framework that does not bypass engine subsystem contracts.
+
+25. **Phase 25 — AI & Navigation**  
+    Production navigation/AI foundation: navmesh build/runtime queries, pathfinding, agent movement interface, perception, BT/FSM framework, entity/component integration, debug visualization, invalid/unreachable-path handling and representative scalability measurements.
+
+26. **Phase 26 — Gameplay Systems for Horror**  
+    Commercial-game gameplay foundation for the target title: interaction, inventory, doors/locks, stamina and fear/sanity hooks, data-driven tuning, save/load compatibility, clear ownership between engine-generic and game-specific code, automated regression coverage for core gameplay rules.
+
+27. **Phase 27 — Editor Play-In-Editor (PIE)**  
+    Robust PIE lifecycle using the real runtime: authored-state isolation, start/stop/pause/step semantics, runtime/editor bridge, policy for runtime changes, safe teardown/restart, scripting/data reload integration where supported, and proof that stopping PIE restores editor authoring state without corruption.
+
+28. **Phase 28 — Debug & Profiling Tooling**  
+    Production observability: CPU/GPU timings, memory/allocation instrumentation, profiler markers, frame/system counters, capture hooks, debug overlays, diagnostic dumps and workflows that can identify regressions without ad-hoc code modification.
+
+29. **Phase 29 — Build & Deployment Pipeline**  
+    Repeatable commercial build/deployment flow: clearly separated development/shipping configurations, deterministic build/cook/package steps, symbol handling, crash-reporting hooks, installer/package generation, configuration validation and reproducible release artifacts.
+
+30. **Phase 30 — Optimization & Content Validation**  
+    Measured optimization and automated content quality gates: frame/memory/streaming budgets, representative benchmarks, LOD/streaming policy, asset validation, cooker validation failures, regression thresholds and removal of known hot-path architectural debt discovered by profiling.
+
+31. **Phase 31 — Shipping Polish**  
+    Release-candidate hardening: QA/regression gates, crash/failure cleanup, deterministic cooks/builds, final editor UX consistency, configuration/settings validation, content validation closure, packaging verification and explicit ship/no-ship criteria for known defects.
+
+### Roadmap rule
+
+The one-line scope above defines **what** each future phase owns. `Docs/Production Engineering Standard.md` defines **how well** it must be implemented.
+
+A future phase is not complete because its headline feature exists. It is complete only when its applicable production quality gates pass.
+
+---
+
+This document remains the top-level architectural and roadmap reference for all future work.
+
+---
+
+## Nocturne Engine — Production Engineering Standard
+
+Document ID: noc.development.production-standard
+Canonical source: Docs/Production Engineering Standard.md
+Web route: /docs/development/production-engineering-standard/
+
+---
+id: "noc.development.production-standard"
+title: "Nocturne Engine — Production Engineering Standard"
+doc_type: "standard"
+canonical: true
+status: "active"
+subsystem: "Development"
+description: "Canonical engineering quality, CI, validation and production-readiness standard for Nocturne Engine."
+source_path: "Docs/Production Engineering Standard.md"
+source_files: []
+source_docs: []
+book_grounding: []
+aliases: ["Production Engineering Standard","Production Standard"]
+deprecated_aliases: []
+---
+> **Canonical AI context.** This export represents current Nocturne documentation. Canonical Architecture/System/Development contracts outrank historical Phase documents for current behavior. Inspect the referenced source files when exact implementation behavior matters.
+
+# Nocturne Engine — Production Engineering Standard
+
+> **Status:** LOCKED FOR PHASE 15 AND ALL SUBSEQUENT PHASES
+>
+> **Product target:** a sellable Windows game engine and a shippable first-person survival horror game.
+>
+> **Applies to:** engine runtime, editor, tools, asset pipeline, game systems, build/deployment, validation and shipping work.
+>
+> **Primary architectural sources:** the books provided with the Nocturne Engine project.
+>
+> **Project-level quality policy:** the completion gates in this document are **Design choice (not directly from the book)** unless a specific phase document explicitly ties an item to a book section.
+
+## 1. Purpose
+
+Nocturne Engine is not being built as a tutorial engine, school project, throwaway prototype or proof of concept.
+
+Starting with Phase 15, every phase must be implemented to a **production-grade standard within the scope of that phase**.
+
+That means:
+
+- complete responsibility ownership;
+- explicit lifetime rules;
+- robust invalid-state handling;
+- documented invariants;
+- deterministic behavior where the architecture requires it;
+- diagnostics for failures;
+- tests and regression coverage;
+- measured performance characteristics for hot paths;
+- no silent corruption;
+- no knowingly temporary architecture presented as final;
+- no editor/runtime divergence that will require a rewrite later;
+- no hidden dependence on validation-scene constants;
+- no feature accepted solely because the happy path works.
+
+Professional-grade does **not** mean pulling future roadmap features into the current phase. Scope remains phase-bounded. The rule is:
+
+> Implement the current phase completely enough that later phases can build on it without first replacing its foundation.
+
+## 2. Source-of-truth rule
+
+The provided books remain the primary source of truth for concepts, terminology and architecture.
+
+When a design decision is not directly prescribed by those sources, the documentation and code review notes must label it:
+
+**Design choice (not directly from the book)**
+
+No invented citations or page numbers are allowed.
+
+Relevant recurring references include:
+
+- Jason Gregory — *Game Engine Architecture, 3rd Edition*:
+  - gameplay foundation and runtime object models;
+  - object references and queries;
+  - engine support systems;
+  - tools/editor architecture;
+  - runtime/update ordering;
+- Bob Nystrom — *Game Programming Patterns*:
+  - Component;
+  - Data Locality;
+  - event/decoupling patterns where they are actually applicable;
+- Frank D. Luna — *Introduction to 3D Game Programming with DirectX 12* for DX12 resource/state/synchronization/rendering mechanics;
+- Eric Lengyel and David Eberly for mathematics, rendering and geometric foundations where relevant.
+
+## 3. Non-negotiable engineering qualities
+
+### 3.1 Ownership and lifetime
+
+Every substantial subsystem must define:
+
+- who creates it;
+- who owns it;
+- who may reference it;
+- when it is valid;
+- how it shuts down;
+- what happens when dependencies disappear;
+- whether references survive relocation/reallocation;
+- whether handles can become stale and how stale access is prevented.
+
+Raw pointers may be used internally where appropriate, but ownership must never be ambiguous.
+
+### 3.2 Invariants and invalid states
+
+Each subsystem must document its invariants.
+
+Examples:
+
+- handle generation must match the live slot;
+- a destroyed entity cannot still expose live components;
+- a transform hierarchy cannot contain cycles;
+- a GPU resource cannot be destroyed while still in-flight;
+- a serialized reference cannot depend on a transient runtime address.
+
+Invalid operations must have an explicit policy:
+
+- reject;
+- return failure;
+- assert in development;
+- log diagnostics;
+- or perform a documented no-op.
+
+Silent corruption is never an acceptable policy.
+
+### 3.3 Error handling
+
+Professional completion requires negative-path handling, not just successful execution.
+
+Each relevant phase must test:
+
+- invalid input;
+- missing resources;
+- duplicate registration;
+- stale handles;
+- out-of-range identifiers;
+- capacity growth;
+- allocation failure paths where practical;
+- malformed or incompatible data when persistence/import is involved;
+- device/resource errors when rendering is involved.
+
+Shipping-safe failures should degrade or report cleanly where possible.
+
+### 3.4 Data ownership and single source of truth
+
+A datum must have one authoritative owner.
+
+Editor mirrors, cached render data, derived bounds and presentation state are allowed only when their relationship to the authoritative data is explicit.
+
+Do not maintain independent mutable copies of the same world state in:
+
+- runtime;
+- editor;
+- renderer;
+- serializer;
+- physics;
+- scripting.
+
+Bridges may transform data, but they do not become alternate authorities.
+
+### 3.5 API quality
+
+Public engine APIs must be:
+
+- narrow;
+- intention-revealing;
+- const-correct where applicable;
+- explicit about ownership and failure;
+- stable enough for the next roadmap phases;
+- free of accidental Win32/editor dependencies in runtime layers;
+- free of project-specific policy when the engine should expose a mechanism.
+
+The existing project rule remains active:
+
+- no STL types in public engine headers unless the architectural contract is deliberately revised and documented.
+
+### 3.6 Memory and allocation discipline
+
+Hot paths must not hide uncontrolled heap churn.
+
+Each phase that introduces frequently-updated data must establish:
+
+- storage ownership;
+- growth policy;
+- relocation behavior;
+- invalidation rules;
+- expected allocation frequency;
+- whether frame arenas/pools/dense storage are appropriate.
+
+Do not optimize blindly, but do not accept known per-frame allocations or synchronous compilation/loading in hot paths when the work can be moved out of them.
+
+### 3.7 Determinism and ordering
+
+Where system correctness depends on order, that order must be explicit and tested.
+
+Examples:
+
+- initialization/shutdown;
+- transform propagation;
+- simulation stages;
+- component destruction;
+- render extraction;
+- fixed-timestep physics;
+- serialization output ordering where deterministic output is required.
+
+A generic scheduler is not automatically more professional than explicit ordering. Complexity must be justified by requirements.
+
+### 3.8 Performance validation
+
+Performance-sensitive systems must have a measured baseline before sign-off.
+
+Do not approve a phase based on intuition alone when it introduces a hot loop, large storage, GPU work, streaming, pathfinding, animation evaluation or similar cost.
+
+At minimum, capture:
+
+- representative workload;
+- timing or throughput measurement;
+- allocation behavior where relevant;
+- obvious algorithmic scaling;
+- regression comparison after major fixes.
+
+Exact performance budgets are phase-specific and should be set when the system requirements are known.
+
+### 3.9 Diagnostics and observability
+
+A sellable engine must help diagnose its own failures.
+
+Relevant systems should expose development diagnostics such as:
+
+- assertions;
+- structured logging;
+- debug names;
+- counters;
+- validation layers;
+- one-shot dumps;
+- profiler markers;
+- editor-visible errors.
+
+Diagnostics must not require invasive ad-hoc code changes each time a subsystem fails.
+
+### 3.10 Tests and regression
+
+A phase is not complete merely because the editor launches.
+
+Required validation should include the appropriate combination of:
+
+- unit tests for isolated algorithms/data structures;
+- integration tests across subsystem boundaries;
+- runtime interaction tests;
+- stress/capacity tests;
+- regression tests for previous phases;
+- debug-layer/validation-layer checks for graphics;
+- save/load round-trip tests for persistence phases;
+- deterministic output checks for cooker/build phases.
+
+Every phase must preserve previously validated contracts unless a deliberate architecture change is documented and migrated.
+
+### 3.11 Tool/editor quality
+
+Editor-facing systems must handle real authoring workflows, not only demonstration scenes.
+
+Where applicable:
+
+- actions must be undoable/redoable when the phase owns editing history;
+- selection and inspection must remain synchronized;
+- invalid assets/components must surface useful diagnostics;
+- authoring operations must not corrupt runtime state;
+- destructive operations need explicit semantics;
+- long operations should not unnecessarily block the UI;
+- editor state must not become a second authoritative game world.
+
+### 3.12 Persistence and versioning
+
+Whenever a phase introduces data that will survive process lifetime, it must define:
+
+- stable identity;
+- format version;
+- compatibility policy;
+- reference representation;
+- migration or rejection behavior;
+- deterministic write policy where required;
+- atomicity/recovery expectations for writes where applicable.
+
+Transient runtime handles, pointers and container indices must not become persisted identities.
+
+### 3.13 Concurrency
+
+Threading is introduced only when the system benefits from it and ownership is clear.
+
+A production-grade subsystem must not be made “more advanced” by adding unsound concurrency.
+
+When concurrency is introduced, define:
+
+- thread ownership;
+- mutation rules;
+- synchronization;
+- job lifetime;
+- cancellation/shutdown behavior;
+- visibility/memory-order requirements where applicable.
+
+### 3.14 Security and trust boundaries
+
+For tooling, asset import, serialization, scripting and external data, malformed inputs must not be assumed impossible.
+
+Where relevant:
+
+- validate sizes and ranges;
+- reject invalid references;
+- avoid unchecked buffer arithmetic;
+- avoid executing untrusted paths/data as code;
+- keep editor/tool parsing failures recoverable where possible.
+
+## 4. Phase completion gate
+
+Beginning with Phase 15, a phase may be marked COMPLETE only when all applicable items below are satisfied:
+
+- [ ] architecture is documented before or alongside implementation;
+- [ ] book grounding is recorded;
+- [ ] design choices not directly from the books are labeled;
+- [ ] ownership/lifetime rules are explicit;
+- [ ] invariants are documented;
+- [ ] invalid/stale/error cases are handled;
+- [ ] no known structural TODO is being hidden as a final implementation;
+- [ ] no duplicate authoritative state exists across layers;
+- [ ] public APIs are reviewed for future-phase compatibility;
+- [ ] hot-path allocation/performance behavior has been inspected;
+- [ ] representative tests exist;
+- [ ] previous-phase regression checks pass;
+- [ ] diagnostics are sufficient to debug failures;
+- [ ] documentation matches the actual code;
+- [ ] an implementation report records what was really built;
+- [ ] a completion report records final validation and deferred scope;
+- [ ] deliberately deferred work is assigned to a later roadmap phase rather than left ambiguous.
+
+## 5. Temporary scaffolding policy
+
+Validation scaffolding is allowed when a phase needs it, but it must be clearly identified.
+
+Examples:
+
+- procedural validation geometry;
+- temporary test scenes;
+- synthetic benchmark entities;
+- debug-only controls.
+
+Scaffolding must not quietly become a permanent production API.
+
+Every completion report must state whether temporary scaffolding remains and which later phase replaces it.
+
+## 6. Refactoring policy
+
+Refactoring is required when the current architecture cannot support the professional implementation of the current phase.
+
+However:
+
+- do not refactor unrelated systems for aesthetics alone;
+- preserve validated behavior;
+- keep migrations reviewable;
+- add regression coverage before risky replacement work;
+- document contract changes.
+
+“Do not touch working code” is not a valid reason to preserve a known structural defect.
+
+“Rewrite everything” is not a valid substitute for a bounded migration plan.
+
+## 7. Definition of professional-grade for Nocturne
+
+For this project, professional-grade means:
+
+- suitable as a durable base for a commercial product;
+- understandable and maintainable by an experienced engineer who did not write it;
+- robust under invalid inputs and lifecycle edges expected for the subsystem;
+- testable without manual guesswork;
+- diagnosable when it fails;
+- measurable when performance matters;
+- compatible with the roadmap without requiring predictable near-term rewrites;
+- intentionally scoped rather than superficially broad.
+
+It does **not** mean:
+
+- maximum abstraction;
+- maximum genericity;
+- implementing every known engine technique;
+- adding concurrency everywhere;
+- adding third-party frameworks by default;
+- solving future phases prematurely.
+
+## 8. Future-phase contract
+
+Every Phase 15+ handoff must explicitly reference this document.
+
+If a future phase proposes a shortcut that conflicts with this standard, the phase plan must either:
+
+1. reject the shortcut; or
+2. document a deliberate exception, its impact, and the concrete later migration point.
+
+Untracked “we will fix it later” architecture is not accepted.
+
+---
+
+## Release Process
+
+Document ID: noc.development.release-process
+Canonical source: Docs/Development/Release Process.md
+Web route: /docs/development/release-process/
+
+---
+id: "noc.development.release-process"
+title: "Release Process"
+doc_type: "standard"
+canonical: true
+status: "active"
+subsystem: "Development"
+phase_introduced: 16
+description: "Canonical release packaging, artifact validation, manifest promotion and Downloads publication contract."
+source_path: "Docs/Development/Release Process.md"
+source_files: [".github/workflows/release-package.yml",".github/scripts/package-release.ps1","Schemas/release.schema.json","Website/src/data/releases.json","Website/src/data/release-schema.mjs","Website/src/pages/download.astro"]
+source_docs: ["Docs/Production Engineering Standard.md","Docs/Web/Nocturne Website — Design & Technical Specification.md"]
+book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §1.7 Tools and the Asset Pipeline"]
+aliases: ["Release Process","Downloads Pipeline","Release Packaging"]
+deprecated_aliases: []
+---
+> **Canonical AI context.** This export represents current Nocturne documentation. Canonical Architecture/System/Development contracts outrank historical Phase documents for current behavior. Inspect the referenced source files when exact implementation behavior matters.
+
+# Release Process
+
+## Purpose
+
+The Nocturne release process defines when a build is allowed to become a public download.
+
+A Visual Studio configuration is **not** evidence of public support.
+
+A target becomes downloadable only after the pipeline has:
+
+1. built the Ship configuration;
+2. assembled the release bundle;
+3. measured exact byte size;
+4. generated a SHA-256 checksum;
+5. published the archive;
+6. promoted a validated release record into the website manifest.
+
+This keeps the Downloads page aligned with actual artifacts rather than theoretical build configurations.
+
+## Current validation state
+
+Web 5 has validated the complete Ship build/package gate for:
+
+- Windows `x86_64`;
+- Windows `x86`.
+
+Validation run:
+
+`35468447675`
+
+Both matrix jobs completed:
+
+```text
+Build Ship outputs         SUCCESS
+Package release candidate  SUCCESS
+Upload packaged candidate  SUCCESS
+```
+
+Candidate artifact names:
+
+```text
+nocturne-release-0.0.0-pr2-windows-x86_64
+nocturne-release-0.0.0-pr2-windows-x86
+```
+
+Candidate package evidence:
+
+| Architecture | Archive | Bytes | SHA-256 |
+|---|---|---:|---|
+| `x86_64` | `nocturne-engine-0.0.0-pr2-windows-x86_64.zip` | 2,762,266 | `c3812e289db7e3fb78f050256ac4a26c3ca8f06628855a16b1dc7402811bfdd2` |
+| `x86` | `nocturne-engine-0.0.0-pr2-windows-x86.zip` | 2,555,997 | `77b123a464965002f4583ee7435f8bc092dc9d4a29ae74b061d97a3eef979869` |
+
+These are ephemeral PR validation artifacts, not public releases.
+
+## Current public state
+
+There is currently no public Nocturne Engine release in the website manifest.
+
+```text
+Website/src/data/releases.json
+
+schemaVersion: 1
+latest: null
+releases: []
+```
+
+Therefore `/download` exposes no download action.
+
+This empty state is intentional.
+
+## Build candidate pipeline
+
+Release candidates are built by:
+
+`.github/workflows/release-package.yml`
+
+The workflow can run from:
+
+- pull requests that change release-relevant build/package files;
+- manual `workflow_dispatch`;
+- semantic version tags beginning with `v`.
+
+The architecture matrix is a **validation request**, not a public-support declaration.
+
+An architecture is build/package-capable only if its matrix job completes all build and packaging steps successfully.
+
+Web 5 currently proves this for `x86_64` and `x86`.
+
+Public Downloads still require a real tagged publication plus reviewed manifest promotion.
+
+## Ship build
+
+The release gate builds:
+
+- `NocturneEngine`;
+- `NocturneHost`;
+- `NocturneEditor`.
+
+The required configuration is:
+
+`Ship`
+
+The current Windows build system uses MSBuild/Visual Studio project files.
+
+**Design choice (not directly from the book):** release packaging currently overrides the CI toolset to the validated runner toolset while preserving the repository's project configuration semantics.
+
+## Release bundle
+
+The packager is:
+
+`.github/scripts/package-release.ps1`
+
+Each architecture bundle contains the current release outputs needed by the existing Ship runtime contract:
+
+```text
+bin/
+  NocturneEditor.exe
+  NocturneHost.exe
+
+lib/
+  NocturneEngine.lib
+
+Data/
+  ...
+
+release-info.json
+```
+
+The exact bundle layout is **Design choice (not directly from the book)**.
+
+It may evolve when Nocturne gains a dedicated SDK/install layout.
+
+## Artifact identity
+
+Current file naming:
+
+```text
+nocturne-engine-<version>-windows-<architecture>.zip
+```
+
+Examples of architecture identifiers accepted by the release metadata schema:
+
+```text
+x86_64
+x86
+arm64
+```
+
+Schema acceptance does **not** mean those architectures are currently supported.
+
+Only published manifest entries are public Downloads truth.
+
+## Checksums
+
+Every packaged ZIP receives:
+
+- exact byte size;
+- SHA-256 digest;
+- a sibling `.sha256` file.
+
+The checksum embedded in release metadata must match the published archive.
+
+## Release metadata
+
+Machine-readable contract:
+
+`Schemas/release.schema.json`
+
+Executable website validation:
+
+`Website/src/data/release-schema.mjs`
+
+Validation command:
+
+```powershell
+cd Website
+npm run validate:releases
+```
+
+Website development and production builds run this validation before Astro starts.
+
+An invalid manifest fails the web build.
+
+## Release manifest
+
+Authored website data:
+
+`Website/src/data/releases.json`
+
+The manifest is ordered newest-first.
+
+The `latest` value must be:
+
+- `null` when there are no releases; or
+- the version of the first release entry.
+
+A release includes:
+
+- semantic version;
+- channel;
+- publication date;
+- release-notes URL;
+- source commit SHA;
+- one or more published build records.
+
+A build record includes:
+
+- platform;
+- architecture;
+- configuration;
+- status;
+- archive filename;
+- exact byte count;
+- SHA-256;
+- HTTPS download URL.
+
+## Channels
+
+Current channel vocabulary:
+
+| Channel | Meaning |
+|---|---|
+| `development` | development-facing release |
+| `preview` | preview/testing release intended for broader evaluation |
+| `stable` | release explicitly promoted as stable |
+
+Channel labels are website/release policy.
+
+**Design choice (not directly from the book).**
+
+## Artifact states
+
+Current build-record states:
+
+| Status | UI meaning |
+|---|---|
+| `supported` | downloadable validated artifact |
+| `experimental` | downloadable but explicitly experimental |
+| `withdrawn` | historical record; no active download action |
+
+A failed CI candidate is never added to the public manifest.
+
+## Tagged release publication
+
+When the release packaging workflow is triggered by a `v<version>` tag and all architecture jobs pass, the publish job creates a GitHub Release and attaches:
+
+- packaged ZIP files;
+- SHA-256 files;
+- per-architecture release-record JSON files.
+
+The website manifest is deliberately a separate reviewed source.
+
+A GitHub Release existing by itself does not cause the website to claim support automatically.
+
+Promotion tool:
+
+```powershell
+cd Website
+npm run promote:release -- <release-record-x86_64.json> [additional-records...]
+npm run validate:releases
+npm run build
+```
+
+`Website/scripts/promote-release.mjs` verifies that all supplied records agree on version, channel, date, release notes and source commit. It rejects duplicate architecture tuples and refuses to overwrite an existing published version.
+
+**Design choice (not directly from the book):** manifest promotion remains an explicit source-controlled action so a malformed/partial publication cannot silently change the public support matrix.
+
+## Website publication
+
+The Downloads page consumes only:
+
+`Website/src/data/releases.json`
+
+It does not infer support from:
+
+- project configurations;
+- solution platform names;
+- source code architecture branches;
+- untagged CI artifacts;
+- failed package jobs.
+
+The page displays, when available:
+
+- version;
+- channel;
+- date;
+- source commit;
+- platform;
+- architecture;
+- Ship configuration;
+- file size;
+- SHA-256;
+- release notes;
+- download link.
+
+## Architecture support rule
+
+A target passes through three distinct states:
+
+```text
+Configured
+    |
+    v
+CI build-capable
+    |
+    v
+Published artifact
+    |
+    v
+Downloads page
+```
+
+Do not collapse these states into one "supported" label.
+
+This distinction is central to Web 5.
+
+## Build-configuration defects discovered by Web 5
+
+The first Ship validation runs exposed incomplete project configuration rather than runtime-feature defects.
+
+The release gate found and repaired:
+
+- missing C++20 language-standard / `NOC_SHIP` settings in the engine Ship configuration;
+- incomplete Ship settings in `NocturneHost`;
+- missing Unicode character-set configuration in the engine Ship configurations;
+- engine Ship targets defaulting to executable output instead of `StaticLibrary`.
+
+These were corrected in the existing Visual Studio project configuration so the Ship contract now matches the engine's actual C++20/static-library architecture.
+
+**Design choice (not directly from the book):** Web 5 treats a configuration that exists in the solution but cannot complete the release gate as not release-capable.
+
+## Failure handling
+
+Release publication stops when:
+
+- Ship compilation fails;
+- a required output is missing;
+- packaging fails;
+- the archive cannot be hashed;
+- release metadata is malformed;
+- the website manifest violates its schema.
+
+A release target that fails these gates is not represented as downloadable.
+
+## Book grounding
+
+Gregory §1.7 grounds the importance of reliable tooling and production pipelines around engine development.
+
+The exact GitHub Actions workflow, semantic-version policy, ZIP layout, checksum contract, release schema and manifest-promotion process are **Design choice (not directly from the book)**.
+
+## Related documentation
+
+- [Production Engineering Standard](/docs/development/production-engineering-standard/)
+- [Website Specification](/docs/development/website-specification/)
+- [Downloads](/download)
+
+---
+
+## Documentation Model
+
+Document ID: noc.documentation.model
+Canonical source: Docs/Development/Documentation Model.md
+Web route: /docs/development/documentation-model/
+
+---
+id: "noc.documentation.model"
+title: "Documentation Model"
+doc_type: "standard"
+canonical: true
+status: "active"
+subsystem: "Documentation"
+phase_introduced: 16
+description: "Canonical source-of-truth, metadata, precedence and generated-documentation rules for Nocturne technical documentation."
+source_path: "Docs/Development/Documentation Model.md"
+source_files: ["Website/scripts/prepare.mjs","Website/src/content.config.ts","Website/astro.config.mjs"]
+source_docs: ["Docs/nocturne_engine_architecture.md","Docs/Production Engineering Standard.md","Docs/Web/Nocturne Website — Design & Technical Specification.md"]
+book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §1.7 Tools and the Asset Pipeline"]
+aliases: ["Documentation Model","Canonical Documentation","Docs Model"]
+deprecated_aliases: []
+---
+> **Canonical AI context.** This export represents current Nocturne documentation. Canonical Architecture/System/Development contracts outrank historical Phase documents for current behavior. Inspect the referenced source files when exact implementation behavior matters.
+
+# Documentation Model
+
+## Purpose
+
+Nocturne documentation must answer two different questions without mixing them:
+
+1. **How does the engine work now?**
+2. **How was the engine implemented over time?**
+
+Canonical documentation answers the first question.
+
+Phase/completion/history documents answer the second.
+
+The distinction is required for human readers, future maintainers and AI agents.
+
+## Source precedence
+
+When sources disagree, use this order for current behavior:
+
+1. current canonical Architecture / Systems / Development contracts;
+2. current source code for exact implementation behavior;
+3. completion/implementation reports as evidence of what a phase delivered;
+4. historical Phase documents for chronology and earlier design context.
+
+Roadmap text describes assigned scope. It does not prove that a future feature is already implemented.
+
+A historical Phase document must never silently override a later canonical system page.
+
+## Authored source
+
+Repository-root `Docs/` remains the authored Markdown source.
+
+The Starlight tree under `Website/src/content/docs/` is generated or website-shell content.
+
+Generated synchronized documents are not edited by hand.
+
+```text
+Docs/*.md
+   |
+   v
+Website/scripts/prepare.mjs
+   |
+   +--> validated Starlight content
+   +--> canonical/history metadata
+   +--> static search index
+```
+
+## Canonical directories
+
+Current canonical authored areas are:
+
+```text
+Docs/Architecture/
+Docs/Systems/
+Docs/Development/
+```
+
+The existing root `Docs/nocturne_engine_architecture.md` remains the top-level architecture contract and is mapped to the canonical Architecture route.
+
+Web implementation reports and Phase documents are historical records even when they are recent.
+
+## Metadata contract
+
+Canonical documents use flat source frontmatter.
+
+Required canonical identity fields:
+
+| Field | Meaning |
+|---|---|
+| `id` | stable semantic identifier, independent of filename |
+| `doc_type` | architecture, system, standard, web-spec, etc. |
+| `canonical` | whether the page is current authority |
+| `status` | implemented, active, planned, foundation, historical |
+| `description` | concise purpose for UI/search |
+| `source_files` | current implementation files relevant to the contract |
+| `source_docs` | supporting authored documentation |
+| `book_grounding` | book sections that ground concepts/terminology |
+
+System pages additionally declare:
+
+- `subsystem`;
+- `phase_introduced` where useful.
+
+Stable IDs use the `noc.*` namespace.
+
+Examples:
+
+```text
+noc.runtime
+noc.resources
+noc.render
+noc.world
+noc.editor
+noc.documentation.model
+```
+
+Renaming a Markdown file must not change its semantic ID.
+
+## Frontmatter shape
+
+The source synchronizer intentionally accepts a constrained flat frontmatter format.
+
+Arrays are authored inline:
+
+```yaml
+---
+id: "noc.resources"
+doc_type: "system"
+canonical: true
+status: "implemented"
+subsystem: "Resources"
+phase_introduced: 4
+source_files: ["Engine/Resources/ResourceManager.h"]
+source_docs: ["Docs/Phase 4 — Resource Manager.md"]
+book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §7.2"]
+---
+```
+
+This constrained form keeps synchronization deterministic and avoids adding a second general-purpose YAML transformation layer merely for generated copies.
+
+**Design choice (not directly from the book):** the exact metadata schema and flat-frontmatter parser are Nocturne documentation-tooling policy.
+
+## Historical documents
+
+Documents not explicitly mapped to canonical Architecture/System/Development surfaces are synchronized into Development History.
+
+Generated historical pages receive:
+
+```text
+doc_type = historical-phase
+canonical = false
+status = historical
+```
+
+Their description and page title treatment identify them as history.
+
+They remain searchable because implementation history is still useful.
+
+## Validation
+
+The website content collection extends Starlight's schema with Nocturne metadata.
+
+The preparation step also validates:
+
+- canonical IDs are present;
+- canonical IDs are unique;
+- canonical pages have a recognized document type/status;
+- system pages declare a subsystem;
+- generated target paths do not collide;
+- source frontmatter uses the supported flat syntax.
+
+Validation failures stop the website build.
+
+## Search policy
+
+Pagefind indexes current and historical documentation.
+
+Canonical pages are the preferred current reference because their titles, descriptions and page metadata clearly identify them as current authority.
+
+Historical pages remain available for chronology and debugging regressions.
+
+A later AI knowledge milestone may create a canonical-only aggregate for machine consumption.
+
+## Book grounding
+
+Gregory §1.7 emphasizes that engine/tool pipelines need reliable processes and data flow.
+
+The documentation precedence model, stable semantic IDs, Starlight generation and AI-oriented metadata are **Design choice (not directly from the book)**.
+
+## Related documentation
+
+- [Architecture Overview](/docs/architecture/overview/)
+- [Production Engineering Standard](/docs/development/production-engineering-standard/)
+- [Development History](/docs/history/)
+
+---
+
+## Editor
+
+Document ID: noc.editor
+Canonical source: Docs/Systems/Editor.md
+Web route: /docs/systems/editor/
+
+---
+id: "noc.editor"
+title: "Editor"
+doc_type: "system"
+canonical: true
+status: "implemented"
+subsystem: "Editor"
+phase_introduced: 13
+description: "Canonical Nocturne Editor shell, runtime boundary, viewport, selection and authoring-tool contract."
+source_path: "Docs/Systems/Editor.md"
+source_files: ["Apps/NocturneEditor/EditorShellV3.h","Apps/NocturneEditor/EditorShellV3.cpp","Apps/NocturneEditor/EditorTheme.h","Apps/NocturneEditor/EditorTheme.cpp","Apps/NocturneEditor/EditorViewportController.h","Apps/NocturneEditor/EditorViewportController.cpp"]
+source_docs: ["Docs/nocturne_engine_architecture.md","Docs/Phase 13 — Completion Report.md","Docs/Phase 14 — Completion Report.md","Docs/Phase 15 — Completion Report.md"]
+book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §15.4 The Game World Editor","Jason Gregory — Game Engine Architecture (3rd ed.), §15.4.1 Typical Features of a Game World Editor"]
+aliases: ["Editor","Nocturne Editor","EditorShellV3"]
+deprecated_aliases: ["EditorShell","EditorControls"]
+---
+> **Canonical AI context.** This export represents current Nocturne documentation. Canonical Architecture/System/Development contracts outrank historical Phase documents for current behavior. Inspect the referenced source files when exact implementation behavior matters.
+
+# Editor
+
+## Purpose
+
+Nocturne Editor is an authoring/development tool built **on top of the same runtime engine used by the game**.
+
+It is not a second engine and it does not own a competing world model or frame loop.
+
+## Runtime boundary
+
+The locked editor/runtime rule is:
+
+```text
+Editor UI / authoring state
+          |
+          v
+runtime World + engine services
+          |
+          v
+renderer / resources / input / jobs
+```
+
+The editor may embed and drive an engine instance, inspect runtime data and submit authoring operations, but the runtime retains system orchestration.
+
+## Active shell
+
+The current native Windows shell is:
+
+`EditorShellV3`
+
+It is the visual and structural baseline established by Phase 13 and retained through later phases.
+
+The historical `EditorShell` / `EditorControls` path is not the current design authority.
+
+Current shell areas include:
+
+- menu and toolbar;
+- Scene Hierarchy;
+- central Viewport;
+- Inspector surface;
+- Content Browser;
+- Console;
+- Build / Play surface;
+- status bar.
+
+The Nocturne website derives its visual token baseline from this shell, but the website remains a separate tooling product and never becomes an editor dependency.
+
+## Viewport controller
+
+`EditorViewportController` owns editor-only viewport behavior:
+
+- editor camera/input integration;
+- viewport picking;
+- selection synchronization;
+- transform gizmo interaction;
+- debug overlay;
+- current deterministic validation scene bridge.
+
+The controller does not own the engine frame loop.
+
+The runtime's render-target attachment seam is reused to bind rendering to the editor child viewport.
+
+## Single source of truth
+
+Phase 15 removed authoritative editor mirrors for transform/render/name state.
+
+Current authority is:
+
+| Data | Authority |
+|---|---|
+| transform | `TransformComponent` |
+| mesh / bounds | `RenderableComponent` |
+| name | `NameComponent` |
+| camera lens | `CameraComponent` |
+| selection / hover / drag-start | editor interaction state |
+
+Gizmo operations write changes through `World`.
+
+Hierarchy and debug presentation read runtime components.
+
+## Editor visual system
+
+The current editor visual vocabulary is centralized around:
+
+- `EditorTheme`;
+- `EditorShellV3`;
+- `EditorIconRenderer`;
+- vendored Tabler SVG icons.
+
+The native UI uses a dark navy palette, Segoe UI Variable typography, Cascadia Mono for console text and Tabler's outline icon language.
+
+**Design choice (not directly from the book):** these are Nocturne product-design decisions.
+
+## Current authoring boundary
+
+The current implemented baseline includes selection and transform-gizmo interaction against the runtime world.
+
+Full production scene authoring remains the responsibility of the active scene-editing/reflection work and later persistence phases.
+
+Do not interpret validation geometry or editor scaffolding as a serialized scene-authoring model.
+
+## Invariants
+
+- Editor does not own a second runtime loop.
+- Editor does not own duplicate authoritative world/component state.
+- Runtime/editor communication uses narrow engine/world seams.
+- Renderer does not receive editor/Win32 concepts merely to render world data.
+- UI-only selection/hover/drag state may remain editor-owned.
+- Historical editor shells are not the baseline for new UI work.
+
+## Book grounding
+
+Gregory's world-editor discussion identifies common editor responsibilities including world visualization, navigation, selection, property editing and object-placement aids, and describes editors that integrate with or communicate with the actual runtime engine.
+
+Nocturne's exact native Win32 shell, child-HWND renderer integration, product theme and editor/runtime bridge are **Design choice (not directly from the book)**.
+
+## Current implementation sources
+
+- `Apps/NocturneEditor/EditorShellV3.h/.cpp`
+- `Apps/NocturneEditor/EditorTheme.h/.cpp`
+- `Apps/NocturneEditor/EditorIconRenderer.h/.cpp`
+- `Apps/NocturneEditor/EditorViewportController.h/.cpp`
+- `Apps/NocturneEditor/main.cpp`
+
+## Related documentation
+
+- [World & ECS](/docs/systems/world-ecs/)
+- [Rendering](/docs/systems/rendering/)
+- [Runtime](/docs/systems/runtime/)
+- [Website specification](/docs/development/website-specification/)
+
+---
+
+## Rendering
+
+Document ID: noc.render
+Canonical source: Docs/Systems/Rendering.md
+Web route: /docs/systems/rendering/
+
+---
+id: "noc.render"
+title: "Rendering"
+doc_type: "system"
+canonical: true
+status: "implemented"
+subsystem: "Rendering"
+phase_introduced: 8
+description: "Canonical renderer ownership, frame handoff, DirectX 12 backend and editor render-target integration contract."
+source_path: "Docs/Systems/Rendering.md"
+source_files: ["Engine/Render/RenderSystem.h","Engine/Render/RenderSystem.cpp","Engine/Render/RenderQueue.h","Engine/Render/DX12/Dx12Renderer.h","Engine/Render/DX12/Dx12SwapChain.h"]
+source_docs: ["Docs/nocturne_engine_architecture.md","Docs/Phase 8 — Rendering Bootstrap (DirectX 12).md","Docs/Phase 9 — Rendering Engine Foundation.md","Docs/Phase 9.5 — GPU Resource Foundation (DX12 Memory, Descriptors, Asset-Backed GPU Resources).md","Docs/Phase 14 — Completion Report.md"]
+book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §11.2 The Rendering Pipeline","Jason Gregory — Game Engine Architecture (3rd ed.), §11.2.1 Overview of the Rendering Pipeline"]
+aliases: ["Rendering","Renderer","Render System","DirectX 12 Renderer"]
+deprecated_aliases: []
+---
+> **Canonical AI context.** This export represents current Nocturne documentation. Canonical Architecture/System/Development contracts outrank historical Phase documents for current behavior. Inspect the referenced source files when exact implementation behavior matters.
+
+# Rendering
+
+## Purpose
+
+The Rendering layer owns GPU interaction and presentation. It consumes frame data produced by runtime/world systems and turns that data into rendered output.
+
+Rendering does not own gameplay state.
+
+## Runtime-to-render boundary
+
+The current high-level seam is `RenderSystem`:
+
+```text
+Init(...)
+AttachToWindow(...)
+ResizeAttachedWindow(...)
+SetResourceManager(...)
+BeginFrame()
+SetFrameRenderQueue(...)
+EndFramePresent()
+Shutdown()
+```
+
+`SetFrameRenderQueue()` explicitly takes a frame queue **without taking ownership**.
+
+The authoritative world produces renderable frame data; the renderer consumes it.
+
+```text
+World / ECS
+   |
+   | BuildRenderQueue(frameArena, viewport)
+   v
+RenderQueue
+   |
+   v
+RenderSystem
+   |
+   v
+DX12 backend
+   |
+   v
+swap chain / target
+```
+
+## Render extraction
+
+`World::BuildRenderQueue()` is the runtime-side extraction boundary.
+
+Phase 15 established that render extraction:
+
+- reads ECS state;
+- updates required derived transform/bounds state;
+- writes renderer-facing POD frame data into the frame arena;
+- does not expose mutable ECS component storage to the renderer;
+- uses deterministic entity-index ordering.
+
+This keeps simulation/authoring authority outside the renderer.
+
+## DirectX 12 backend
+
+Nocturne currently targets Direct3D 12 on Windows.
+
+**Design choice (not directly from the book):** Direct3D 12 is the selected graphics API/backend for Nocturne. The books describe rendering architecture and graphics concepts but do not mandate this project-level API choice.
+
+The DX12 layer owns concrete device, swap-chain, descriptor, pipeline-state and GPU-resource mechanics.
+
+Higher layers should not need to contain gameplay decisions just because the backend is DirectX 12.
+
+## Rendering pipeline grounding
+
+Gregory describes the rendering pipeline as an ordered set of stages, from offline tools and asset conditioning through CPU application submission and GPU geometry/rasterization.
+
+Nocturne's current boundary follows that separation:
+
+- tools/import produce engine-ready content;
+- Resources loads assets;
+- World extracts potentially renderable instances;
+- Render consumes the frame queue;
+- DX12 performs GPU submission/presentation.
+
+## Editor viewport
+
+The editor attaches rendering to a dedicated child window through the same runtime/render attachment seam.
+
+Phase 14 established resize-safe editor render-target handling, camera navigation, picking, selection, gizmos, depth-tested validation geometry, procedural grid/sky and debug selection.
+
+The editor does not own a second rendering loop.
+
+## Current debug channel
+
+`Engine` exposes a deliberately small debug-selection channel that sends local bounds plus world transform to rendering without exposing editor/Win32 types inside the renderer.
+
+**Design choice (not directly from the book):** this is development/editor scaffolding, not a general gameplay selection API.
+
+## Invariants
+
+- Renderer does not own authoritative world/gameplay state.
+- Frame render data is extracted across an explicit boundary.
+- `RenderSystem` does not take ownership of the submitted `RenderQueue`.
+- GPU resource lifetime must respect in-flight usage.
+- Resize operations update render targets through the renderer's explicit resize path.
+- Editor rendering reuses runtime/render mechanisms.
+
+## Non-responsibilities
+
+Rendering does not own:
+
+- entity/component authority;
+- editor selection semantics;
+- asset source authoring;
+- gameplay logic;
+- scene serialization.
+
+## Book grounding
+
+Primary grounding:
+
+- Jason Gregory — *Game Engine Architecture, 3rd Edition*, §11.2, for rendering as a staged pipeline.
+- Jason Gregory — *Game Engine Architecture, 3rd Edition*, §11.2.1, for the tools → asset-conditioning → application → GPU pipeline split.
+
+Nocturne's DX12 backend, `RenderQueue` shape, frame-arena extraction and child-HWND editor integration are **Design choice (not directly from the book)**.
+
+## Current implementation sources
+
+- `Engine/Render/RenderSystem.h/.cpp`
+- `Engine/Render/RenderQueue.h`
+- `Engine/Render/DX12/`
+- `Engine/Runtime/World.h/.cpp`
+- `Apps/NocturneEditor/EditorViewportController.h/.cpp`
+
+## Related documentation
+
+- [Runtime](/docs/systems/runtime/)
+- [Resources](/docs/systems/resources/)
+- [World & ECS](/docs/systems/world-ecs/)
+- [Editor](/docs/systems/editor/)
+
+---
+
+## Resources
+
+Document ID: noc.resources
+Canonical source: Docs/Systems/Resources.md
+Web route: /docs/systems/resources/
+
+---
+id: "noc.resources"
+title: "Resources"
+doc_type: "system"
+canonical: true
+status: "implemented"
+subsystem: "Resources"
+phase_introduced: 4
+description: "Canonical virtual file system, resource loading, typed resource and runtime asset-lifetime contract."
+source_path: "Docs/Systems/Resources.md"
+source_files: ["Engine/Resources/VirtualFileSystem.h","Engine/Resources/ResourceManager.h","Engine/Resources/ResourceManager.cpp","Engine/Resources/ResourceHandle.h","Engine/Resources/Typed/ResourceLoaderRegistry.h"]
+source_docs: ["Docs/nocturne_engine_architecture.md","Docs/Phase 4 — Resource Manager.md","Docs/Phase 5 — Typed Resources & Loader Registry.md","Docs/Phase 11 — Asset Import Pipeline.md"]
+book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §7.2 The Resource Manager","Jason Gregory — Game Engine Architecture (3rd ed.), §7.2.2 Runtime Resource Management"]
+aliases: ["Resources","Resource Manager","VFS","Virtual File System"]
+deprecated_aliases: []
+---
+> **Canonical AI context.** This export represents current Nocturne documentation. Canonical Architecture/System/Development contracts outrank historical Phase documents for current behavior. Inspect the referenced source files when exact implementation behavior matters.
+
+# Resources
+
+## Purpose
+
+The Resources layer provides one runtime path for locating, requesting, loading and accessing engine assets.
+
+The system separates **where bytes come from** from **what a resource means**.
+
+## Architecture
+
+```text
+virtual path
+    |
+    v
+VirtualFileSystem
+    |
+    v
+ResourceManager
+    |
+    +--> binary resource
+    |
+    +--> typed loader registry
+             |
+             +--> Text
+             +--> Mesh
+             +--> Texture
+             +--> Material
+```
+
+The application supplies physical content layout through configuration. The runtime does not guess where project content lives.
+
+## Virtual File System
+
+The VFS is the runtime mechanism for mapping the engine's virtual namespace onto mounted storage.
+
+Current mount implementations include:
+
+- loose-file mounts;
+- archive-file mounts.
+
+The runtime architecture permits development content to come from loose files and packaged content to come from archives while resource users continue to address assets through virtual paths.
+
+**Design choice (not directly from the book):** the application defines the physical content roots and mount policy; the engine mounts exactly the paths it is given.
+
+## Resource manager
+
+`ResourceManager` is initialized with the owning `Engine` and `VirtualFileSystem`.
+
+Current public request/state operations include:
+
+```text
+RequestBinary(...)
+IsReady(...)
+HasFailed(...)
+GetBytes(...)
+GetSize(...)
+GetError(...)
+WaitUntilReady(...)
+Update()
+```
+
+Typed requests currently include:
+
+```text
+RequestText(...)
+RequestMesh(...)
+RequestTexture(...)
+RequestMaterial(...)
+```
+
+Typed resources are resolved through `ResourceLoaderRegistry`.
+
+## Asynchronous loading
+
+The resource manager owns load-job submission internally and exposes readiness/failure state instead of requiring all callers to perform synchronous file I/O.
+
+Gregory identifies streaming/asynchronous loading as a normal runtime resource-manager responsibility and describes the resource manager as responsible for loading, unloading, lifetime and composite-resource relationships.
+
+Nocturne's exact job integration is **Design choice (not directly from the book)**.
+
+## Tool/runtime boundary
+
+The runtime consumes engine-ready resources.
+
+Offline authoring/import/cook/package work belongs to tools and the asset pipeline.
+
+The runtime is responsible for reading mounted content; tools are responsible for producing packaged/archive content.
+
+This prevents asset-authoring policy from leaking into runtime resource access.
+
+## Invariants
+
+- Resource access begins from the virtual namespace, not ad-hoc absolute paths in gameplay.
+- The application owns content-layout policy; the engine owns VFS/resource mechanisms.
+- Resource handles are validated before access.
+- A failed resource exposes a diagnostic state instead of becoming silently valid.
+- Typed loaders are registered through the resource-loader registry.
+- Rendering may consume loaded resources, but Resources does not contain gameplay logic.
+
+## Non-responsibilities
+
+Resources does not own:
+
+- editor Content Browser presentation;
+- GPU draw submission;
+- game-specific asset semantics;
+- scene serialization;
+- source-asset DCC authoring.
+
+## Book grounding
+
+Primary grounding:
+
+- Jason Gregory — *Game Engine Architecture, 3rd Edition*, §7.2, for the resource-manager/tool-chain split.
+- Jason Gregory — *Game Engine Architecture, 3rd Edition*, §7.2.2, for runtime loading, lifetime, single-instance/composite-resource and streaming responsibilities.
+
+Nocturne's VFS namespace, handle formats, typed-loader API and application-owned mount policy are **Design choice (not directly from the book)**.
+
+## Current implementation sources
+
+- `Engine/Resources/VirtualFileSystem.h/.cpp`
+- `Engine/Resources/IFileMount.h`
+- `Engine/Resources/LooseFileMount.h/.cpp`
+- `Engine/Resources/ArchiveFileMount.h/.cpp`
+- `Engine/Resources/ResourceManager.h/.cpp`
+- `Engine/Resources/ResourceHandle.h`
+- `Engine/Resources/Typed/`
+- `Engine/Assets/AssetImportPipeline.*`
+
+## Related documentation
+
+- [Runtime](/docs/systems/runtime/)
+- [Rendering](/docs/systems/rendering/)
+- [Architecture Overview](/docs/architecture/overview/)
+
+---
+
+## Runtime
+
+Document ID: noc.runtime
+Canonical source: Docs/Systems/Runtime.md
+Web route: /docs/systems/runtime/
+
+---
+id: "noc.runtime"
+title: "Runtime"
+doc_type: "system"
+canonical: true
+status: "implemented"
+subsystem: "Runtime"
+phase_introduced: 1
+description: "Canonical runtime ownership, lifecycle, frame execution, configuration and subsystem orchestration contract."
+source_path: "Docs/Systems/Runtime.md"
+source_files: ["Engine/Runtime/Engine.h","Engine/Runtime/Engine.cpp","Engine/Runtime/MainLoop.h","Engine/Runtime/MainLoop.cpp","Engine/Runtime/EngineConfig.h"]
+source_docs: ["Docs/nocturne_engine_architecture.md","Docs/Phase 6 — Job System & Async Infrastructure.md","Docs/Production Engineering Standard.md"]
+book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §8.2 The Game Loop","Jason Gregory — Game Engine Architecture (3rd ed.), §8.6 Multiprocessor Game Loops"]
+aliases: ["Runtime","Engine Runtime","Main Loop"]
+deprecated_aliases: []
+---
+> **Canonical AI context.** This export represents current Nocturne documentation. Canonical Architecture/System/Development contracts outrank historical Phase documents for current behavior. Inspect the referenced source files when exact implementation behavior matters.
+
+# Runtime
+
+## Purpose
+
+The Runtime layer coordinates Nocturne Engine execution. It owns the engine-level lifecycle, the master frame loop, boot-time configuration consumption, subsystem ordering and the frame boundaries through which the other engine systems are serviced.
+
+The runtime is an **orchestrator**, not a container for gameplay policy.
+
+## Authoritative owner
+
+`noc::Engine` owns the current engine services that participate in the runtime lifecycle:
+
+- persistent allocator and frame `LinearArena`;
+- `VirtualFileSystem`;
+- `JobSystem`;
+- `ResourceManager`;
+- `AssetImportPipeline`;
+- `InputSystem`;
+- `RenderSystem`;
+- `World`;
+- engine configuration and render-target attachment state.
+
+The application may configure the engine before initialization, but it does not replace the runtime's lifecycle ownership.
+
+## Lifecycle
+
+The public runtime seam includes:
+
+```text
+Engine::ConfigMutable()
+Engine::Init()
+Engine::Run()
+Engine::TickOnce()
+Engine::BeginFrame()
+Engine::Tick()
+Engine::EndFrame()
+Engine::Shutdown()
+```
+
+The architectural contract is deterministic initialization and shutdown ordering.
+
+Boot configuration is mutable before `Engine::Init()`. Once initialization begins, configuration is frozen.
+
+**Design choice (not directly from the book):** Nocturne exposes an engine-owned `EngineConfig` mechanism while the application supplies project policy such as content roots and enabled behavior.
+
+## Frame execution
+
+Gregory describes the game loop as the master loop that periodically services engine subsystems, noting that different systems can require different update rates.
+
+Nocturne follows that model:
+
+```text
+OS / window events
+      |
+      v
+input snapshot
+      |
+      v
+runtime/world servicing
+      |
+      v
+render extraction
+      |
+      v
+render stage / present
+```
+
+Rendering is a stage inside the runtime frame. It does not own a second master loop.
+
+The runtime architecture allows systems to use different cadences where required. Nocturne does not introduce a separate monolithic "scheduler subsystem" merely to express multi-rate updates.
+
+**Design choice (not directly from the book):** explicit runtime ordering remains preferred over adding generic scheduling complexity without a concrete requirement.
+
+## Job system boundary
+
+The `JobSystem` is owned by `Engine` and is available to systems that benefit from asynchronous or parallel work.
+
+It does not own overall engine execution.
+
+Gregory's multiprocessor game-loop discussion motivates decomposing frame work into task- or data-parallel jobs, but the runtime remains responsible for when those jobs are created, synchronized and consumed.
+
+## Window and render attachment
+
+The runtime owns the seam used to attach rendering to a native window:
+
+```text
+AttachWindow(...)
+AttachRenderWindow(...)
+ResizeRenderWindow(...)
+CreateAndAttachMainWindow(...)
+```
+
+The editor reuses this seam for its dedicated child viewport. The runtime still owns frame execution.
+
+## Invariants
+
+- There is one authoritative engine lifecycle.
+- The editor does not fork or replace the runtime loop.
+- Configuration is not mutated after initialization begins.
+- Subsystem lifetime follows explicit initialization/shutdown order.
+- Frame-arena data does not outlive its frame ownership.
+- Higher-level application policy is not embedded into lower-level engine mechanisms.
+
+## Non-responsibilities
+
+Runtime does not own:
+
+- game-specific rules;
+- editor presentation state;
+- asset authoring UX;
+- rendering implementation details;
+- persistent scene serialization;
+- physics, animation or audio policies that belong to their respective systems.
+
+## Book grounding
+
+Primary grounding:
+
+- Jason Gregory — *Game Engine Architecture, 3rd Edition*, §8.2, for the game loop as the master subsystem-service loop.
+- Jason Gregory — *Game Engine Architecture, 3rd Edition*, §8.6, for task/data decomposition and job-system use in multiprocessor frame execution.
+
+Nocturne-specific ownership, configuration and API shapes are **Design choice (not directly from the book)**.
+
+## Current implementation sources
+
+- `Engine/Runtime/Engine.h/.cpp`
+- `Engine/Runtime/MainLoop.h/.cpp`
+- `Engine/Runtime/EngineConfig.h`
+- `Engine/Core/Subsystems/SubsystemRegistry.*`
+- `Engine/Core/Jobs/JobSystem.*`
+
+## Related documentation
+
+- [Architecture Overview](/docs/architecture/overview/)
+- [Resources](/docs/systems/resources/)
+- [Rendering](/docs/systems/rendering/)
+- [World & ECS](/docs/systems/world-ecs/)
+- [Editor](/docs/systems/editor/)
+
+---
+
+## Nocturne Website — Design & Technical Specification
+
+Document ID: noc.web.spec
+Canonical source: Docs/Web/Nocturne Website — Design & Technical Specification.md
+Web route: /docs/development/website-specification/
+
+---
+id: "noc.web.spec"
+title: "Nocturne Website — Design & Technical Specification"
+doc_type: "web-spec"
+canonical: true
+status: "active"
+subsystem: "Website"
+description: "Canonical product and technical specification for the Nocturne Engine website and documentation surface."
+source_path: "Docs/Web/Nocturne Website — Design & Technical Specification.md"
+source_files: []
+source_docs: []
+book_grounding: []
+aliases: ["Website Specification","Nocturne Website"]
+deprecated_aliases: []
+---
+> **Canonical AI context.** This export represents current Nocturne documentation. Canonical Architecture/System/Development contracts outrank historical Phase documents for current behavior. Inspect the referenced source files when exact implementation behavior matters.
+
+# Nocturne Website — Design & Technical Specification
+
+> **Status:** FOUNDATION CONTRACT — Web Track
+>
+> **Branch:** `web-docs-foundation`
+>
+> **Product:** Nocturne Engine Website + Documentation Portal
+>
+> **Runtime relationship:** external tooling/documentation product; never a runtime-engine dependency
+>
+> **Current code baseline audited:** `master` at `91feb6411910a398827792b20059e7c275b4983c`
+>
+> **Visual baseline audited:** current `EditorShellV3`, inherited from the validated Phase 13 UI baseline and Phase 14 menu-bar correction
+>
+> **Primary architectural source:** Jason Gregory, *Game Engine Architecture (3rd Edition)*
+>
+> **Web implementation status:** Web 5 Downloads milestone implemented on `web-docs-foundation`; release schema/validator, artifact-driven Downloads UI, reviewed manifest promotion and Windows Ship packaging for x86_64/x86 are validated. No public release has been published yet, so the production manifest remains intentionally empty.
+
+---
+
+## 1. Objective
+
+Build a lightweight, modern Nocturne Engine website that is visually recognizable as the web surface of the Nocturne Editor rather than a separate generic documentation theme.
+
+The website has three primary product surfaces:
+
+1. **Landing** — concise product identity, current capabilities and direct routes into downloads/documentation.
+2. **Downloads** — release/build discovery driven by generated release metadata, showing only artifacts that actually exist.
+3. **Documentation** — searchable, structured technical documentation for humans while preserving a machine-readable source for AI agents and APIs.
+
+The site must work locally first and remain suitable for later static deployment.
+
+Target local routes:
+
+```text
+/                     Landing
+/download             Downloads
+/docs                  Documentation home
+/docs/...              Documentation pages
+/roadmap               Roadmap view (later Web milestone)
+/changelog             Release/change history (later Web milestone)
+
+/llms.txt               AI entry point
+/llms-full.txt          Canonical documentation export
+/knowledge/...          Machine-readable project knowledge
+/schemas/...            Machine-readable format contracts
+```
+
+---
+
+## 2. Book grounding
+
+### 2.1 Tools are part of the engine development ecosystem
+
+Jason Gregory, *Game Engine Architecture (3rd Edition)*, §1.7 describes tools and the asset pipeline as part of the broader game-engine development environment and emphasizes that tools need to be usable and reliable for teams to produce polished games efficiently.
+
+Gregory §15.4 describes the game world editor as the gameplay-side tool used to define and populate game worlds. §15.4.1 further identifies common editor facilities including world visualization, navigation, selection, property inspection and object-placement aids, while §15.4.2 discusses integrated asset-management tooling.
+
+These sections ground the importance of coherent, reliable developer tooling and the technical concepts that the website will document.
+
+### 2.2 What the books do not prescribe
+
+**Design choice (not directly from the book):** the website framework, static-site architecture, routes, CSS implementation, responsive behavior, AI metadata formats, `llms.txt`, release manifest, documentation information architecture and reuse of Nocturne Editor visual tokens are project/product decisions.
+
+The website must not be presented as an engine architecture mandated by the books.
+
+---
+
+## 3. Product boundary
+
+The website is an external consumer of Nocturne project information.
+
+It must never become a dependency of:
+
+- `Engine/`;
+- `Apps/NocturneEditor/`;
+- runtime rendering;
+- runtime resources;
+- gameplay;
+- build-time engine initialization.
+
+The dependency direction is:
+
+```text
+Engine / Editor / Tools / Docs / Build outputs
+                    |
+                    v
+               Website build
+                    |
+                    v
+             static web output
+```
+
+Never:
+
+```text
+Engine --> Website
+Editor --> Website runtime
+```
+
+The website may consume generated metadata and source documentation. The engine must never require Node.js, Astro, Starlight or browser assets in order to build or run.
+
+This follows the existing Nocturne rule that mechanisms and policies remain separated and that upward dependencies are not allowed.
+
+---
+
+## 4. Website technical architecture
+
+### 4.1 Selected stack
+
+**Design choice (not directly from the book):**
+
+- **Astro** — site/application shell and static generation.
+- **Starlight** — documentation surface.
+- **Markdown / MDX** — authored documentation representation used by the web build.
+- **Pagefind** — local/static full-text documentation search through Starlight.
+- **CSS custom properties** — Nocturne web design tokens.
+- **Tabler SVG** — same general icon vocabulary as Nocturne Editor.
+- **Minimal client JavaScript** — only where interactions require it.
+- **Doxygen XML/HTML** — later C++ API reference input/output.
+- **JSON/YAML + JSON Schema** — machine-readable project/release/document contracts.
+
+Astro custom routes are used for Landing and Downloads. Starlight owns the documentation experience.
+
+Official implementation references:
+
+- https://starlight.astro.build/getting-started/
+- https://starlight.astro.build/guides/pages/
+- https://starlight.astro.build/guides/site-search/
+- https://starlight.astro.build/reference/overrides/
+
+### 4.2 Static-first rule
+
+**Design choice (not directly from the book):** the initial website is fully static.
+
+No backend is required for:
+
+- documentation;
+- Pagefind search;
+- landing content;
+- release manifest rendering when metadata is available at build time;
+- AI-readable files;
+- architecture diagrams;
+- changelog/roadmap pages.
+
+A backend may be introduced only when a concrete future requirement justifies it.
+
+### 4.3 Proposed repository layout
+
+```text
+Nocturne/
+├── Engine/
+├── Apps/
+├── Tools/
+├── Data/
+│
+├── Docs/
+│   ├── Architecture/
+│   ├── Systems/
+│   ├── Editor/
+│   ├── Development/
+│   ├── ADR/
+│   ├── Phases/
+│   ├── Reference/
+│   └── Web/
+│       └── Nocturne Website — Design & Technical Specification.md
+│
+├── Design/
+│   ├── nocturne-theme.json                 # later Web milestone
+│   └── generated/
+│       ├── nocturne-theme.generated.css
+│       └── NocturneTheme.generated.h       # optional future editor integration
+│
+├── Knowledge/
+│   ├── engine.yaml
+│   ├── systems.yaml
+│   ├── terminology.yaml
+│   └── manifest.json
+│
+├── Schemas/
+│   ├── documentation.schema.json
+│   ├── release.schema.json
+│   └── ...
+│
+├── Website/
+│   ├── src/
+│   │   ├── pages/
+│   │   │   ├── index.astro
+│   │   │   └── download.astro
+│   │   ├── components/
+│   │   ├── styles/
+│   │   └── content/
+│   │       └── docs/                       # generated/synchronized input
+│   ├── public/
+│   ├── scripts/
+│   ├── astro.config.mjs
+│   ├── package.json
+│   └── tsconfig.json
+│
+├── llms.txt                                # generated
+└── llms-full.txt                           # generated
+```
+
+This directory structure is a target contract. It is not all created by this specification commit.
+
+---
+
+## 5. Documentation source-of-truth contract
+
+### 5.1 One authored source
+
+The repository must not maintain two manually edited copies of technical documentation.
+
+The contract is:
+
+```text
+Docs/*.md
+   |
+   +--> website documentation
+   +--> Pagefind index
+   +--> llms exports
+   +--> Knowledge manifest references
+```
+
+`Docs/` remains the authored documentation source.
+
+### 5.2 Starlight ingestion
+
+**Design choice (not directly from the book):** because Starlight's normal documentation collection lives under `src/content/docs/`, the website build will use a deterministic synchronization/generation step:
+
+```text
+Docs/ canonical Markdown
+        |
+        v
+Website/scripts/sync-docs.*
+        |
+        v
+Website/src/content/docs/ generated tree
+        |
+        v
+Astro/Starlight build
+```
+
+Rules:
+
+- generated web-doc copies are not edited by hand;
+- generated files must clearly state their origin;
+- generation must be deterministic;
+- broken links/frontmatter fail the web validation step rather than silently producing wrong content;
+- Windows development must not depend on administrator-only symbolic-link behavior;
+- source Markdown remains readable outside the website toolchain.
+
+### 5.3 Current truth versus historical truth
+
+This distinction is non-negotiable for both humans and AI agents.
+
+```text
+Docs/Systems/
+    current canonical subsystem behavior
+
+Docs/Architecture/
+    current global architectural contract
+
+Docs/ADR/
+    why important architectural/product decisions were made
+
+Docs/Phases/
+    chronological implementation history
+```
+
+Phase documents must not silently outrank current system documentation when they disagree with a later implementation.
+
+Target frontmatter:
+
+```yaml
+---
+id: noc.resources.manager
+title: Resource Manager
+type: system
+canonical: true
+status: implemented
+phase_introduced: 4
+source_files:
+  - Engine/Resources/ResourceManager.h
+  - Engine/Resources/ResourceManager.cpp
+depends_on:
+  - noc.core
+  - noc.resources.vfs
+related:
+  - noc.resources.loaders
+---
+```
+
+Historical phase pages use:
+
+```yaml
+type: historical-phase
+canonical: false
+```
+
+### 5.4 Migration rule
+
+Existing phase files remain intact until a deliberate documentation-migration pass.
+
+The first website milestone must not destructively reorganize all existing documentation just to make the website work.
+
+The migration order is:
+
+1. make existing docs render;
+2. establish canonical Architecture/System pages;
+3. add stable metadata;
+4. move/alias historical phase content only with validated link migration.
+
+---
+
+## 6. Nocturne visual identity — audited current baseline
+
+### 6.1 Visual source of truth
+
+The current visual reference is:
+
+- `Apps/NocturneEditor/EditorShellV3.*`;
+- `Apps/NocturneEditor/EditorTheme.*`;
+- `Apps/NocturneEditor/EditorIconRenderer.*`;
+- Phase 13 visual completion/fidelity documents;
+- Phase 14's final menu-bar correction.
+
+The historical `EditorShell.*` / `EditorControls.*` path is not the design reference for new website work.
+
+### 6.2 Color tokens
+
+The following values are taken directly from the current `EditorTheme.cpp` implementation.
+
+| Token | RGB | Hex | Web role |
+|---|---:|---:|---|
+| `windowBg` | 10, 15, 22 | `#0A0F16` | page/base background |
+| `panelBg` | 16, 23, 32 | `#101720` | primary surfaces/cards/docs panes |
+| `panelBgAlt` | 20, 28, 39 | `#141C27` | elevated/header surfaces |
+| `viewportBg` | 13, 22, 33 | `#0D1621` | hero/visual canvas accents |
+| `toolbarBg` | 14, 21, 30 | `#0E151E` | top navigation/tool strips |
+| `inputBg` | 12, 19, 28 | `#0C131C` | inputs/search/code-adjacent surfaces |
+| `buttonBg` | 21, 31, 45 | `#151F2D` | neutral button background |
+| `buttonHover` | 27, 40, 58 | `#1B283A` | hover surface |
+| `border` | 34, 47, 63 | `#222F3F` | subtle borders/dividers |
+| `textPrimary` | 222, 230, 240 | `#DEE6F0` | primary text |
+| `textMuted` | 132, 149, 171 | `#8495AB` | secondary text |
+| `accent` | 25, 132, 236 | `#1984EC` | active/action accent |
+| `accentHover` | 42, 148, 250 | `#2A94FA` | accent hover/focus |
+| `success` | 78, 205, 112 | `#4ECD70` | success/ready/supported |
+| `warning` | 226, 166, 67 | `#E2A643` | warning/experimental |
+| `danger` | 232, 86, 103 | `#E85667` | errors/unsupported |
+
+**Design choice (not directly from the book):** the website will reuse these color values as its primary palette instead of creating a visually similar but independent web palette.
+
+### 6.3 Color usage rules
+
+**Design choice (not directly from the book):**
+
+- Default page background is `windowBg`.
+- Main docs/content surfaces use `panelBg`.
+- Headers, sticky navigation and secondary surfaces use `toolbarBg` / `panelBgAlt`.
+- Borders remain low contrast and primarily use `border`.
+- Electric blue is reserved for interaction, focus, current navigation state and primary calls to action.
+- Green indicates successful/supported/ready state; it must not become a second general accent.
+- Warning and danger colors are semantic only.
+- Large decorative gradients are not part of the baseline.
+- Avoid pure black and pure white when a Nocturne token exists.
+- Avoid bright stock browser-control appearance.
+
+### 6.4 Typography
+
+Current editor typography:
+
+- UI: `Segoe UI Variable Text`;
+- brand/display: `Segoe UI Variable Display`;
+- console: `Cascadia Mono`.
+
+Current effective editor sizes include:
+
+- standard UI: 12 px;
+- semibold UI: 12 px;
+- top menu: 14 px semibold;
+- compact/small text: 11 px;
+- console: 11 px;
+- editor placeholder brand mark: 42 px semibold.
+
+**Design choice (not directly from the book):** website font stacks are system/local stacks; the repository will not vendor or redistribute Microsoft font files.
+
+Target CSS stacks:
+
+```css
+--font-ui:
+  "Segoe UI Variable Text",
+  "Segoe UI",
+  system-ui,
+  -apple-system,
+  BlinkMacSystemFont,
+  sans-serif;
+
+--font-display:
+  "Segoe UI Variable Display",
+  "Segoe UI",
+  system-ui,
+  sans-serif;
+
+--font-mono:
+  "Cascadia Mono",
+  "Cascadia Code",
+  "Consolas",
+  ui-monospace,
+  monospace;
+```
+
+For the web surface, body copy may use a slightly larger responsive size than the native 11–12 px editor chrome because long-form documentation must remain comfortable to read.
+
+This is an adaptation of the same typography language, not literal pixel duplication.
+
+### 6.5 Effective UI metrics
+
+Important audit result:
+
+`EditorTheme::Metrics()` still contains older/default values, while the final validated `EditorShellV3::Layout_()` uses newer effective metrics after Phase 14.
+
+Current effective shell baseline:
+
+| Metric | Effective value |
+|---|---:|
+| top menu height | 36 px |
+| toolbar height | 48 px |
+| status height | 24 px |
+| panel gap | 7 px |
+| panel header height | 29 px |
+| main toolbar button height | 34 px |
+| toolbar ordinary horizontal gap | 4 px |
+| extra group separation | +10 px |
+| content inner padding | 9 px |
+| content search height | 30 px |
+| content action button | 30 × 30 px |
+| content action gap | 4 px |
+| console custom scrollbar | ~8 px |
+| button/input radius baseline | ~5–6 px |
+
+Panel proportions in the active shell:
+
+- left/top Scene Hierarchy: 20% width, clamped 250–330 px;
+- right Inspector/Build: 22% width, clamped 285–355 px;
+- central Viewport gets remaining primary width;
+- bottom area targets ~34% height, clamped 205–280 px;
+- Content Browser bottom column targets 31% width, clamped 345–495 px;
+- Content Browser tree targets ~30% of its area, clamped 110–145 px.
+
+**Design choice (not directly from the book):** web layout will preserve the *density, rhythm and hierarchy* of these metrics rather than force native-editor fixed pixel dimensions onto every browser viewport.
+
+### 6.6 Token drift follow-up
+
+The discrepancy between `EditorTheme::Metrics()` and effective `EditorShellV3::Layout_()` must not be duplicated into the website.
+
+A later Web 1 implementation step should introduce a reviewed canonical design-token representation and then decide whether the C++ editor should consume generated values from that representation.
+
+Do not rewrite the editor theme as part of website scaffolding without a dedicated regression pass.
+
+### 6.7 Icons
+
+Current Nocturne Editor icon contract:
+
+- source vocabulary: **Tabler Icons 3.46.0**;
+- license: MIT;
+- source assets: `ThirdParty/TablerIcons/`;
+- logical SVG geometry: 24 × 24;
+- stroke: 2 px, round caps/joins;
+- toolbar rendered glyph: 12 px in 16 px slot;
+- compact header/tree/table glyph: 11 px.
+
+**Design choice (not directly from the book):** the website will use the same Tabler semantic vocabulary. New generic web icons should first be selected from the vendored Tabler set. Custom art is reserved for Nocturne identity or concepts for which Tabler has no suitable semantic glyph.
+
+Website icon CSS may render larger than 11–12 px where web hit targets require it, but stroke language and semantic mappings remain consistent.
+
+---
+
+## 7. Shared design-token target
+
+### 7.1 Target model
+
+**Design choice (not directly from the book):**
+
+```text
+Design/nocturne-theme.json
+              |
+        +-----+------+
+        |            |
+        v            v
+ Web CSS tokens   C++ generated tokens
+        |            |
+     Website       Editor
+```
+
+The first implementation must treat this as a migration target, not assume it already exists.
+
+### 7.2 Initial JSON shape
+
+Target:
+
+```json
+{
+  "schemaVersion": 1,
+  "colors": {
+    "windowBg": "#0A0F16",
+    "panelBg": "#101720",
+    "panelBgAlt": "#141C27",
+    "viewportBg": "#0D1621",
+    "toolbarBg": "#0E151E",
+    "inputBg": "#0C131C",
+    "buttonBg": "#151F2D",
+    "buttonHover": "#1B283A",
+    "border": "#222F3F",
+    "textPrimary": "#DEE6F0",
+    "textMuted": "#8495AB",
+    "accent": "#1984EC",
+    "accentHover": "#2A94FA",
+    "success": "#4ECD70",
+    "warning": "#E2A643",
+    "danger": "#E85667"
+  }
+}
+```
+
+Before the editor consumes generated values, generated output must be compared against the current validated editor rendering behavior.
+
+---
+
+## 8. Global website shell
+
+### 8.1 Product feel
+
+**Design choice (not directly from the book):** the website should feel like the browser-native companion to the Nocturne Editor.
+
+Target qualities:
+
+- dark technical surface;
+- thin/subtle borders;
+- compact top navigation;
+- restrained radius;
+- clear hierarchy without oversized SaaS cards;
+- sparse use of accent color;
+- dense but readable technical content;
+- Tabler icon language;
+- keyboard-friendly interactions;
+- code and diagrams treated as first-class content.
+
+Avoid:
+
+- generic purple SaaS gradients;
+- oversized rounded cards everywhere;
+- glassmorphism as a primary language;
+- decorative motion that competes with technical content;
+- marketing-heavy page length;
+- visually unrelated light documentation theme.
+
+### 8.2 Top navigation
+
+Target desktop navigation:
+
+```text
+[Nocturne mark] NOCTURNE ENGINE      Docs   Download   Roadmap     Search   GitHub
+```
+
+Rules:
+
+- top bar maps visually to the editor's top menu/tool strip;
+- current route uses `accent`;
+- hover uses `buttonHover`;
+- navigation remains compact;
+- search is available globally;
+- docs can add their own secondary/sidebar navigation without duplicating the full site header.
+
+### 8.3 Responsive behavior
+
+**Design choice (not directly from the book):**
+
+- Desktop-first because Nocturne is a desktop Windows engine/tool.
+- Documentation still must remain readable on tablet/mobile.
+- At narrow widths, sidebars collapse into accessible navigation drawers.
+- Tables must scroll or adapt rather than overflow the page.
+- Code blocks must remain horizontally scrollable.
+- Download architecture cards stack vertically.
+- Marketing layout simplifies before typography becomes unreadably small.
+
+---
+
+## 9. Landing page specification
+
+### 9.1 Purpose
+
+The landing page answers, quickly:
+
+- What is Nocturne Engine?
+- What platform/technology does it target?
+- Where do I download it?
+- Where is the documentation?
+- What exists today?
+
+### 9.2 Hero
+
+Target copy hierarchy:
+
+```text
+NOCTURNE ENGINE
+
+A custom C++ game engine built for first-person survival horror.
+
+[ Download ]   [ Documentation -> ]
+
+Windows · C++20+ · DirectX 12
+```
+
+The exact public copy may be revised later without changing the layout contract.
+
+### 9.3 Hero visual
+
+**Design choice (not directly from the book):** use current Nocturne Editor imagery/logo rather than abstract generated graphics.
+
+Preferred visual hierarchy:
+
+1. actual editor screenshot;
+2. Nocturne logo/mark;
+3. optional subtle technical grid/viewport motif.
+
+Do not fabricate screenshots of functionality that does not exist.
+
+### 9.4 Capability sections
+
+Landing sections should remain few and meaningful.
+
+Candidate current categories:
+
+- Runtime;
+- Rendering;
+- Resources / Asset Pipeline;
+- Editor;
+- Documentation / Tooling.
+
+Every capability claim must be backed by current code/completion documentation.
+
+Phase history is not marketing proof of a feature if later code removed/replaced it.
+
+---
+
+## 10. Downloads page specification
+
+### 10.1 Source of truth
+
+**Design choice (not directly from the book):** download availability is data-driven.
+
+The page must not hardcode architectures as if they are supported.
+
+Target data flow:
+
+```text
+Build / CI
+   |
+   +--> release artifacts
+   +--> checksums
+   +--> release metadata
+             |
+             v
+        releases.json
+             |
+             v
+       /download page
+```
+
+### 10.2 Current support rule
+
+The documentation shows Windows x64 build/run validation in existing completed editor phases.
+
+The download page may show a public x64 artifact only when the release pipeline actually produces and publishes that artifact.
+
+ARM64, x86 or other architectures must not be presented as downloadable/supported solely because they are theoretically compilable.
+
+### 10.3 Release manifest target
+
+```json
+{
+  "schemaVersion": 1,
+  "latest": "0.1.0",
+  "releases": [
+    {
+      "version": "0.1.0",
+      "channel": "development",
+      "publishedAt": "YYYY-MM-DD",
+      "notesUrl": "/changelog/0.1.0",
+      "builds": [
+        {
+          "platform": "windows",
+          "architecture": "x86_64",
+          "configuration": "release",
+          "status": "supported",
+          "file": "nocturne-engine-0.1.0-windows-x64.zip",
+          "bytes": 0,
+          "sha256": "..."
+        }
+      ]
+    }
+  ]
+}
+```
+
+The actual schema will be versioned under `Schemas/release.schema.json`.
+
+### 10.4 UI state semantics
+
+- supported/validated: `success`;
+- experimental: `warning`;
+- unavailable: muted, not a fake download action;
+- failed/withdrawn build: `danger` only when showing a historical diagnostic state.
+
+Each artifact should expose:
+
+- version;
+- platform;
+- architecture;
+- channel;
+- file size;
+- checksum;
+- release notes;
+- download action.
+
+---
+
+## 11. Documentation page specification
+
+### 11.1 Layout
+
+Desktop target:
+
+```text
++-------------------+--------------------------------------+------------------+
+| Docs sidebar      | Main article                         | On this page     |
+|                   |                                      |                  |
+| Getting Started   | Title                                | Purpose          |
+| Architecture      | Summary                              | Architecture     |
+| Engine            |                                      | Lifecycle        |
+| Editor            | Diagram / prose / code               | Threading        |
+| Tools             |                                      | API              |
+| Reference         |                                      |                  |
++-------------------+--------------------------------------+------------------+
+```
+
+This deliberately echoes the editor's left navigation / dominant center / right inspector composition without literally cloning its native window layout.
+
+### 11.2 Information architecture
+
+Target documentation navigation:
+
+```text
+Getting Started
+  Introduction
+  Building Nocturne
+  Repository Structure
+
+Architecture
+  Overview
+  Dependency Rules
+  Runtime Lifecycle
+  Architecture Diagram
+  Architecture Decisions
+
+Engine
+  Core
+  Platform
+  Runtime
+  Resources
+  Jobs
+  Input
+  Rendering
+  Scene / World
+  Entity / Components
+
+Editor
+  Architecture
+  Shell
+  Viewport
+  Scene Editing
+  Content Browser
+  Console
+
+Tools
+  Asset Import
+  Cooker
+  Packager
+
+API Reference
+  C++ API
+
+Development
+  Production Engineering Standard
+  Testing
+  Debugging
+  Build Configurations
+
+Development History
+  Phase 1
+  ...
+```
+
+Only sections backed by current documentation are promoted as canonical.
+
+### 11.3 Article structure
+
+Canonical system pages should use a stable structure where relevant:
+
+```text
+Purpose
+Responsibilities
+Non-Responsibilities
+Architecture
+Ownership
+Lifecycle
+Threading Model
+Dependencies
+Data Flow
+Public API
+Failure Handling
+Diagnostics
+Performance
+Examples
+Design Decisions
+Source Files
+Book Grounding
+Related Documentation
+```
+
+Not every heading is mandatory for every subsystem. Empty ritual sections are worse than concise accurate pages.
+
+### 11.4 Search
+
+**Design choice (not directly from the book):** use Starlight/Pagefind static full-text search initially.
+
+Desired UX:
+
+- `Ctrl+K` / `Cmd+K` opens search where appropriate;
+- modal styling uses Nocturne `inputBg`, `panelBg`, `border`, `accent`;
+- results show section/context;
+- historical phase results are visually identified as history when metadata permits;
+- canonical pages should rank above historical pages when reasonable.
+
+---
+
+## 12. Machine-readable / AI-readable layer
+
+### 12.1 Principle
+
+The web UI is a presentation layer.
+
+AI agents should not need to scrape rendered navigation HTML to understand Nocturne.
+
+Target relationship:
+
+```text
+Canonical Markdown -----------------------+
+     |                                    |
+     +--> Human website                   |
+     +--> Search                          |
+     +--> llms exports                    |
+     +--> manifest -----------------------+--> AI/API consumers
+Structured Knowledge YAML/JSON -----------+
+Schemas ----------------------------------+
+Doxygen XML ------------------------------+
+```
+
+### 12.2 Stable identifiers
+
+**Design choice (not directly from the book):** canonical concepts receive stable IDs independent of filenames.
+
+Examples:
+
+```text
+noc.core
+noc.platform
+noc.runtime
+noc.resources.vfs
+noc.resources.manager
+noc.jobs
+noc.input
+noc.render
+noc.render.dx12
+noc.world
+noc.ecs
+noc.editor
+noc.editor.viewport
+```
+
+Renaming a page must not silently change the semantic ID.
+
+### 12.3 Knowledge manifest
+
+Target:
+
+```json
+{
+  "schemaVersion": 1,
+  "project": "Nocturne Engine",
+  "documents": [
+    {
+      "id": "noc.architecture.overview",
+      "path": "Docs/Architecture/Overview.md",
+      "type": "architecture",
+      "canonical": true
+    },
+    {
+      "id": "noc.phase.14",
+      "path": "Docs/Phases/Phase-14.md",
+      "type": "historical-phase",
+      "canonical": false
+    }
+  ]
+}
+```
+
+### 12.4 `llms.txt`
+
+Target responsibilities:
+
+- describe Nocturne briefly;
+- identify canonical architecture;
+- identify canonical system docs;
+- identify historical phase docs;
+- tell AI agents which source wins on conflict;
+- expose stable machine-readable endpoints;
+- state core repository rules.
+
+Minimal policy concept:
+
+```text
+Read canonical Architecture and Systems documents before historical Phase documents.
+Use Phase documents to understand implementation history, not to override current behavior.
+Inspect referenced source files when exact implementation behavior matters.
+Do not introduce upward engine dependencies.
+Engine provides mechanisms; applications provide policies.
+```
+
+### 12.5 `llms-full.txt`
+
+Generated from canonical documentation only by default.
+
+It should not blindly concatenate every historical phase report, log or obsolete implementation note.
+
+### 12.6 Raw-source affordances
+
+Documentation UI should eventually provide:
+
+- **View Markdown**
+- **Copy Markdown**
+- **Copy for AI**
+- **Edit on GitHub** where appropriate
+
+"Copy for AI" should prefer clean canonical Markdown + metadata rather than copied rendered HTML.
+
+---
+
+## 13. C++ API documentation
+
+### 13.1 Separation of concerns
+
+Conceptual documentation and API reference are not the same artifact.
+
+```text
+Docs/System page:
+  Why does ResourceManager exist?
+  Who owns it?
+  What is its lifecycle?
+  How should systems use it?
+
+API Reference:
+  What is the exact signature of Request()?
+  What are the parameter/return types?
+  Where is the declaration?
+```
+
+### 13.2 Doxygen integration target
+
+**Design choice (not directly from the book):**
+
+```text
+C++ public/internal documented headers
+              |
+              v
+           Doxygen
+          /       \
+      HTML         XML
+       |            |
+       v            v
+ Web API pages    AI/tooling index
+```
+
+Doxygen integration is a later milestone. It must not block the initial human documentation site.
+
+---
+
+## 14. Architecture diagrams
+
+### 14.1 Existing source
+
+The project already contains the full Nocturne architecture diagram in PDF/VSDX form.
+
+### 14.2 Web target
+
+**Design choice (not directly from the book):** provide two levels:
+
+1. simplified responsive architecture overview in docs;
+2. full interactive/detail view for the complete architecture.
+
+Future enhancements may include:
+
+- pan;
+- zoom;
+- subsystem search;
+- click a subsystem to open its documentation;
+- highlighting dependency direction.
+
+Diagram data should prefer text/structured representations that can be versioned and indexed, while retaining the authoritative source artifact where necessary.
+
+---
+
+## 15. Accessibility and interaction quality
+
+**Design choice (not directly from the book):** professional web quality includes keyboard and accessibility behavior.
+
+Minimum contract:
+
+- semantic landmarks and heading order;
+- visible keyboard focus using Nocturne accent;
+- sufficient contrast for text and controls;
+- icon-only controls have accessible names;
+- hover is never the only indication of state;
+- reduced-motion preference is respected;
+- navigation/search work by keyboard;
+- code copy controls are focusable;
+- links are identifiable beyond color alone where context is ambiguous.
+
+The visual target is dark/compact, not low-legibility.
+
+---
+
+## 16. Performance contract
+
+**Design choice (not directly from the book):**
+
+- static HTML wherever possible;
+- no large frontend SPA runtime for documentation;
+- hydrate only interactive islands that need client state;
+- optimize editor screenshots before shipping;
+- SVG icons remain vector where practical;
+- avoid loading the entire architecture visualization bundle on every docs page;
+- keep search static/local initially;
+- no third-party analytics in the foundation milestone.
+
+Performance must be measured once representative content exists.
+
+---
+
+## 17. Security / trust boundary
+
+The website is static, but its build still consumes repository data.
+
+Rules:
+
+- never embed GitHub/private build secrets into generated client output;
+- sanitize/escape generated release metadata;
+- validate release manifests against schema;
+- validate paths before copying documentation;
+- never execute documentation text as build code merely because it is inside a repository file;
+- MDX is allowed only in trusted authored documentation, not arbitrary external content;
+- checksum values are generated from release artifacts, not manually invented.
+
+---
+
+## 18. Versioning strategy
+
+### 18.1 Website versioning
+
+The website itself does not need a visible independent product version initially.
+
+### 18.2 Engine documentation versions
+
+**Design choice (not directly from the book):** start with documentation for current `master`.
+
+Do not implement multi-version docs until there are public releases whose older API/documentation must remain accessible.
+
+When introduced, versioning must define:
+
+- current/latest docs;
+- archived release docs;
+- canonical latest machine-readable manifest;
+- links from download release -> matching docs/changelog.
+
+---
+
+## 19. Web implementation milestones
+
+This track is separate from engine Phases 1–31.
+
+### Web 1 — Design contract and token extraction
+
+Scope:
+
+- audit current editor;
+- lock current color/type/icon baseline;
+- identify effective metric drift;
+- write this specification;
+- define the shared-token migration target.
+
+**Status:** COMPLETE for the foundation scope. `Design/nocturne-theme.json` now exists and the website generates CSS variables from it. The C++ editor still uses its existing theme implementation; migrating the editor to generated tokens remains deliberately deferred until a dedicated visual-regression pass.
+
+### Web 2 — Astro + Starlight skeleton
+
+Scope:
+
+- create `Website/`;
+- pin dependency versions;
+- create Astro/Starlight configuration;
+- add Nocturne global CSS tokens;
+- establish `/`, `/download`, `/docs`;
+- add deterministic docs synchronization;
+- add local dev/build scripts.
+
+Acceptance:
+
+- [x] dependency installation succeeds in GitHub Actions;
+- [x] local-development command path is configured through `npm run dev`;
+- [x] static production build succeeds;
+- [x] `/`, `/download` and `/docs` static outputs are verified in CI;
+- [x] repository-root `Docs/` is synchronized before dev/build;
+- [x] the existing editor logo is copied as a generated website asset;
+- [x] the Nocturne theme is generated from `Design/nocturne-theme.json`;
+- [x] no engine build dependency on Node was introduced.
+
+**Status:** COMPLETE for the skeleton scope. See `Docs/Web/Nocturne Website — Web 2 Implementation Report.md`.
+
+### Web 3 — Documentation foundation
+
+Scope:
+
+- [x] Nocturne Starlight shell;
+- [x] curated docs sidebar/TOC;
+- [x] Pagefind static search;
+- [x] code highlighting retained through Starlight/Expressive Code;
+- [x] current repository-root docs ingestion;
+- [x] canonical/history visual distinction;
+- [x] first canonical Architecture/System pages;
+- [x] stable Nocturne document IDs;
+- [x] frontmatter/schema validation;
+- [x] deterministic target/ID collision validation;
+- [x] canonical route/ID CI checks.
+
+**Status:** COMPLETE. See `Docs/Web/Nocturne Website — Web 3 Implementation Report.md`.
+
+### Web 4 — Landing
+
+Scope:
+
+- [x] production landing layout;
+- [x] current Nocturne logo and EditorShellV3-derived visual language;
+- [x] implemented capability sections linked to canonical system docs;
+- [x] responsive behavior for desktop/tablet/mobile breakpoints;
+- [x] Documentation and Downloads CTA routes;
+- [x] accessibility shell improvements (skip link, focus path, active navigation state);
+- [x] shared vendored Tabler icon vocabulary;
+- [x] explicit artifact-honest Downloads status;
+- [x] no unsupported roadmap feature claims;
+- [x] landing-specific CI assertions.
+
+**Status:** COMPLETE. See `Docs/Web/Nocturne Website — Web 4 Implementation Report.md`.
+
+No real editor screenshot asset currently exists in the repository or available Project image context. Web 4 therefore uses the real Nocturne logo plus an explicitly labeled **EditorShellV3 interface schematic** derived from the audited current editor layout. It is not represented as a screenshot.
+
+### Web 5 — Downloads
+
+Scope:
+
+- [x] versioned `Schemas/release.schema.json`;
+- [x] executable release-manifest validation before dev/build;
+- [x] reviewed `releases.json` promotion workflow;
+- [x] artifact-driven architecture/platform rendering;
+- [x] exact byte size + SHA-256 metadata;
+- [x] development / preview / stable channels;
+- [x] release-notes links and source commit identity;
+- [x] supported / experimental / withdrawn artifact states;
+- [x] Windows Ship packaging workflow;
+- [x] x86_64 Ship build/package validation;
+- [x] x86 Ship build/package validation;
+- [x] tagged GitHub Release publication path;
+- [x] CI fixture exercising the non-empty Downloads rendering path;
+- [x] honest zero-artifact public state until a real tagged release is promoted.
+
+**Status:** COMPLETE. See `Docs/Web/Nocturne Website — Web 5 Implementation Report.md`.
+
+Current evidence proves that Windows `x86_64` and `x86` can both complete the Web 5 Ship build/package gate. This is **build/package capability**, not yet a claim that either architecture has a public release. `Website/src/data/releases.json` remains empty until a real published artifact is reviewed and promoted.
+
+### Web 6 — AI knowledge layer
+
+Scope:
+
+- stable IDs;
+- `Knowledge/`;
+- manifest;
+- terminology;
+- `llms.txt`;
+- `llms-full.txt`;
+- raw/copy-for-AI affordances;
+- schema validation.
+
+### Web 7 — C++ API reference
+
+Scope:
+
+- Doxygen config;
+- API generation;
+- web integration;
+- XML output for tooling;
+- links between conceptual pages and C++ symbols.
+
+### Web 8 — CI, deployment and quality gates
+
+Scope:
+
+- web build in CI;
+- link validation;
+- schema validation;
+- stale generated-doc detection;
+- accessibility baseline;
+- performance baseline;
+- static deployment target;
+- release-page artifact integration.
+
+---
+
+## 20. Verification checklist for the website foundation
+
+Before the Website track can be treated as a durable product surface:
+
+- [x] `Website/` builds independently of engine compilation.
+- [x] Engine/editor builds do not depend on the website toolchain.
+- [x] `Docs/` remains the human-authored documentation source.
+- [x] Generated Starlight docs are deterministic and not manually edited.
+- [x] Current canonical docs are distinguishable from phase history.
+- [x] Landing, Download and Docs share the same Nocturne visual tokens.
+- [x] Website colors match the audited editor palette.
+- [x] Typography follows the Nocturne font vocabulary with safe local/system fallbacks.
+- [x] Tabler remains the shared generic icon vocabulary.
+- [x] Final web design does not expose generic default Starlight styling as the primary brand.
+- [x] Documentation search works in the static build.
+- [x] Download page never exposes an architecture without a real release artifact.
+- [x] Release metadata validates against a schema.
+- [ ] AI entry points identify canonical versus historical sources.
+- [ ] No private credentials/paths appear in static output.
+- [ ] Keyboard navigation and focus states are functional.
+- [ ] Responsive docs remain readable at narrow widths.
+- [ ] Broken internal docs links fail validation.
+- [x] Build output is static and deployable without a permanent application server.
+
+---
+
+## 21. Common pitfalls
+
+- Copying old `EditorTheme::Metrics()` values without checking effective `EditorShellV3` layout.
+- Making website colors "close enough" instead of deriving them from the editor baseline.
+- Editing generated `Website/src/content/docs/` copies by hand.
+- Letting Phase documents become the current architecture source by accident.
+- Building a SPA when static HTML is enough.
+- Hardcoding x64/ARM64 cards without release artifacts.
+- Treating Doxygen output as a substitute for conceptual documentation.
+- Creating a second icon vocabulary for the website.
+- Vendoring proprietary font files instead of using local/system font stacks.
+- Copying the native editor's tiny 11–12 px text literally into long-form browser reading.
+- Pulling Node/Astro dependencies into C++ engine build targets.
+- Generating `llms-full.txt` from every historical file without canonical filtering.
+- Allowing machine-readable metadata and Markdown to become two manually maintained truths.
+- Redesigning the editor while attempting to build the website.
+- Publishing claims about planned engine systems as if they are already implemented.
+
+---
+
+## 22. Decisions locked by this specification
+
+Unless deliberately revised in a later Web ADR/spec:
+
+1. **`Docs/` remains the authored documentation source.**
+2. **The website is an external static consumer, never an engine runtime dependency.**
+3. **Astro + Starlight is the initial website/docs implementation stack.**
+4. **Pagefind is the initial static documentation search implementation.**
+5. **Landing and Downloads are custom Astro pages.**
+6. **Documentation uses a customized Starlight surface.**
+7. **Nocturne Editor's audited palette is the website palette baseline.**
+8. **Tabler is the shared generic icon vocabulary.**
+9. **Current Architecture/System docs outrank historical Phase docs for current behavior.**
+10. **Download architecture support is generated from actual release artifacts.**
+11. **AI consumers receive raw/structured sources rather than being expected to scrape rendered HTML.**
+12. **A future shared design-token source must eliminate, not multiply, token drift.**
+
+All twelve items above are **Design choice (not directly from the book)** except where they preserve an already locked Nocturne dependency/source-of-truth rule grounded elsewhere in the project architecture.
+
+---
+
+## 23. Next implementation handoff
+
+Start Web 5 with:
+
+> Implement **Web 5 — Downloads** from `Docs/Web/Nocturne Website — Design & Technical Specification.md` on top of the validated Web 4 landing and Web 3 canonical documentation model. Define and validate the release metadata schema, make `/download` render only real published artifacts, add checksum/channel/version/release-note fields, and connect the page to the repository build/release pipeline without claiming unsupported architectures. Keep the current empty-state honest until a real release artifact exists. Do not merge draft PR #2 automatically and do not make the website an engine/runtime dependency.
+
+Bring:
+
+- this specification;
+- `Docs/Web/Nocturne Website — Web 3 Implementation Report.md`;
+- `Docs/Web/Nocturne Website — Web 4 Implementation Report.md`;
+- current `Website/src/pages/download.astro`;
+- current `Website/src/data/releases.json`;
+- current GitHub Actions workflows;
+- current Windows build configuration/CI evidence;
+- `Docs/Production Engineering Standard.md`;
+- current canonical `Docs/Systems/` pages.
+
+---
+
+## World & ECS
+
+Document ID: noc.world
+Canonical source: Docs/Systems/World & ECS.md
+Web route: /docs/systems/world-ecs/
+
+---
+id: "noc.world"
+title: "World & ECS"
+doc_type: "system"
+canonical: true
+status: "implemented"
+subsystem: "World & ECS"
+phase_introduced: 15
+description: "Canonical runtime entity identity, component ownership, transform hierarchy, camera and render-extraction contract."
+source_path: "Docs/Systems/World & ECS.md"
+source_files: ["Engine/Runtime/World.h","Engine/Runtime/World.cpp","Engine/Runtime/Entity.h","Engine/Runtime/EntityRegistry.h","Engine/Runtime/ComponentStorage.h","Engine/Runtime/ComponentRegistry.h"]
+source_docs: ["Docs/nocturne_engine_architecture.md","Docs/Phase 15 — Entity Component System Architecture.md","Docs/Phase 15 — Completion Report.md"]
+book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §16.2.1.6 Pure Component Models","Jason Gregory — Game Engine Architecture (3rd ed.), §16.2.2 Property-Centric Architectures","Jason Gregory — Game Engine Architecture (3rd ed.), §16.5 Object References and World Queries","Bob Nystrom — Game Programming Patterns, Component and Data Locality"]
+aliases: ["World","ECS","Entity Component System","World & ECS"]
+deprecated_aliases: []
+---
+> **Canonical AI context.** This export represents current Nocturne documentation. Canonical Architecture/System/Development contracts outrank historical Phase documents for current behavior. Inspect the referenced source files when exact implementation behavior matters.
+
+# World & ECS
+
+## Purpose
+
+`World` is the authoritative runtime owner/orchestrator for Nocturne's entity/component state.
+
+Phase 15 replaced the earlier temporary parallel-array world model with one production entity/component foundation.
+
+## Entity identity
+
+The canonical runtime identity type is `EntityHandle`.
+
+Current identity semantics include:
+
+- slot/index identity;
+- generation;
+- invalid sentinel;
+- stale-handle rejection;
+- slot reuse without resurrecting an old handle.
+
+Runtime entity handles are transient process-lifetime identities.
+
+Persistent scene identity remains serialization scope and is not represented by a raw runtime handle.
+
+## World ownership
+
+`World` orchestrates:
+
+- `EntityRegistry`;
+- `ComponentRegistry`;
+- `TransformSystem`;
+- `RenderableSystem`;
+- `CameraSystem`;
+- `NameSystem`.
+
+The public world API provides entity lifecycle plus component-domain operations.
+
+Current foundation components are:
+
+| Component | Authority |
+|---|---|
+| Transform | local TRS and hierarchy; world transform is derived |
+| Renderable | mesh handle, bounds and enabled state |
+| Camera | lens/camera state associated with an entity |
+| Name | runtime/editor display name, not entity identity |
+
+## Component storage
+
+Phase 15 established dense/sparse component storage with:
+
+- dense component data;
+- dense owner handles;
+- sparse entity-to-dense lookup;
+- one component of a given type per entity;
+- duplicate-add rejection;
+- safe absent-remove behavior;
+- swap-remove reverse-lookup repair;
+- support for non-trivial/over-aligned component lifetime.
+
+Component storage is not exposed as mutable renderer authority.
+
+## Transform hierarchy
+
+Transform state uses local translation/rotation/scale as authoritative authored/runtime data.
+
+World transforms are derived and cached.
+
+Hierarchy rules include:
+
+- no self-parenting;
+- no indirect cycles;
+- deterministic top-down propagation;
+- dirty descendant propagation;
+- explicit stale-handle rejection.
+
+## Camera authority
+
+Camera lens state belongs to `CameraComponent`.
+
+Spatial state belongs to `TransformComponent`.
+
+The active camera is referenced by an entity handle.
+
+The previous special-case camera authority outside ECS was removed.
+
+## Render extraction
+
+`World::BuildRenderQueue()` is the renderer handoff.
+
+It reads component state and produces frame-owned rendering data rather than allowing the renderer to mutate or own ECS storage.
+
+This preserves a single authority for world state.
+
+## Editor/runtime single source of truth
+
+Editor selection, hierarchy labels, picking and gizmo operations read/write the same runtime components.
+
+The editor may own transient presentation/interaction state, such as selection index or gizmo drag-start values, but it does not maintain a second authoritative transform/name/renderable model.
+
+## Invariants
+
+- A stale entity handle cannot access live components.
+- Destroying an entity removes its foundation components before invalidating identity.
+- Transform hierarchy cannot contain cycles.
+- A disabled/removed/destroyed active camera cannot remain authoritative.
+- Display name is not identity.
+- Renderer sees extracted data, not mutable ECS ownership.
+- Editor-authored changes flow through `World`.
+
+## Deferred scope
+
+Not part of the current World/ECS contract:
+
+- persistent scene/entity identity;
+- scene serialization;
+- reference fixups across saved data;
+- scripting ownership;
+- physics body authority.
+
+These remain assigned to later roadmap phases.
+
+## Book grounding
+
+Primary grounding:
+
+- Jason Gregory — *Game Engine Architecture, 3rd Edition*, §16.2.1.6.
+- Jason Gregory — *Game Engine Architecture, 3rd Edition*, §16.2.2.
+- Jason Gregory — *Game Engine Architecture, 3rd Edition*, §16.5.
+- Bob Nystrom — *Game Programming Patterns*, Component and Data Locality.
+
+Nocturne's exact handle layout, component IDs, storage policy and destruction semantics are **Design choice (not directly from the book)**.
+
+## Current implementation sources
+
+- `Engine/Runtime/World.h/.cpp`
+- `Engine/Runtime/Entity.h`
+- `Engine/Runtime/EntityRegistry.h/.cpp`
+- `Engine/Runtime/ComponentStorage.h`
+- `Engine/Runtime/ComponentRegistry.h/.cpp`
+- `Engine/Runtime/TransformSystem.*`
+- `Engine/Runtime/RenderableSystem.*`
+- `Engine/Runtime/CameraSystem.*`
+- `Engine/Runtime/NameSystem.*`
+- `Engine/Runtime/Components/`
+
+## Related documentation
+
+- [Runtime](/docs/systems/runtime/)
+- [Rendering](/docs/systems/rendering/)
+- [Editor](/docs/systems/editor/)
