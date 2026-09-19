@@ -28,7 +28,7 @@ permissions:
 jobs:
   phase15-foundation:
     name: Phase 15 — ECS Foundation
-    runs-on: windows-latest
+    runs-on: [self-hosted, Windows, X64]
     timeout-minutes: 15
 
     steps:
