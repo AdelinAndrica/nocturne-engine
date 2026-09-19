@@ -8,6 +8,7 @@ export default defineConfig({
       title: 'Nocturne Engine',
       description: 'Technical documentation for Nocturne Engine.',
       pagefind: true,
+      disable404Route: true,
       customCss: ['./src/styles/nocturne.css'],
       components: {
         SiteTitle: './src/components/docs/NocturneSiteTitle.astro',
