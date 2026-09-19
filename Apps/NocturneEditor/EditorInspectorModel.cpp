@@ -566,7 +566,8 @@ namespace nocturne::editor
                 };
                 noc::PropertyAccessContext propertyContext =
                     noc::MakeComponentPropertyAccessContext(
-                        runtime);
+                        runtime,
+                        type->componentMetadata);
 
                 for (uint32_t i = 0;
                      i < type->propertyCount;
@@ -784,7 +785,9 @@ namespace nocturne::editor
         };
 
         noc::PropertyAccessContext propertyContext =
-            noc::MakeComponentPropertyAccessContext(runtime);
+            noc::MakeComponentPropertyAccessContext(
+                runtime,
+                componentType->componentMetadata);
 
         return noc::ReadPropertyValue(
                 context.reflection,

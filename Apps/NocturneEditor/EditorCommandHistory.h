@@ -47,6 +47,28 @@ namespace nocturne::editor
             EditorCommandContext& context) = 0;
         [[nodiscard]] virtual bool Redo(
             EditorCommandContext& context) = 0;
+
+        // Design choice (not directly from the book): commands that create or
+        // recreate runtime entities can expose the new runtime identity without
+        // coupling history/UI to concrete command types. Invalid means "keep
+        // current selection if still alive"; callers still validate staleness.
+        [[nodiscard]] virtual noc::EntityHandle
+        SelectionHintAfterExecute() const noexcept
+        {
+            return noc::EntityHandle::Invalid();
+        }
+
+        [[nodiscard]] virtual noc::EntityHandle
+        SelectionHintAfterUndo() const noexcept
+        {
+            return noc::EntityHandle::Invalid();
+        }
+
+        [[nodiscard]] virtual noc::EntityHandle
+        SelectionHintAfterRedo() const noexcept
+        {
+            return noc::EntityHandle::Invalid();
+        }
     };
 
     // Design choice (not directly from the book): compound commands are the
@@ -131,6 +153,8 @@ namespace nocturne::editor
         [[nodiscard]] uint32_t Cursor() const noexcept;
         [[nodiscard]] std::size_t UsedBytes() const noexcept;
         [[nodiscard]] uint64_t Version() const noexcept;
+        [[nodiscard]] noc::EntityHandle
+        LastSelectionHint() const noexcept;
 
         [[nodiscard]] const char* UndoLabel() const noexcept;
         [[nodiscard]] const char* RedoLabel() const noexcept;
@@ -146,5 +170,6 @@ namespace nocturne::editor
         std::size_t maxBytes_ = 8u * 1024u * 1024u;
         std::size_t usedBytes_ = 0;
         uint64_t version_ = 0;
+        noc::EntityHandle lastSelectionHint_{};
     };
 }

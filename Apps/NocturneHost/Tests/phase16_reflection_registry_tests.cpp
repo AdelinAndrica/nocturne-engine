@@ -842,10 +842,15 @@ bool RunPhase16ReflectionRegistryTests()
         "Builtin/enum reflection Freeze failed");
 
     SchemaDumpCapture builtinSchemaDump{};
+    const std::size_t schemaDumpAllocationsBefore =
+        allocator.AllocationCount();
+
     ok &= CheckReflectionRegistry(
         builtinRegistry.DumpSchema(
             &CaptureSchemaDumpLine,
             &builtinSchemaDump)
+            && allocator.AllocationCount()
+                == schemaDumpAllocationsBefore
             && builtinSchemaDump.Contains(
                 "registry state=Frozen")
             && builtinSchemaDump.Contains(

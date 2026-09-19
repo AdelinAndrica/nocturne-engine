@@ -773,7 +773,9 @@ namespace nocturne::editor
             entity
         };
         noc::PropertyAccessContext propertyContext =
-            noc::MakeComponentPropertyAccessContext(runtime);
+            noc::MakeComponentPropertyAccessContext(
+                runtime,
+                componentType->componentMetadata);
 
         if (noc::ReadPropertyValue(
                 context.reflection,
@@ -930,7 +932,9 @@ namespace nocturne::editor
             entity_
         };
         noc::PropertyAccessContext propertyContext =
-            noc::MakeComponentPropertyAccessContext(runtime);
+            noc::MakeComponentPropertyAccessContext(
+                runtime,
+                componentType->componentMetadata);
 
         return noc::WritePropertyValue(
             *property,

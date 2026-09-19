@@ -2582,6 +2582,11 @@ bool RunPhase16EditorSessionTests()
                 std::move(create)),
             "CreateEntityCommand execute failed");
 
+        ok &= CheckEditorSession(
+            session.History().LastSelectionHint()
+                == createRaw->CurrentEntity(),
+            "Create execute did not expose current runtime selection identity");
+
         const noc::EntityHandle firstCreated =
             createRaw->CurrentEntity();
 
@@ -2605,6 +2610,11 @@ bool RunPhase16EditorSessionTests()
         ok &= CheckEditorSession(
             session.History().Redo(context),
             "CreateEntityCommand redo failed");
+
+        ok &= CheckEditorSession(
+            session.History().LastSelectionHint()
+                == createRaw->CurrentEntity(),
+            "Create redo did not expose recreated runtime selection identity");
 
         const noc::EntityHandle recreated =
             createRaw->CurrentEntity();
@@ -3046,6 +3056,11 @@ bool RunPhase16EditorSessionTests()
             "Delete undo did not restore reflected subtree state");
 
         ok &= CheckEditorSession(
+            session.History().LastSelectionHint()
+                == restoredParent,
+            "Delete undo did not expose restored root selection identity");
+
+        ok &= CheckEditorSession(
             session.History().Redo(context)
                 && !world.IsAlive(restoredParent)
                 && !world.IsAlive(restoredChild),
@@ -3103,6 +3118,11 @@ bool RunPhase16EditorSessionTests()
             "Duplicate subtree state mismatch");
 
         ok &= CheckEditorSession(
+            session.History().LastSelectionHint()
+                == duplicateRoot,
+            "Duplicate execute did not expose duplicate root selection identity");
+
+        ok &= CheckEditorSession(
             session.History().Undo(context)
                 && !world.IsAlive(duplicateRoot)
                 && world.IsAlive(sourceRoot),
@@ -3122,6 +3142,11 @@ bool RunPhase16EditorSessionTests()
                 && duplicateRoot2 != duplicateRoot
                 && duplicateChild2.IsValid(),
             "Duplicate redo reused stale runtime identity");
+
+        ok &= CheckEditorSession(
+            session.History().LastSelectionHint()
+                == duplicateRoot2,
+            "Duplicate redo did not expose recreated root selection identity");
 
         session.History().Clear();
 

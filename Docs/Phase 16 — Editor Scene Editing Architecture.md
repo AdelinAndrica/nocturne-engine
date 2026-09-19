@@ -246,6 +246,20 @@ The Phase 16 implementation has resolved the major audit findings above:
 
 ---
 
+### 3.12 Generic component property access context
+
+Phase 16 supports both reflected direct-member component properties and semantic World-backed component properties through one `PropertyAccessContext`.
+
+`MakeComponentPropertyAccessContext()` provides:
+
+- `object` from reflected `ComponentMetadata::getConst` when available;
+- `mutableObject` from `ComponentMetadata::getMutable` when available;
+- `userContext` containing World + EntityHandle for semantic adapters.
+
+This allows an OCP-added component with ordinary reflected members to work in the generic Inspector, property command and reflected snapshot paths without special-case switches, while foundation Transform/Camera/Renderable/Name setters continue to enforce runtime invariants through semantic World adapters.
+
+**Design choice (not directly from the book):** recursive nested-property traversal follows registered by-value structs. Entity/resource references are terminal semantic leaves rather than recursively traversed object graphs; persistent reference fixups belong to Phase 17.
+
 ## 4. Target ownership model
 
 **Design choice (not directly from the book)**

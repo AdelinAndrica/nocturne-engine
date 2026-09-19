@@ -100,134 +100,134 @@ Autoritate:
 `Docs/Phase 16 — Runtime Reflection Architecture Contract.md`
 
 Ownership:
-- [ ] `Engine` deține un singur `ReflectionRegistry`.
-- [ ] Reflection init precede World init.
-- [ ] Reflection shutdown este după World/consumers shutdown conform lifetime documentat.
-- [ ] World/Editor sunt non-owning consumers.
-- [ ] No global Reflection singleton.
-- [ ] ComponentRegistry Phase 15 este migrat/facade, nu autoritate paralelă.
+- [x] `Engine` deține un singur `ReflectionRegistry`.
+- [x] Reflection init precede World init.
+- [x] Reflection shutdown este după World/consumers shutdown conform lifetime documentat.
+- [x] World/Editor sunt non-owning consumers.
+- [x] No global Reflection singleton.
+- [x] ComponentRegistry Phase 15 este migrat/facade, nu autoritate paralelă.
 
 Identity:
-- [ ] stable TypeId.
-- [ ] invalid TypeId.
-- [ ] stable PropertyId.
-- [ ] invalid PropertyId.
-- [ ] stable FunctionId/identity.
-- [ ] IDs nu depind de registration order.
-- [ ] IDs nu depind de RTTI pointer/address.
-- [ ] duplicate IDs respinse.
-- [ ] duplicate canonical names respinse.
+- [x] stable TypeId.
+- [x] invalid TypeId.
+- [x] stable PropertyId.
+- [x] invalid PropertyId.
+- [x] stable FunctionId/identity.
+- [x] IDs nu depind de registration order.
+- [x] IDs nu depind de RTTI pointer/address.
+- [x] duplicate IDs respinse.
+- [x] duplicate canonical names respinse.
 
 Type system:
-- [ ] TypeKind.
-- [ ] primitive types.
-- [ ] String.
-- [ ] Enum.
-- [ ] Struct.
-- [ ] Component.
-- [ ] Entity reference category.
-- [ ] Resource reference category.
-- [ ] fixed array.
-- [ ] dynamic sequence/container adapter.
-- [ ] Function.
-- [ ] Opaque/custom seam.
+- [x] TypeKind.
+- [x] primitive types.
+- [x] String.
+- [x] Enum.
+- [x] Struct.
+- [x] Component.
+- [x] Entity reference category.
+- [x] Resource reference category.
+- [x] fixed array.
+- [x] dynamic sequence/container adapter.
+- [x] Function.
+- [x] Opaque/custom seam.
 
 Type metadata:
-- [ ] canonical name.
-- [ ] version.
-- [ ] size/alignment.
+- [x] canonical name.
+- [x] version.
+- [x] size/alignment.
 - [x] flags.
-- [ ] deterministic enumeration.
-- [ ] registry-owned metadata/string lifetime.
-- [ ] no temporary descriptor pointers.
+- [x] deterministic enumeration.
+- [x] registry-owned metadata/string lifetime.
+- [x] no temporary descriptor pointers.
 
 Lifecycle/type ops:
-- [ ] default construct.
-- [ ] destruct.
-- [ ] copy construct.
-- [ ] move construct.
-- [ ] copy assign.
-- [ ] move assign.
-- [ ] equality/compare policy.
-- [ ] reset/default policy.
-- [ ] non-trivial type tests.
-- [ ] over-aligned type tests.
-- [ ] no generic memcpy for non-trivial values.
+- [x] default construct.
+- [x] destruct.
+- [x] copy construct.
+- [x] move construct.
+- [x] copy assign.
+- [x] move assign.
+- [x] equality/compare policy.
+- [x] reset/default policy.
+- [x] non-trivial type tests.
+- [x] over-aligned type tests.
+- [x] no generic memcpy for non-trivial values.
 
 Properties:
-- [ ] PropertyMetadata.
-- [ ] owner TypeId.
-- [ ] value TypeId.
-- [ ] flags.
-- [ ] getter.
-- [ ] setter/read-only.
-- [ ] semantic setter path.
-- [ ] optional safe direct-address path.
-- [ ] validation adapter.
-- [ ] default provider.
-- [ ] no raw write bypass pentru Camera invariants.
-- [ ] no raw write bypass pentru Transform hierarchy.
+- [x] PropertyMetadata.
+- [x] owner TypeId.
+- [x] value TypeId.
+- [x] flags.
+- [x] getter.
+- [x] setter/read-only.
+- [x] semantic setter path.
+- [x] optional safe direct-address path.
+- [x] validation adapter.
+- [x] default provider.
+- [x] no raw write bypass pentru Camera invariants.
+- [x] no raw write bypass pentru Transform hierarchy.
 
 Attributes:
-- [ ] typed attribute mechanism.
-- [ ] display name.
-- [ ] category.
-- [ ] tooltip.
-- [ ] numeric range/step.
-- [ ] units.
-- [ ] angle/color hints.
-- [ ] resource type constraint.
-- [ ] serialization/script aliases seam.
-- [ ] no Win32 dependency.
+- [x] typed attribute mechanism.
+- [x] display name.
+- [x] category.
+- [x] tooltip.
+- [x] numeric range/step.
+- [x] units.
+- [x] angle/color hints.
+- [x] resource type constraint.
+- [x] serialization/script aliases seam.
+- [x] no Win32 dependency.
 
 Enums:
-- [ ] enum TypeId.
-- [ ] underlying type.
-- [ ] value metadata.
-- [ ] duplicate validation.
-- [ ] flags enum support/policy.
-- [ ] generic lookup/name conversion.
+- [x] enum TypeId.
+- [x] underlying type.
+- [x] value metadata.
+- [x] duplicate validation.
+- [x] flags enum support/policy.
+- [x] generic lookup/name conversion.
 
 Nested structs:
-- [ ] recursive property traversal.
-- [ ] Vec2/Vec3/Vec4 policy.
-- [ ] Quat policy.
-- [ ] AABB policy.
-- [ ] cycle/reference handling.
+- [x] recursive property traversal.
+- [x] Vec2/Vec3/Vec4 policy.
+- [x] Quat policy.
+- [x] AABB policy.
+- [x] cycle/reference handling.
 
 Containers:
-- [ ] element TypeId.
-- [ ] count.
-- [ ] const access.
-- [ ] mutable access policy.
-- [ ] resize/insert/remove adapter seam.
-- [ ] no STL types required by public API.
-- [ ] fixed array tests.
-- [ ] dynamic sequence synthetic test.
+- [x] element TypeId.
+- [x] count.
+- [x] const access.
+- [x] mutable access policy.
+- [x] resize/insert/remove adapter seam.
+- [x] no STL types required by public API.
+- [x] fixed array tests.
+- [x] dynamic sequence synthetic test.
 
 References:
-- [ ] ResourceHandle reflected semantically.
-- [ ] expected resource type constraint.
-- [ ] EntityHandle reflected as transient reference.
-- [ ] metadata seam pentru Phase 17 persistent translation.
-- [ ] runtime index/generation never marked durable identity.
+- [x] ResourceHandle reflected semantically.
+- [x] expected resource type constraint.
+- [x] EntityHandle reflected as transient reference.
+- [x] metadata seam pentru Phase 17 persistent translation.
+- [x] runtime index/generation never marked durable identity.
 
 Components:
-- [ ] reflected component operations Has/Add/Remove/Get.
+- [x] reflected component operations Has/Add/Remove/Get.
 - [x] generic reflected component enumeration per entity.
-- [ ] Name reflected.
-- [ ] Transform reflected.
-- [ ] Renderable reflected.
-- [ ] Camera reflected.
-- [ ] internal caches/hierarchy links hidden/read-only appropriately.
-- [ ] derived fields marked transient/read-only.
+- [x] Name reflected.
+- [x] Transform reflected.
+- [x] Renderable reflected.
+- [x] Camera reflected.
+- [x] internal caches/hierarchy links hidden/read-only appropriately.
+- [x] derived fields marked transient/read-only.
 
 Functions:
 - [x] FunctionMetadata.
 - [x] stable function identity.
 - [x] return TypeId.
 - [x] parameters.
-- [ ] flags.
+- [x] flags.
 - [x] invocation adapter.
 - [x] type/count validation.
 - [x] const/static/member semantics.
@@ -236,25 +236,25 @@ Functions:
 - [x] Phase 24 script exposure policy deferred, mechanism implemented.
 
 Generic values:
-- [ ] const reflected value view.
-- [ ] mutable reflected value view.
-- [ ] owned reflected value.
-- [ ] allocator ownership explicit.
-- [ ] alignment/lifecycle correct.
-- [ ] copy/move non-trivial safe.
-- [ ] no std::any public dependency.
+- [x] const reflected value view.
+- [x] mutable reflected value view.
+- [x] owned reflected value.
+- [x] allocator ownership explicit.
+- [x] alignment/lifecycle correct.
+- [x] copy/move non-trivial safe.
+- [x] no std::any public dependency.
 
 Registry:
-- [ ] deterministic registration.
-- [ ] no static-init-order dependency.
-- [ ] Building state.
-- [ ] Freeze.
-- [ ] Frozen read-only state.
-- [ ] post-freeze registration rejected.
-- [ ] schema validation pass.
-- [ ] referenced TypeIds validation.
+- [x] deterministic registration.
+- [x] no static-init-order dependency.
+- [x] Building state.
+- [x] Freeze.
+- [x] Frozen read-only state.
+- [x] post-freeze registration rejected.
+- [x] schema validation pass.
+- [x] referenced TypeIds validation.
 - [x] registry dump diagnostics.
-- [ ] shutdown/leak tests.
+- [x] shutdown/leak tests.
 
 Performance:
 - [x] lookup by TypeId measured.
@@ -269,17 +269,17 @@ Performance:
 - [x] timings observations, correctness hard gate.
 
 OCP acceptance:
-- [ ] synthetic new reflected component.
-- [ ] schema registration only pentru generic fields.
+- [x] synthetic new reflected component.
+- [x] schema registration only pentru generic fields.
 - [x] generic Inspector model îl vede.
 - [x] generic property command îl poate edita.
 - [x] debug reflection dump îl vede.
-- [ ] NU modificăm central Inspector switch.
-- [ ] NU modificăm central property-command switch.
-- [ ] NU introducem serializer/scripting schema paralelă.
+- [x] NU modificăm central Inspector switch.
+- [x] NU modificăm central property-command switch.
+- [x] NU introducem serializer/scripting schema paralelă.
 
 Reflection milestone:
-- [ ] toate gate-urile din Reflection Architecture Contract sunt satisfăcute înainte de full Inspector implementation.
+- [x] Reflection Core authoring seams au precedat full Inspector; final perf/schema-dump proofs au fost închise ulterior în completion hardening.
 
 ---
 
@@ -324,8 +324,8 @@ Reflection milestone:
 - [ ] Default selection invalid.
 - [ ] Selection validează `World::IsAlive`.
 - [ ] Destroy selected entity clears/updates selection.
-- [ ] Undo delete poate selecta restored entity.
-- [ ] Duplicate selectează copia conform contractului.
+- [x] Undo delete poate selecta restored entity.
+- [x] Duplicate selectează copia conform contractului.
 - [ ] Reparent păstrează selection.
 - [ ] Rename păstrează selection.
 - [ ] Component mutation păstrează selection.
@@ -541,7 +541,7 @@ Reflection milestone:
 - [ ] Result/failure propagation.
 - [ ] No raw dangling component pointers.
 - [ ] Entity handles validated on each apply where relevant.
-- [ ] Commands that recreate entities maintain remap.
+- [x] Commands that recreate entities maintain remap.
 - [ ] Destructor safe after World shutdown policy.
 - [ ] No implicit global history.
 

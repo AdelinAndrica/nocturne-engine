@@ -15,10 +15,38 @@ namespace noc
 
     [[nodiscard]] inline PropertyAccessContext
     MakeComponentPropertyAccessContext(
-        ComponentPropertyRuntimeContext& runtime) noexcept
+        ComponentPropertyRuntimeContext& runtime,
+        const ComponentMetadata* componentMetadata = nullptr) noexcept
     {
         PropertyAccessContext context{};
         context.userContext = &runtime;
+
+        // Generic reflected components may expose plain member properties,
+        // while foundation components deliberately route writes through
+        // semantic World adapters. Populate both seams: direct reflected
+        // members receive object/mutableObject, semantic adapters keep the
+        // runtime userContext. Foundation getMutable may intentionally be null.
+        if (runtime.world
+            && runtime.entity.IsValid()
+            && componentMetadata)
+        {
+            if (componentMetadata->getConst)
+            {
+                context.object =
+                    componentMetadata->getConst(
+                        *runtime.world,
+                        runtime.entity);
+            }
+
+            if (componentMetadata->getMutable)
+            {
+                context.mutableObject =
+                    componentMetadata->getMutable(
+                        *runtime.world,
+                        runtime.entity);
+            }
+        }
+
         return context;
     }
 

@@ -5239,6 +5239,12 @@ namespace nocturne::editor
                 auto context = session_->CommandContext();
                 if (session_->History().Undo(context))
                 {
+                    session_->ValidateSelection();
+                    const noc::EntityHandle hint =
+                        session_->History().LastSelectionHint();
+                    if (hint.IsValid())
+                        (void)session_->SetSelection(hint);
+
                     session_->SetSceneDirty();
                     PopulateScene_();
                     RefreshInspector();
@@ -5253,6 +5259,12 @@ namespace nocturne::editor
                 auto context = session_->CommandContext();
                 if (session_->History().Redo(context))
                 {
+                    session_->ValidateSelection();
+                    const noc::EntityHandle hint =
+                        session_->History().LastSelectionHint();
+                    if (hint.IsValid())
+                        (void)session_->SetSelection(hint);
+
                     session_->SetSceneDirty();
                     PopulateScene_();
                     RefreshInspector();

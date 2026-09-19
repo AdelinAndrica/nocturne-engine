@@ -32,6 +32,18 @@ namespace nocturne::editor
         [[nodiscard]] bool Undo(EditorCommandContext& context) override;
         [[nodiscard]] bool Redo(EditorCommandContext& context) override;
 
+        [[nodiscard]] noc::EntityHandle
+        SelectionHintAfterExecute() const noexcept override
+        {
+            return currentEntity_;
+        }
+
+        [[nodiscard]] noc::EntityHandle
+        SelectionHintAfterRedo() const noexcept override
+        {
+            return currentEntity_;
+        }
+
     private:
         [[nodiscard]] bool Create_(EditorCommandContext& context);
 
@@ -122,6 +134,12 @@ namespace nocturne::editor
         [[nodiscard]] bool Undo(EditorCommandContext& context) override;
         [[nodiscard]] bool Redo(EditorCommandContext& context) override;
 
+        [[nodiscard]] noc::EntityHandle
+        SelectionHintAfterUndo() const noexcept override
+        {
+            return snapshot_.CurrentRoot();
+        }
+
     private:
         ReflectedEntitySubtreeSnapshot snapshot_;
     };
@@ -141,6 +159,18 @@ namespace nocturne::editor
         [[nodiscard]] bool Execute(EditorCommandContext& context) override;
         [[nodiscard]] bool Undo(EditorCommandContext& context) override;
         [[nodiscard]] bool Redo(EditorCommandContext& context) override;
+
+        [[nodiscard]] noc::EntityHandle
+        SelectionHintAfterExecute() const noexcept override
+        {
+            return snapshot_.CurrentRoot();
+        }
+
+        [[nodiscard]] noc::EntityHandle
+        SelectionHintAfterRedo() const noexcept override
+        {
+            return snapshot_.CurrentRoot();
+        }
 
     private:
         ReflectedEntitySubtreeSnapshot snapshot_;

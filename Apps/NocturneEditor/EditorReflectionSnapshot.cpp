@@ -67,7 +67,9 @@ namespace nocturne::editor
             entity
         };
         noc::PropertyAccessContext propertyContext =
-            noc::MakeComponentPropertyAccessContext(runtime);
+            noc::MakeComponentPropertyAccessContext(
+                runtime,
+                type->componentMetadata);
 
         for (uint32_t i = 0; i < type->propertyCount; ++i)
         {
@@ -149,7 +151,9 @@ namespace nocturne::editor
             entity
         };
         noc::PropertyAccessContext propertyContext =
-            noc::MakeComponentPropertyAccessContext(runtime);
+            noc::MakeComponentPropertyAccessContext(
+                runtime,
+                type->componentMetadata);
 
         uint32_t remaining =
             static_cast<uint32_t>(properties_.size());

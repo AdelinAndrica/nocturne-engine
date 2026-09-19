@@ -282,6 +282,9 @@ namespace nocturne::editor
         EditorCommandContext& context,
         std::unique_ptr<IEditorCommand> command)
     {
+        lastSelectionHint_ =
+            noc::EntityHandle::Invalid();
+
         if (!command || maxCommandCount_ == 0 || maxBytes_ == 0)
             return false;
 
@@ -300,6 +303,9 @@ namespace nocturne::editor
 
         DiscardRedoTail_();
 
+        lastSelectionHint_ =
+            command->SelectionHintAfterExecute();
+
         usedBytes_ += cost;
         commands_.push_back(std::move(command));
         cursor_ = static_cast<uint32_t>(commands_.size());
@@ -313,6 +319,9 @@ namespace nocturne::editor
         EditorCommandContext& context,
         std::unique_ptr<IEditorCommand> command)
     {
+        lastSelectionHint_ =
+            noc::EntityHandle::Invalid();
+
         if (!command || maxCommandCount_ == 0 || maxBytes_ == 0)
         {
             if (command)
@@ -335,6 +344,9 @@ namespace nocturne::editor
 
         DiscardRedoTail_();
 
+        lastSelectionHint_ =
+            command->SelectionHintAfterExecute();
+
         usedBytes_ += cost;
         commands_.push_back(std::move(command));
         cursor_ = static_cast<uint32_t>(commands_.size());
@@ -346,12 +358,18 @@ namespace nocturne::editor
 
     bool EditorCommandHistory::Undo(EditorCommandContext& context)
     {
+        lastSelectionHint_ =
+            noc::EntityHandle::Invalid();
+
         if (!CanUndo())
             return false;
 
         IEditorCommand& command = *commands_[cursor_ - 1u];
         if (!command.Undo(context))
             return false;
+
+        lastSelectionHint_ =
+            command.SelectionHintAfterUndo();
 
         --cursor_;
         ++version_;
@@ -360,12 +378,18 @@ namespace nocturne::editor
 
     bool EditorCommandHistory::Redo(EditorCommandContext& context)
     {
+        lastSelectionHint_ =
+            noc::EntityHandle::Invalid();
+
         if (!CanRedo())
             return false;
 
         IEditorCommand& command = *commands_[cursor_];
         if (!command.Redo(context))
             return false;
+
+        lastSelectionHint_ =
+            command.SelectionHintAfterRedo();
 
         ++cursor_;
         ++version_;
@@ -377,6 +401,8 @@ namespace nocturne::editor
         commands_.clear();
         cursor_ = 0;
         usedBytes_ = 0;
+        lastSelectionHint_ =
+            noc::EntityHandle::Invalid();
         ++version_;
     }
 
@@ -408,6 +434,12 @@ namespace nocturne::editor
     uint64_t EditorCommandHistory::Version() const noexcept
     {
         return version_;
+    }
+
+    noc::EntityHandle
+    EditorCommandHistory::LastSelectionHint() const noexcept
+    {
+        return lastSelectionHint_;
     }
 
     const char* EditorCommandHistory::UndoLabel() const noexcept

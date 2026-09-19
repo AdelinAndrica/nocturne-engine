@@ -341,6 +341,14 @@ Keyboard shortcuts, Actor menu actions, hierarchy drag/drop and hierarchy contex
 
 ## 11. Remaining structural work in detail
 
+### 11.1A Selection remap after history recreation — IMPLEMENTED; CI PENDING
+
+`EditorCommandHistory` exposes a type-agnostic `LastSelectionHint()`. Create/Delete/Duplicate commands provide fresh runtime handles after operations that create or recreate authored entities. `EditorShellV3` validates current selection after Undo/Redo and applies the hint when present.
+
+This avoids RTTI or command-type switches in UI code. Automated tests cover create execute/redo, delete undo restored-root identity, and duplicate execute/redo.
+
+**Design choice (not directly from the book):** invalid hint means preserve current selection if it is still alive; stale destroyed handles are cleared by `EditorSession::ValidateSelection()`.
+
 ### 11.1 Transaction / CompoundCommand — IMPLEMENTED
 
 **Design choice (not directly from the book):** EditorSession owns one deferred transaction builder. Nested Begin is rejected. Append only records child commands and does not mutate World. Commit moves the resulting CompoundEditorCommand through the same EditorCommandHistory::Execute path; Cancel discards the pending transaction.
@@ -501,6 +509,14 @@ The Phase 16 allocation gate now has both corrective changes and evidence:
 - `EditorGizmoDragTransaction::PreviewMove` is exercised through a 10k-update hot-path workload with zero Nocturne allocator calls.
 
 This closes the Phase 16 allocation-discipline gate without claiming that `DebugAlloc` observes unrelated CRT or Win32 internal allocations.
+
+### 11.6A Generic direct-member component property access — IMPLEMENTED; CI PENDING
+
+The OCP editor-consumer proof exposed a real gap: editor property contexts previously populated only `userContext`, which supported Nocturne foundation semantic adapters but not newly registered components using ordinary direct-member reflected properties.
+
+`MakeComponentPropertyAccessContext()` now populates both direct object/mutable-object pointers from `ComponentMetadata` and the semantic World+Entity `userContext`. Inspector refresh/read, `SetReflectedPropertyCommand`, and reflected snapshot capture/restore all use the same context construction path.
+
+The synthetic OCP component now exercises generic component enumeration, schema dump, generic Inspector visibility and generic property command Undo/Redo without central switches.
 
 ### 11.6 Reflection schema diagnostics — VERIFIED
 
