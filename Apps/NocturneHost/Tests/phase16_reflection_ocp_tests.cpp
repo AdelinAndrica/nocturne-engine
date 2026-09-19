@@ -4,6 +4,9 @@
 #include "Runtime/Reflection/ReflectionRegistry.h"
 #include "Runtime/World.h"
 
+#include "../../NocturneEditor/EditorCommands.h"
+#include "../../NocturneEditor/EditorInspectorModel.h"
+
 #include "Core/Log.h"
 #include "Core/Memory/Allocator.h"
 #include "Core/Memory/DebugAlloc.h"
@@ -261,6 +264,13 @@ bool RunPhase16ReflectionOcpTests()
         world.Init(allocator, registry),
         "World init with synthetic reflected component failed");
 
+    nocturne::editor::EditorCommandContext editorContext{
+        world,
+        registry,
+        allocator,
+        noc::EntityHandle::Invalid()
+    };
+
     const noc::EntityHandle entity = world.CreateEntity();
     ok &= CheckOcp(
         entity.IsValid(),
@@ -275,6 +285,28 @@ bool RunPhase16ReflectionOcpTests()
             world,
             entity) == 1,
         "Synthetic component was not generically enumerable");
+
+    nocturne::editor::EditorInspectorModel inspectorModel;
+    ok &= CheckOcp(
+        inspectorModel.Refresh(
+            editorContext,
+            entity),
+        "Generic Inspector model did not refresh synthetic reflected component");
+
+    const noc::PropertyId syntheticSpeedPropertyId =
+        noc::MakePropertyId(
+            "Nocturne.Tests.ReflectionTestComponent.speed");
+    const auto* inspectorSpeed =
+        inspectorModel.FindProperty(
+            kReflectionTestTypeId,
+            syntheticSpeedPropertyId);
+
+    ok &= CheckOcp(
+        inspectorSpeed
+            && inspectorSpeed->editable
+            && inspectorSpeed->valueTypeId
+                == noc::BuiltinTypeIds::Float32,
+        "Generic Inspector model did not expose synthetic reflected property");
 
     auto* component =
         static_cast<ReflectionTestComponent*>(
@@ -299,6 +331,38 @@ bool RunPhase16ReflectionOcpTests()
 
     const float newSpeed = 7.5f;
     const bool newEnabled = false;
+
+    nocturne::editor::SetReflectedPropertyCommand
+        genericPropertyCommand;
+
+    const float commandSpeed = 4.25f;
+    ok &= CheckOcp(
+        genericPropertyCommand.Init(
+            editorContext,
+            entity,
+            kReflectionTestTypeId,
+            syntheticSpeedPropertyId,
+            noc::ReflectedConstValueView{
+                noc::BuiltinTypeIds::Float32,
+                &commandSpeed })
+            && genericPropertyCommand.Execute(
+                editorContext)
+            && component
+            && component->speed == commandSpeed
+            && genericPropertyCommand.Undo(
+                editorContext)
+            && component->speed == 1.0f
+            && genericPropertyCommand.Redo(
+                editorContext)
+            && component->speed == commandSpeed,
+        "Generic SetReflectedPropertyCommand did not edit synthetic component");
+
+    // Reset the command-authored value before the lower-level semantic
+    // reflected-value checks below.
+    ok &= CheckOcp(
+        genericPropertyCommand.Undo(editorContext)
+            && component->speed == 1.0f,
+        "Generic synthetic property command cleanup failed");
 
     ok &= CheckOcp(
         speed
