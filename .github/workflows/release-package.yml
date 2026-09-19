@@ -40,7 +40,7 @@ permissions:
 jobs:
   package:
     name: Ship ${{ matrix.architecture }}
-    runs-on: windows-latest
+    runs-on: [self-hosted, Windows, X64]
     timeout-minutes: 25
 
     strategy:
@@ -139,7 +139,7 @@ jobs:
     name: Publish GitHub release
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     needs: package
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Windows, X64]
     permissions:
       contents: write
 
@@ -154,18 +154,27 @@ jobs:
       - name: Publish release assets
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: bash
+        shell: pwsh
         run: |
-          shopt -s nullglob
-          assets=(release-assets/*.zip release-assets/*.sha256 release-assets/release-record-*.json)
-
-          if [ "${#assets[@]}" -eq 0 ]; then
-            echo "No packaged assets found."
+          $assets = @(
+            Get-ChildItem -Path "release-assets" -File | Where-Object {
+              $_.Name -like "*.zip" -or
+              $_.Name -like "*.sha256" -or
+              $_.Name -like "release-record-*.json"
+            } | ForEach-Object { $_.FullName }
+          )
+          
+          if ($assets.Count -eq 0) {
+            Write-Error "No packaged assets found."
             exit 1
-          fi
-
-          gh release create "${GITHUB_REF_NAME}" \
-            --repo "${GITHUB_REPOSITORY}" \
-            --title "Nocturne Engine ${GITHUB_REF_NAME}" \
-            --generate-notes \
-            "${assets[@]}"
+          }
+          
+          $ghArgs = @(
+            "release", "create", $env:GITHUB_REF_NAME,
+            "--repo", $env:GITHUB_REPOSITORY,
+            "--title", "Nocturne Engine $env:GITHUB_REF_NAME",
+            "--generate-notes"
+          ) + $assets
+          
+          & gh @ghArgs
+          exit $LASTEXITCODE
