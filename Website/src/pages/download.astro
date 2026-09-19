@@ -1,0 +1,273 @@
+---
+import SiteLayout from '../layouts/SiteLayout.astro';
+import releaseData from '../data/releases.json';
+
+const releases = releaseData.releases;
+const hasReleases = releases.length > 0;
+---
+
+<SiteLayout
+  title="Downloads — Nocturne Engine"
+  description="Download published Nocturne Engine builds by platform and architecture."
+>
+  <section class="download shell">
+    <div class="heading">
+      <span class="eyebrow">NOCTURNE / BUILDS</span>
+      <h1>Downloads</h1>
+      <p>
+        This page is artifact-driven. A platform or architecture is shown as downloadable
+        only after the release pipeline has produced a real build and checksum.
+      </p>
+    </div>
+
+    {hasReleases ? (
+      <div class="release-list">
+        {releases.map((release) => (
+          <article class="release">
+            <div class="release-header">
+              <div>
+                <span class="version">{release.version}</span>
+                <span class="channel">{release.channel}</span>
+              </div>
+              <time>{release.publishedAt}</time>
+            </div>
+
+            <div class="builds">
+              {release.builds.map((build) => (
+                <div class="build">
+                  <div>
+                    <strong>{build.platform} · {build.architecture}</strong>
+                    <small>{build.configuration} · {build.status}</small>
+                  </div>
+                  <a href={build.url ?? '#'} aria-disabled={!build.url}>Download</a>
+                </div>
+              ))}
+            </div>
+          </article>
+        ))}
+      </div>
+    ) : (
+      <div class="empty-state">
+        <div class="status-row">
+          <span class="status-dot" aria-hidden="true"></span>
+          RELEASE PIPELINE NOT PUBLISHED
+        </div>
+        <h2>No public artifacts yet.</h2>
+        <p>
+          Internal development has validated Windows x64 builds, but this page will not
+          fabricate a download. The first public artifact will appear here when CI emits
+          the release manifest and checksum.
+        </p>
+        <div class="target">
+          <span>Current development target</span>
+          <strong>Windows · x86_64</strong>
+          <small>Validated internally — not a public release artifact</small>
+        </div>
+      </div>
+    )}
+
+    <aside class="policy">
+      <h2>Build policy</h2>
+      <p>
+        Architecture cards are generated from release metadata. ARM64, x86 or other
+        targets will only appear after those builds are produced and validated.
+      </p>
+      <a href="/docs/development/production-engineering-standard">
+        Read the production engineering standard →
+      </a>
+    </aside>
+  </section>
+</SiteLayout>
+
+<style>
+  .shell {
+    width: min(980px, calc(100% - 2rem));
+    margin-inline: auto;
+  }
+
+  .download {
+    padding-block: clamp(3.5rem, 8vw, 7rem);
+  }
+
+  .eyebrow {
+    color: var(--noc-text-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+  }
+
+  h1 {
+    margin: 0.65rem 0 0.8rem;
+    font-family: var(--noc-font-display);
+    font-size: clamp(2.7rem, 6vw, 5rem);
+    letter-spacing: -0.05em;
+  }
+
+  .heading {
+    max-width: 44rem;
+  }
+
+  .heading p,
+  .empty-state p,
+  .policy p {
+    color: var(--noc-text-muted);
+    line-height: 1.7;
+  }
+
+  .release-list {
+    display: grid;
+    gap: 1rem;
+    margin-top: 2rem;
+  }
+
+  .release,
+  .empty-state,
+  .policy {
+    border: 1px solid var(--noc-border);
+    border-radius: 8px;
+    background: var(--noc-panel-bg);
+  }
+
+  .release {
+    overflow: hidden;
+  }
+
+  .release-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--noc-border);
+    background: var(--noc-panel-bg-alt);
+  }
+
+  .version {
+    color: var(--noc-text-primary);
+    font-weight: 700;
+  }
+
+  .channel,
+  time {
+    margin-left: 0.6rem;
+    color: var(--noc-text-muted);
+    font-size: 0.75rem;
+  }
+
+  .builds {
+    display: grid;
+  }
+
+  .build {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem;
+  }
+
+  .build + .build {
+    border-top: 1px solid var(--noc-border);
+  }
+
+  .build strong,
+  .build small {
+    display: block;
+  }
+
+  .build strong {
+    text-transform: capitalize;
+  }
+
+  .build small {
+    margin-top: 0.28rem;
+    color: var(--noc-text-muted);
+  }
+
+  .build a {
+    padding: 0.55rem 0.8rem;
+    border: 1px solid var(--noc-accent);
+    border-radius: var(--noc-radius-sm);
+    background: var(--noc-accent);
+    color: white;
+    text-decoration: none;
+    font-size: 0.78rem;
+    font-weight: 650;
+  }
+
+  .empty-state {
+    margin-top: 2rem;
+    padding: clamp(1.25rem, 4vw, 2rem);
+  }
+
+  .status-row {
+    color: var(--noc-warning);
+    font-family: var(--noc-font-mono);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+
+  .status-dot {
+    display: inline-block;
+    width: 0.45rem;
+    height: 0.45rem;
+    margin-right: 0.4rem;
+    border-radius: 50%;
+    background: var(--noc-warning);
+  }
+
+  .empty-state h2,
+  .policy h2 {
+    margin: 0.75rem 0 0.45rem;
+    font-family: var(--noc-font-display);
+  }
+
+  .target {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.25rem 1rem;
+    margin-top: 1.3rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--noc-border);
+    border-radius: var(--noc-radius-md);
+    background: var(--noc-input-bg);
+  }
+
+  .target span,
+  .target small {
+    color: var(--noc-text-muted);
+    font-size: 0.75rem;
+  }
+
+  .target strong {
+    grid-row: span 2;
+    align-self: center;
+    font-family: var(--noc-font-mono);
+    font-size: 0.78rem;
+  }
+
+  .policy {
+    margin-top: var(--noc-panel-gap);
+    padding: 1rem 1.2rem;
+  }
+
+  .policy h2 {
+    font-size: 1rem;
+  }
+
+  .policy a {
+    color: var(--noc-accent-hover);
+    font-size: 0.82rem;
+    font-weight: 650;
+  }
+
+  @media (max-width: 620px) {
+    .target {
+      grid-template-columns: 1fr;
+    }
+
+    .target strong {
+      grid-row: auto;
+    }
+  }
+</style>

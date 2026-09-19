@@ -1,0 +1,109 @@
+@import './generated/nocturne-theme.css';
+
+:root {
+  color-scheme: dark;
+
+  --sl-font: var(--noc-font-ui);
+  --sl-font-mono: var(--noc-font-mono);
+
+  --sl-color-accent-low: #0c2a46;
+  --sl-color-accent: var(--noc-accent);
+  --sl-color-accent-high: #b8dcff;
+
+  --sl-color-white: var(--noc-text-primary);
+  --sl-color-gray-1: #d5dfeb;
+  --sl-color-gray-2: #b5c2d1;
+  --sl-color-gray-3: var(--noc-text-muted);
+  --sl-color-gray-4: #627389;
+  --sl-color-gray-5: var(--noc-border);
+  --sl-color-gray-6: var(--noc-panel-bg-alt);
+  --sl-color-black: var(--noc-window-bg);
+
+  --sl-color-bg: var(--noc-window-bg);
+  --sl-color-bg-nav: color-mix(in srgb, var(--noc-toolbar-bg) 94%, transparent);
+  --sl-color-bg-sidebar: var(--noc-panel-bg);
+  --sl-color-hairline: var(--noc-border);
+  --sl-color-hairline-light: color-mix(in srgb, var(--noc-border) 72%, transparent);
+  --sl-color-text: var(--noc-text-primary);
+  --sl-color-text-accent: var(--noc-accent-hover);
+
+  --sl-content-width: 52rem;
+  --sl-sidebar-width: 17.5rem;
+}
+
+html {
+  background: var(--noc-window-bg);
+  scrollbar-color: #34465a var(--noc-input-bg);
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at 70% -20%, rgba(25, 132, 236, 0.08), transparent 34rem),
+    var(--noc-window-bg);
+  color: var(--noc-text-primary);
+  font-family: var(--noc-font-ui);
+}
+
+a {
+  text-underline-offset: 0.16em;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--noc-accent) 42%, transparent);
+  color: var(--noc-text-primary);
+}
+
+:focus-visible {
+  outline: 2px solid var(--noc-accent);
+  outline-offset: 2px;
+}
+
+header.header {
+  border-bottom-color: var(--noc-border);
+  background: color-mix(in srgb, var(--noc-toolbar-bg) 94%, transparent);
+  backdrop-filter: blur(14px);
+}
+
+.sidebar-pane {
+  border-inline-end-color: var(--noc-border);
+  background: var(--noc-panel-bg);
+}
+
+.right-sidebar {
+  border-inline-start-color: var(--noc-border);
+}
+
+.sl-markdown-content code:not(:where(.not-content *)) {
+  border: 1px solid color-mix(in srgb, var(--noc-border) 78%, transparent);
+  border-radius: 4px;
+  background: var(--noc-input-bg);
+}
+
+.sl-markdown-content table {
+  border: 1px solid var(--noc-border);
+}
+
+.sl-markdown-content th {
+  background: var(--noc-panel-bg-alt);
+}
+
+.expressive-code {
+  --ec-brdRad: var(--noc-radius-md);
+}
+
+.site-title {
+  font-family: var(--noc-font-display);
+  letter-spacing: 0.035em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

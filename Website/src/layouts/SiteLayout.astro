@@ -1,0 +1,135 @@
+---
+import '../styles/nocturne.css';
+
+interface Props {
+  title: string;
+  description: string;
+}
+
+const { title, description } = Astro.props;
+const pathname = Astro.url.pathname;
+const isActive = (href: string) =>
+  href === '/' ? pathname === '/' : pathname.startsWith(href);
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#0A0F16" />
+    <title>{title}</title>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="Nocturne Engine home">
+        <img src="/nocturne-logo.png" alt="" width="28" height="28" />
+        <span>NOCTURNE ENGINE</span>
+      </a>
+
+      <nav aria-label="Primary navigation">
+        <a class:list={{ active: isActive('/docs') }} href="/docs">Docs</a>
+        <a class:list={{ active: isActive('/download') }} href="/download">Download</a>
+      </nav>
+    </header>
+
+    <main>
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      <span>Nocturne Engine</span>
+      <span class="muted">Windows · C++20+ · DirectX 12</span>
+    </footer>
+  </body>
+</html>
+
+<style>
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    min-height: var(--noc-menu-height);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.55rem clamp(1rem, 4vw, 4rem);
+    border-bottom: 1px solid var(--noc-border);
+    background: color-mix(in srgb, var(--noc-toolbar-bg) 94%, transparent);
+    backdrop-filter: blur(14px);
+  }
+
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.65rem;
+    color: var(--noc-text-primary);
+    text-decoration: none;
+    font-family: var(--noc-font-display);
+    font-size: 0.78rem;
+    font-weight: 650;
+    letter-spacing: 0.09em;
+  }
+
+  .brand img {
+    object-fit: contain;
+  }
+
+  nav {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  nav a {
+    padding: 0.48rem 0.72rem;
+    border: 1px solid transparent;
+    border-radius: var(--noc-radius-sm);
+    color: var(--noc-text-muted);
+    text-decoration: none;
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+
+  nav a:hover {
+    background: var(--noc-button-hover);
+    color: var(--noc-text-primary);
+  }
+
+  nav a.active {
+    border-color: color-mix(in srgb, var(--noc-accent) 45%, var(--noc-border));
+    background: color-mix(in srgb, var(--noc-accent) 14%, var(--noc-button-bg));
+    color: var(--noc-text-primary);
+  }
+
+  main {
+    min-height: calc(100vh - 8rem);
+  }
+
+  .site-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.1rem clamp(1rem, 4vw, 4rem);
+    border-top: 1px solid var(--noc-border);
+    background: var(--noc-toolbar-bg);
+    color: var(--noc-text-primary);
+    font-size: 0.75rem;
+  }
+
+  .muted {
+    color: var(--noc-text-muted);
+  }
+
+  @media (max-width: 640px) {
+    .brand span {
+      display: none;
+    }
+
+    .site-footer {
+      flex-direction: column;
+    }
+  }
+</style>

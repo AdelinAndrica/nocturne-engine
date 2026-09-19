@@ -1,0 +1,472 @@
+---
+import SiteLayout from '../layouts/SiteLayout.astro';
+---
+
+<SiteLayout
+  title="Nocturne Engine"
+  description="Nocturne Engine — a custom Windows C++20+ game engine for first-person survival horror."
+>
+  <section class="hero shell">
+    <div class="hero-copy">
+      <div class="eyebrow">
+        <span class="status-dot" aria-hidden="true"></span>
+        NOCTURNE / ENGINE
+      </div>
+      <h1>Built for the dark.</h1>
+      <p class="lede">
+        A custom C++ game engine and editor built for a first-person survival horror game,
+        with a Windows-first runtime and DirectX 12 renderer.
+      </p>
+
+      <div class="actions">
+        <a class="button primary" href="/docs">Documentation</a>
+        <a class="button" href="/download">Downloads</a>
+      </div>
+
+      <div class="tech-line" aria-label="Core technology">
+        <span>Windows</span>
+        <span>C++20+</span>
+        <span>DirectX 12</span>
+      </div>
+    </div>
+
+    <div class="editor-surface" aria-label="Nocturne Engine technical overview">
+      <div class="surface-toolbar">
+        <span class="surface-title">NOCTURNE</span>
+        <span class="surface-state"><i></i> Runtime ready</span>
+      </div>
+      <div class="surface-body">
+        <div class="surface-sidebar">
+          <span>SCENE</span>
+          <b>Runtime World</b>
+          <span>Resources</span>
+          <span>Renderer</span>
+          <span>Editor</span>
+        </div>
+        <div class="viewport">
+          <div class="viewport-grid"></div>
+          <img src="/nocturne-logo.png" alt="" />
+          <strong>NOCTURNE ENGINE</strong>
+          <small>Runtime · Rendering · Tools</small>
+        </div>
+        <div class="surface-inspector">
+          <span>STATUS</span>
+          <dl>
+            <div><dt>Runtime</dt><dd>Ready</dd></div>
+            <div><dt>Renderer</dt><dd>DX12</dd></div>
+            <div><dt>Editor</dt><dd>Active</dd></div>
+          </dl>
+        </div>
+      </div>
+      <div class="surface-status">
+        <span><i></i> Ready</span>
+        <span>Nocturne Engine</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="capabilities shell" aria-labelledby="capabilities-title">
+    <div class="section-heading">
+      <span class="eyebrow">CURRENT FOUNDATION</span>
+      <h2 id="capabilities-title">One engine. One editor. Explicit systems.</h2>
+      <p>
+        The site documents the current implementation rather than presenting planned
+        roadmap systems as finished features.
+      </p>
+    </div>
+
+    <div class="capability-grid">
+      <article>
+        <span class="index">01</span>
+        <h3>Runtime</h3>
+        <p>Explicit subsystem lifetime, main-loop ownership and production engineering contracts.</p>
+      </article>
+      <article>
+        <span class="index">02</span>
+        <h3>Rendering</h3>
+        <p>DirectX 12 renderer foundation with editor viewport integration and GPU resource infrastructure.</p>
+      </article>
+      <article>
+        <span class="index">03</span>
+        <h3>Resources</h3>
+        <p>Virtual file system, resource management and an asset import/cook pipeline designed for tooling.</p>
+      </article>
+      <article>
+        <span class="index">04</span>
+        <h3>Editor</h3>
+        <p>A native Windows authoring surface built on the same runtime rather than a second engine.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="docs-cta shell">
+    <div>
+      <span class="eyebrow">DOCUMENTATION</span>
+      <h2>Architecture that stays inspectable.</h2>
+      <p>
+        Read the architectural contract, implementation history, production engineering
+        standard and current system documentation from one searchable surface.
+      </p>
+    </div>
+    <a class="button primary" href="/docs">Open documentation →</a>
+  </section>
+</SiteLayout>
+
+<style>
+  .shell {
+    width: min(1180px, calc(100% - 2rem));
+    margin-inline: auto;
+  }
+
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(480px, 1.1fr);
+    align-items: center;
+    gap: clamp(2rem, 6vw, 6rem);
+    padding-block: clamp(4.5rem, 9vw, 8rem);
+  }
+
+  .eyebrow {
+    color: var(--noc-text-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+  }
+
+  .status-dot {
+    display: inline-block;
+    width: 0.46rem;
+    height: 0.46rem;
+    margin-right: 0.45rem;
+    border-radius: 999px;
+    background: var(--noc-accent);
+    box-shadow: 0 0 16px color-mix(in srgb, var(--noc-accent) 60%, transparent);
+  }
+
+  h1 {
+    margin: 0.8rem 0 1rem;
+    font-family: var(--noc-font-display);
+    font-size: clamp(3.4rem, 7vw, 6.4rem);
+    line-height: 0.94;
+    letter-spacing: -0.055em;
+  }
+
+  .lede {
+    max-width: 42rem;
+    color: var(--noc-text-muted);
+    font-size: clamp(1rem, 1.8vw, 1.17rem);
+    line-height: 1.7;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    margin-top: 1.6rem;
+  }
+
+  .button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.55rem;
+    padding: 0 1rem;
+    border: 1px solid var(--noc-border);
+    border-radius: var(--noc-radius-md);
+    background: var(--noc-button-bg);
+    color: var(--noc-text-primary);
+    text-decoration: none;
+    font-size: 0.84rem;
+    font-weight: 650;
+  }
+
+  .button:hover {
+    border-color: color-mix(in srgb, var(--noc-border) 55%, var(--noc-text-muted));
+    background: var(--noc-button-hover);
+  }
+
+  .button.primary {
+    border-color: var(--noc-accent);
+    background: var(--noc-accent);
+    color: #f7fbff;
+  }
+
+  .button.primary:hover {
+    border-color: var(--noc-accent-hover);
+    background: var(--noc-accent-hover);
+  }
+
+  .tech-line {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 1.35rem;
+  }
+
+  .tech-line span {
+    padding: 0.3rem 0.5rem;
+    border: 1px solid var(--noc-border);
+    border-radius: 4px;
+    background: var(--noc-input-bg);
+    color: var(--noc-text-muted);
+    font-family: var(--noc-font-mono);
+    font-size: 0.72rem;
+  }
+
+  .editor-surface {
+    overflow: hidden;
+    border: 1px solid var(--noc-border);
+    border-radius: 8px;
+    background: var(--noc-panel-bg);
+    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.34);
+  }
+
+  .surface-toolbar,
+  .surface-status {
+    min-height: 2.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-inline: 0.75rem;
+    background: var(--noc-toolbar-bg);
+    color: var(--noc-text-muted);
+    font-size: 0.66rem;
+  }
+
+  .surface-toolbar {
+    border-bottom: 1px solid var(--noc-border);
+  }
+
+  .surface-status {
+    border-top: 1px solid var(--noc-border);
+  }
+
+  .surface-title {
+    color: var(--noc-text-primary);
+    font-weight: 700;
+    letter-spacing: 0.11em;
+  }
+
+  .surface-state i,
+  .surface-status i {
+    display: inline-block;
+    width: 0.42rem;
+    height: 0.42rem;
+    margin-right: 0.32rem;
+    border-radius: 50%;
+    background: var(--noc-success);
+  }
+
+  .surface-body {
+    min-height: 330px;
+    display: grid;
+    grid-template-columns: 108px 1fr 124px;
+    gap: 1px;
+    background: var(--noc-border);
+  }
+
+  .surface-sidebar,
+  .surface-inspector {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    padding: 0.8rem;
+    background: var(--noc-panel-bg);
+    color: var(--noc-text-muted);
+    font-size: 0.62rem;
+  }
+
+  .surface-sidebar > span:first-child,
+  .surface-inspector > span:first-child {
+    color: var(--noc-text-muted);
+    font-size: 0.57rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+  }
+
+  .surface-sidebar b {
+    color: var(--noc-text-primary);
+    font-size: 0.65rem;
+  }
+
+  .viewport {
+    position: relative;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    overflow: hidden;
+    min-width: 0;
+    background:
+      radial-gradient(circle at 50% 38%, rgba(25, 132, 236, 0.09), transparent 9rem),
+      var(--noc-viewport-bg);
+  }
+
+  .viewport-grid {
+    position: absolute;
+    inset: 45% -30% -50%;
+    opacity: 0.45;
+    transform: perspective(360px) rotateX(62deg);
+    transform-origin: top;
+    background-image:
+      linear-gradient(var(--noc-border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--noc-border) 1px, transparent 1px);
+    background-size: 30px 30px;
+  }
+
+  .viewport img {
+    position: relative;
+    z-index: 1;
+    width: 54px;
+    height: 54px;
+    object-fit: contain;
+    opacity: 0.82;
+  }
+
+  .viewport strong,
+  .viewport small {
+    position: relative;
+    z-index: 1;
+  }
+
+  .viewport strong {
+    margin-top: 0.7rem;
+    font-family: var(--noc-font-display);
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+  }
+
+  .viewport small {
+    margin-top: 0.35rem;
+    color: var(--noc-text-muted);
+    font-size: 0.62rem;
+  }
+
+  dl,
+  dl div {
+    margin: 0;
+  }
+
+  dl div {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.6rem;
+    padding-block: 0.42rem;
+    border-bottom: 1px solid var(--noc-border);
+  }
+
+  dt,
+  dd {
+    margin: 0;
+  }
+
+  dd {
+    color: var(--noc-text-primary);
+  }
+
+  .capabilities {
+    padding-block: 2rem 6rem;
+  }
+
+  .section-heading {
+    max-width: 46rem;
+    margin-bottom: 2rem;
+  }
+
+  .section-heading h2,
+  .docs-cta h2 {
+    margin: 0.55rem 0 0.7rem;
+    font-family: var(--noc-font-display);
+    font-size: clamp(1.9rem, 4vw, 3rem);
+    letter-spacing: -0.035em;
+  }
+
+  .section-heading p,
+  .docs-cta p {
+    color: var(--noc-text-muted);
+    line-height: 1.7;
+  }
+
+  .capability-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--noc-panel-gap);
+  }
+
+  .capability-grid article {
+    min-height: 165px;
+    padding: 1rem;
+    border: 1px solid var(--noc-border);
+    border-radius: var(--noc-radius-md);
+    background: var(--noc-panel-bg);
+  }
+
+  .index {
+    color: var(--noc-accent);
+    font-family: var(--noc-font-mono);
+    font-size: 0.7rem;
+  }
+
+  .capability-grid h3 {
+    margin: 1.8rem 0 0.5rem;
+    font-size: 0.95rem;
+  }
+
+  .capability-grid p {
+    margin: 0;
+    color: var(--noc-text-muted);
+    font-size: 0.82rem;
+    line-height: 1.65;
+  }
+
+  .docs-cta {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 2rem;
+    margin-bottom: 5rem;
+    padding: clamp(1.4rem, 4vw, 2.4rem);
+    border: 1px solid var(--noc-border);
+    border-radius: 8px;
+    background:
+      linear-gradient(120deg, rgba(25, 132, 236, 0.08), transparent 42%),
+      var(--noc-panel-bg);
+  }
+
+  .docs-cta > div {
+    max-width: 45rem;
+  }
+
+  @media (max-width: 940px) {
+    .hero {
+      grid-template-columns: 1fr;
+    }
+
+    .capability-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (max-width: 620px) {
+    .hero {
+      padding-top: 3.25rem;
+    }
+
+    .surface-body {
+      grid-template-columns: 82px 1fr;
+    }
+
+    .surface-inspector {
+      display: none;
+    }
+
+    .capability-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .docs-cta {
+      align-items: start;
+      flex-direction: column;
+    }
+  }
+</style>

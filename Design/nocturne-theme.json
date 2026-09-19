@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "name": "Nocturne",
+  "source": {
+    "editorTheme": "Apps/NocturneEditor/EditorTheme.cpp",
+    "editorShell": "Apps/NocturneEditor/EditorShellV3.cpp",
+    "auditedCommit": "91feb6411910a398827792b20059e7c275b4983c"
+  },
+  "note": "Design choice (not directly from the book): shared product design tokens derived from the validated Nocturne Editor visual baseline.",
+  "colors": {
+    "windowBg": "#0A0F16",
+    "panelBg": "#101720",
+    "panelBgAlt": "#141C27",
+    "viewportBg": "#0D1621",
+    "toolbarBg": "#0E151E",
+    "inputBg": "#0C131C",
+    "buttonBg": "#151F2D",
+    "buttonHover": "#1B283A",
+    "border": "#222F3F",
+    "textPrimary": "#DEE6F0",
+    "textMuted": "#8495AB",
+    "accent": "#1984EC",
+    "accentHover": "#2A94FA",
+    "success": "#4ECD70",
+    "warning": "#E2A643",
+    "danger": "#E85667"
+  },
+  "metrics": {
+    "menuHeightPx": 36,
+    "toolbarHeightPx": 48,
+    "statusHeightPx": 24,
+    "panelGapPx": 7,
+    "panelHeaderHeightPx": 29,
+    "toolbarButtonHeightPx": 34,
+    "contentInnerPaddingPx": 9,
+    "contentSearchHeightPx": 30,
+    "contentActionSizePx": 30,
+    "contentActionGapPx": 4,
+    "radiusSmallPx": 5,
+    "radiusMediumPx": 6
+  },
+  "typography": {
+    "ui": ["Segoe UI Variable Text", "Segoe UI", "system-ui", "sans-serif"],
+    "display": ["Segoe UI Variable Display", "Segoe UI", "system-ui", "sans-serif"],
+    "mono": ["Cascadia Mono", "Cascadia Code", "Consolas", "ui-monospace", "monospace"]
+  },
+  "icons": {
+    "family": "Tabler Icons",
+    "version": "3.46.0",
+    "source": "ThirdParty/TablerIcons",
+    "license": "MIT",
+    "logicalViewBox": 24,
+    "strokeWidth": 2
+  }
+}

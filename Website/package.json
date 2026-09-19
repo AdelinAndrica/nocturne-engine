@@ -1,0 +1,22 @@
+{
+  "name": "nocturne-engine-website",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "prepare:nocturne": "node scripts/prepare.mjs",
+    "predev": "npm run prepare:nocturne",
+    "dev": "astro dev",
+    "prebuild": "npm run prepare:nocturne",
+    "build": "astro build",
+    "preview": "astro preview",
+    "sync": "npm run prepare:nocturne"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "0.42.2",
+    "astro": "7.3.3"
+  }
+}
