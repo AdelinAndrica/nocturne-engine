@@ -752,6 +752,21 @@ No arbitrary timing budget is introduced before measurements.
 
 ---
 
+### Recoverable authoring failure policy
+
+**Design choice (not directly from the book):** Phase 16 treats invalid/stale user actions, validation failures, resource-selection failures and allocation failures as recoverable authoring errors.
+
+Policy:
+
+- command/model/runtime seams return `bool`, enum/status, or invalid handle/value rather than asserting for expected user mistakes;
+- mutation is committed only after validation succeeds;
+- partial structural work is rolled back where mutation has already begun;
+- history cursor/ownership changes only after a successful command adoption;
+- EditorShellV3 converts recoverable interaction failures into user-visible Console diagnostics;
+- low-level subsystem logging may supplement the editor diagnostic, but an assertion is reserved for programmer/invariant violations rather than routine invalid authoring input;
+- a failed asset selection never replaces the previous reflected `ResourceHandle`;
+- failure paths must preserve valid World/session/history state.
+
 ## 23. Testing / CI plan
 
 Retain all Phase 15 tests.

@@ -446,6 +446,12 @@ Allocation-discipline evidence now includes:
 
 **Design choice (not directly from the book):** STL presentation allocations are evidenced through capacity-growth/retained-capacity telemetry rather than pretending that Nocturne's DebugAlloc intercepts the CRT heap. Win32/GDI draw-object creation remains bounded, immediately released and visually regression-tested separately.
 
+### 11.3B Error-handling policy reconciliation — VERIFIED
+
+The Phase 16 error matrix now has explicit policy and evidence for stale selection/targets, allocation failures, duplicate/absent/required components, invalid hierarchy targets, singular/non-representable transforms, invalid names/numerics/camera lens, invalid asset/resource selection, history budget failures, compound rollback and tool-camera misuse.
+
+Recoverable authoring errors return a result/status, preserve state, and surface user-visible Console diagnostics at the EditorShellV3 interaction boundary. Assertions are not the expected control path for routine invalid authoring input.
+
 ### 11.4 Completion test matrices
 
 #### Hierarchy — VERIFIED / CLOSED

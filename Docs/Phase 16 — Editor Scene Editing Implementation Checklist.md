@@ -882,7 +882,7 @@ Dacă nu este implementat:
 - [x] stale selected entity.
 - [x] stale command target.
 - [x] create allocation fail.
-- [ ] snapshot allocation fail.
+- [x] snapshot allocation fail.
 - [x] restore allocation fail.
 - [x] duplicate component.
 - [x] absent component remove.
@@ -892,19 +892,19 @@ Dacă nu este implementat:
 - [x] cycle parent.
 - [x] non-invertible parent transform.
 - [x] TRS decomposition failure.
-- [ ] invalid name.
+- [x] invalid name.
 - [x] invalid numeric field.
 - [x] invalid camera lens.
-- [ ] invalid asset/resource.
+- [x] invalid asset/resource.
 - [x] history budget failure.
 - [x] compound rollback failure.
 - [x] editor tool camera misuse.
 - [x] shutdown with active transaction.
 
 Fiecare caz are:
-- [ ] return/result policy.
-- [ ] log/assert policy.
-- [ ] user-visible diagnostic policy.
+- [x] return/result policy.
+- [x] log/assert policy.
+- [x] user-visible diagnostic policy.
 - [x] state integrity verification.
 
 ---
