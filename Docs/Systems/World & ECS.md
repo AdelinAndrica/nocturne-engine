@@ -9,6 +9,8 @@ description: "Canonical runtime entity identity, component ownership, transform 
 source_files: ["Engine/Runtime/World.h","Engine/Runtime/World.cpp","Engine/Runtime/Entity.h","Engine/Runtime/EntityRegistry.h","Engine/Runtime/ComponentStorage.h","Engine/Runtime/ComponentRegistry.h"]
 source_docs: ["Docs/nocturne_engine_architecture.md","Docs/Phase 15 — Entity Component System Architecture.md","Docs/Phase 15 — Completion Report.md"]
 book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §16.2.1.6 Pure Component Models","Jason Gregory — Game Engine Architecture (3rd ed.), §16.2.2 Property-Centric Architectures","Jason Gregory — Game Engine Architecture (3rd ed.), §16.5 Object References and World Queries","Bob Nystrom — Game Programming Patterns, Component and Data Locality"]
+aliases: ["World","ECS","Entity Component System","World & ECS"]
+deprecated_aliases: []
 ---
 
 # World & ECS
