@@ -2985,8 +2985,16 @@ bool RunPhase16EditorSessionTests()
 
         if (!world.HasRenderable(authored))
         {
+            const noc::AABB defaultBounds{
+                noc::Vec3::Zero(),
+                noc::Vec3::Zero()
+            };
+
             ok &= CheckEditorSession(
-                world.AddRenderable(authored),
+                world.AddRenderable(
+                    authored,
+                    noc::ResourceHandle{},
+                    defaultBounds),
                 "Asset assignment Renderable setup failed");
         }
 
