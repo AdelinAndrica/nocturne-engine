@@ -41,6 +41,9 @@ jobs:
       - name: Install website dependencies
         run: npm ci --no-audit --no-fund
 
+      - name: Validate release manifest
+        run: npm run validate:releases
+
       - name: Build static website
         run: npm run build
 
@@ -86,3 +89,9 @@ jobs:
           grep -q "noc.world" dist/index.html
           grep -q "noc.editor" dist/index.html
           grep -q "Skip to content" dist/index.html
+
+          test -f ../Schemas/release.schema.json
+          grep -q "PUBLIC RELEASE NOT PUBLISHED" dist/download/index.html
+          grep -q "0 published artifacts" dist/download/index.html
+          grep -q "Configuration is not the same as support" dist/download/index.html
+          grep -q "SHA-256" dist/download/index.html
