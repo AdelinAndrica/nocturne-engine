@@ -19,22 +19,37 @@ const isActive = (href: string) =>
     <meta name="viewport" content="width=device-width" />
     <meta name="description" content={description} />
     <meta name="theme-color" content="#0A0F16" />
+    <meta name="color-scheme" content="dark" />
     <title>{title}</title>
   </head>
   <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+
     <header class="site-header">
       <a class="brand" href="/" aria-label="Nocturne Engine home">
         <img src="/nocturne-logo.png" alt="" width="28" height="28" />
-        <span>NOCTURNE ENGINE</span>
+        <span class="brand-name">NOCTURNE ENGINE</span>
       </a>
 
       <nav aria-label="Primary navigation">
-        <a class:list={{ active: isActive('/docs') }} href="/docs">Docs</a>
-        <a class:list={{ active: isActive('/download') }} href="/download">Download</a>
+        <a
+          class:list={{ active: isActive('/docs') }}
+          href="/docs/"
+          aria-current={isActive('/docs') ? 'page' : undefined}
+        >
+          Docs
+        </a>
+        <a
+          class:list={{ active: isActive('/download') }}
+          href="/download"
+          aria-current={isActive('/download') ? 'page' : undefined}
+        >
+          Download
+        </a>
       </nav>
     </header>
 
-    <main>
+    <main id="main-content" tabindex="-1">
       <slot />
     </main>
 
@@ -46,6 +61,26 @@ const isActive = (href: string) =>
 </html>
 
 <style>
+  .skip-link {
+    position: fixed;
+    top: 0.6rem;
+    left: 0.75rem;
+    z-index: 1000;
+    padding: 0.55rem 0.75rem;
+    border: 1px solid var(--noc-accent);
+    border-radius: var(--noc-radius-sm);
+    background: var(--noc-panel-bg-alt);
+    color: var(--noc-text-primary);
+    text-decoration: none;
+    font-size: 0.8rem;
+    font-weight: 650;
+    transform: translateY(-180%);
+  }
+
+  .skip-link:focus {
+    transform: translateY(0);
+  }
+
   .site-header {
     position: sticky;
     top: 0;
@@ -74,6 +109,8 @@ const isActive = (href: string) =>
   }
 
   .brand img {
+    width: 28px;
+    height: 28px;
     object-fit: contain;
   }
 
@@ -84,7 +121,10 @@ const isActive = (href: string) =>
   }
 
   nav a {
-    padding: 0.48rem 0.72rem;
+    min-height: 2.2rem;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 0.72rem;
     border: 1px solid transparent;
     border-radius: var(--noc-radius-sm);
     color: var(--noc-text-muted);
@@ -106,6 +146,7 @@ const isActive = (href: string) =>
 
   main {
     min-height: calc(100vh - 8rem);
+    outline: none;
   }
 
   .site-footer {
@@ -124,12 +165,22 @@ const isActive = (href: string) =>
   }
 
   @media (max-width: 640px) {
-    .brand span {
+    .brand-name {
       display: none;
+    }
+
+    .site-header {
+      padding-inline: 0.8rem;
     }
 
     .site-footer {
       flex-direction: column;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .skip-link {
+      transition: none;
     }
   }
 </style>
