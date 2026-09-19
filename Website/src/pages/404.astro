@@ -1,0 +1,98 @@
+---
+import SiteLayout from '../layouts/SiteLayout.astro';
+---
+
+<SiteLayout
+  title="Page not found — Nocturne Engine"
+  description="The requested Nocturne Engine page does not exist."
+>
+  <section class="not-found">
+    <span class="code">404</span>
+    <span class="eyebrow">NOCTURNE / ROUTE</span>
+    <h1>Page not found.</h1>
+    <p>
+      The requested route does not exist or moved to a newer canonical documentation path.
+    </p>
+    <div class="actions">
+      <a class="primary" href="/docs/">Documentation</a>
+      <a href="/">Website home</a>
+    </div>
+  </section>
+</SiteLayout>
+
+<style>
+  .not-found {
+    width: min(760px, calc(100% - 2rem));
+    min-height: calc(100vh - 12rem);
+    margin-inline: auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding-block: 4rem;
+  }
+
+  .code,
+  .eyebrow {
+    font-family: var(--noc-font-mono);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+  }
+
+  .code {
+    color: var(--noc-accent);
+  }
+
+  .eyebrow {
+    margin-top: 0.5rem;
+    color: var(--noc-text-muted);
+  }
+
+  h1 {
+    margin: 0.8rem 0 0.65rem;
+    font-family: var(--noc-font-display);
+    font-size: clamp(2.8rem, 7vw, 5rem);
+    letter-spacing: -0.05em;
+  }
+
+  p {
+    max-width: 38rem;
+    color: var(--noc-text-muted);
+    line-height: 1.7;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    margin-top: 1.2rem;
+  }
+
+  .actions a {
+    min-height: 2.5rem;
+    display: inline-flex;
+    align-items: center;
+    padding-inline: 0.9rem;
+    border: 1px solid var(--noc-border);
+    border-radius: var(--noc-radius-md);
+    background: var(--noc-button-bg);
+    color: var(--noc-text-primary);
+    text-decoration: none;
+    font-size: 0.82rem;
+    font-weight: 650;
+  }
+
+  .actions a:hover {
+    background: var(--noc-button-hover);
+  }
+
+  .actions .primary {
+    border-color: var(--noc-accent);
+    background: var(--noc-accent);
+    color: white;
+  }
+
+  .actions .primary:hover {
+    background: var(--noc-accent-hover);
+  }
+</style>
