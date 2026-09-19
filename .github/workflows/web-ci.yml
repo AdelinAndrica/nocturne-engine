@@ -15,7 +15,7 @@ on:
       - ".github/workflows/web-ci.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   static-site:
@@ -39,13 +39,18 @@ jobs:
       - name: Install website dependencies
         run: npm install --no-audit --no-fund
 
-      - name: Capture generated dependency lock
-        uses: actions/upload-artifact@v4
-        with:
-          name: nocturne-website-package-lock
-          path: Website/package-lock.json
-          if-no-files-found: error
-          retention-days: 1
+      - name: Commit generated dependency lock once
+        if: github.event_name == 'push' && github.ref_name == 'web-docs-foundation'
+        working-directory: .
+        shell: bash
+        run: |
+          if [ -n "$(git status --porcelain -- Website/package-lock.json)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add Website/package-lock.json
+            git commit -m "web: lock website dependencies"
+            git push origin HEAD:web-docs-foundation
+          fi
 
       - name: Build static website
         run: npm run build
