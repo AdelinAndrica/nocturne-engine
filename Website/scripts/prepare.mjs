@@ -12,6 +12,19 @@ const generatedThemeDir = path.join(websiteRoot, 'src', 'styles', 'generated');
 const generatedThemePath = path.join(generatedThemeDir, 'nocturne-theme.css');
 const manifestPath = path.join(websiteRoot, '.generated-docs.json');
 
+const allowedSourceMetadata = new Set([
+  'id',
+  'doc_type',
+  'canonical',
+  'status',
+  'subsystem',
+  'phase_introduced',
+  'description',
+  'source_files',
+  'source_docs',
+  'book_grounding'
+]);
+
 function toPosix(value) {
   return value.split(path.sep).join('/');
 }
@@ -25,13 +38,83 @@ function slugify(value) {
     .toLowerCase();
 }
 
-function yamlString(value) {
+function yamlValue(value) {
   return JSON.stringify(value);
 }
 
-function stripFrontmatter(markdown) {
-  const match = markdown.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
-  return match ? markdown.slice(match[0].length) : markdown;
+function parseFlatValue(raw) {
+  const value = raw.trim();
+
+  if (value === '') return '';
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  if (value === 'null') return null;
+
+  if (/^-?\d+(?:\.\d+)?$/.test(value)) {
+    return Number(value);
+  }
+
+  if (
+    value.startsWith('"') ||
+    value.startsWith('[') ||
+    value.startsWith('{')
+  ) {
+    return JSON.parse(value);
+  }
+
+  return value;
+}
+
+function parseSourceDocument(markdown, relativeSource) {
+  const match = markdown.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+  if (!match) {
+    return { metadata: {}, body: markdown };
+  }
+
+  const rawLines = match[1].split(/\r?\n/);
+  const looksLikeFrontmatter = rawLines.some((line) =>
+    /^(?:id|doc_type|canonical|status|description|subsystem|phase_introduced|source_files|source_docs|book_grounding):/.test(
+      line.trim()
+    )
+  );
+
+  if (!looksLikeFrontmatter) {
+    return { metadata: {}, body: markdown };
+  }
+
+  const metadata = {};
+
+  for (const rawLine of rawLines) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) continue;
+
+    const field = line.match(/^([a-zA-Z0-9_]+):\s*(.*)$/);
+    if (!field) {
+      throw new Error(
+        `Unsupported multiline/nested source frontmatter in Docs/${relativeSource}: ${rawLine}`
+      );
+    }
+
+    const key = field[1];
+    if (!allowedSourceMetadata.has(key)) {
+      throw new Error(
+        `Unsupported source frontmatter field "${key}" in Docs/${relativeSource}`
+      );
+    }
+
+    try {
+      metadata[key] = parseFlatValue(field[2]);
+    } catch (error) {
+      throw new Error(
+        `Invalid source frontmatter value for "${key}" in Docs/${relativeSource}: ${error.message}`
+      );
+    }
+  }
+
+  return {
+    metadata,
+    body: markdown.slice(match[0].length)
+  };
 }
 
 function extractTitle(markdown, fallback) {
@@ -50,6 +133,7 @@ async function walkMarkdown(directory) {
 
   for (const entry of entries) {
     const absolute = path.join(directory, entry.name);
+
     if (entry.isDirectory()) {
       result.push(...await walkMarkdown(absolute));
       continue;
@@ -63,25 +147,147 @@ async function walkMarkdown(directory) {
   return result;
 }
 
+function canonicalDirectoryTarget(normalized, sourcePrefix, targetPrefix) {
+  if (!normalized.startsWith(sourcePrefix)) return null;
+
+  const relative = normalized.slice(sourcePrefix.length);
+  const basename = path.posix.basename(relative, path.posix.extname(relative));
+  return `${targetPrefix}/${slugify(basename)}.md`;
+}
+
 function mapDoc(relativeSource) {
   const normalized = toPosix(relativeSource);
 
   if (normalized === 'nocturne_engine_architecture.md') {
-    return 'docs/architecture/overview.md';
+    return {
+      target: 'docs/architecture/overview.md',
+      metadata: {
+        id: 'noc.architecture.overview',
+        doc_type: 'architecture',
+        canonical: true,
+        status: 'active',
+        subsystem: 'Architecture'
+      }
+    };
   }
 
   if (normalized === 'Production Engineering Standard.md') {
-    return 'docs/development/production-engineering-standard.md';
+    return {
+      target: 'docs/development/production-engineering-standard.md',
+      metadata: {
+        id: 'noc.development.production-standard',
+        doc_type: 'standard',
+        canonical: true,
+        status: 'active',
+        subsystem: 'Development'
+      }
+    };
   }
 
   if (normalized === 'Web/Nocturne Website — Design & Technical Specification.md') {
-    return 'docs/development/website-specification.md';
+    return {
+      target: 'docs/development/website-specification.md',
+      metadata: {
+        id: 'noc.web.spec',
+        doc_type: 'web-spec',
+        canonical: true,
+        status: 'active',
+        subsystem: 'Website'
+      }
+    };
+  }
+
+  const systemTarget = canonicalDirectoryTarget(
+    normalized,
+    'Systems/',
+    'docs/systems'
+  );
+  if (systemTarget) {
+    return { target: systemTarget, metadata: {} };
+  }
+
+  const architectureTarget = canonicalDirectoryTarget(
+    normalized,
+    'Architecture/',
+    'docs/architecture'
+  );
+  if (architectureTarget) {
+    return { target: architectureTarget, metadata: {} };
+  }
+
+  const developmentTarget = canonicalDirectoryTarget(
+    normalized,
+    'Development/',
+    'docs/development'
+  );
+  if (developmentTarget) {
+    return { target: developmentTarget, metadata: {} };
   }
 
   const basename = path.basename(normalized, path.extname(normalized));
   if (/^combined/i.test(basename)) return null;
 
-  return `docs/history/${slugify(basename)}.md`;
+  return {
+    target: `docs/history/${slugify(basename)}.md`,
+    metadata: {
+      doc_type: 'historical-phase',
+      canonical: false,
+      status: 'historical'
+    }
+  };
+}
+
+function validateCanonicalMetadata(metadata, relativeSource) {
+  if (metadata.canonical !== true) return;
+
+  for (const required of ['id', 'doc_type', 'status']) {
+    if (metadata[required] === undefined || metadata[required] === '') {
+      throw new Error(
+        `Canonical document Docs/${relativeSource} is missing required metadata field "${required}".`
+      );
+    }
+  }
+
+  if (metadata.doc_type === 'system' && !metadata.subsystem) {
+    throw new Error(
+      `Canonical system document Docs/${relativeSource} must declare "subsystem".`
+    );
+  }
+}
+
+function renderGeneratedFrontmatter(metadata, historical) {
+  const orderedKeys = [
+    'title',
+    'description',
+    'id',
+    'doc_type',
+    'canonical',
+    'status',
+    'subsystem',
+    'phase_introduced',
+    'source_files',
+    'source_docs',
+    'book_grounding'
+  ];
+
+  const lines = ['---'];
+
+  for (const key of orderedKeys) {
+    if (metadata[key] === undefined) continue;
+    lines.push(`${key}: ${yamlValue(metadata[key])}`);
+  }
+
+  if (historical) {
+    lines.push(
+      'sidebar:',
+      '  badge:',
+      '    text: History',
+      '    variant: default'
+    );
+  }
+
+  lines.push('---', '');
+  return lines.join('\n');
 }
 
 async function cleanPreviousGeneratedDocs() {
@@ -91,9 +297,13 @@ async function cleanPreviousGeneratedDocs() {
 
     for (const relative of previous.files ?? []) {
       const absolute = path.resolve(contentRoot, relative);
+
       if (!absolute.startsWith(contentRoot + path.sep)) {
-        throw new Error(`Refusing to delete path outside content root: ${absolute}`);
+        throw new Error(
+          `Refusing to delete path outside content root: ${absolute}`
+        );
       }
+
       await fs.rm(absolute, { force: true });
     }
   } catch (error) {
@@ -107,46 +317,74 @@ async function syncDocs() {
   const sourceFiles = await walkMarkdown(docsRoot);
   const generated = [];
   const claimedTargets = new Map();
+  const claimedIds = new Map();
   const historicalPages = [];
 
   for (const source of sourceFiles) {
     const relativeSource = path.relative(docsRoot, source);
-    const relativeTarget = mapDoc(relativeSource);
-    if (!relativeTarget) continue;
+    const normalizedSource = toPosix(relativeSource);
+    const mapping = mapDoc(relativeSource);
 
-    const existing = claimedTargets.get(relativeTarget);
-    if (existing) {
+    if (!mapping) continue;
+
+    const relativeTarget = mapping.target;
+    const existingTarget = claimedTargets.get(relativeTarget);
+
+    if (existingTarget) {
       throw new Error(
-        `Generated documentation collision: ${existing} and ${toPosix(relativeSource)} both map to ${relativeTarget}`
+        `Generated documentation collision: ${existingTarget} and ${normalizedSource} both map to ${relativeTarget}`
       );
     }
-    claimedTargets.set(relativeTarget, toPosix(relativeSource));
+
+    claimedTargets.set(relativeTarget, normalizedSource);
+
+    const raw = await fs.readFile(source, 'utf8');
+    const sourceDoc = parseSourceDocument(raw, normalizedSource);
+    const sourceMetadata = sourceDoc.metadata;
+
+    const fallback = path.basename(source, '.md');
+    const title = extractTitle(sourceDoc.body, fallback);
+    const historical = mapping.metadata.doc_type === 'historical-phase';
+
+    const metadata = {
+      ...mapping.metadata,
+      ...sourceMetadata,
+      title,
+      description:
+        sourceMetadata.description ??
+        (historical
+          ? `Historical implementation record from Docs/${normalizedSource}. Prefer canonical Architecture/System documentation for current behavior.`
+          : `Canonical Nocturne documentation synchronized from Docs/${normalizedSource}.`)
+    };
+
+    validateCanonicalMetadata(metadata, normalizedSource);
+
+    if (metadata.id) {
+      const existingId = claimedIds.get(metadata.id);
+      if (existingId) {
+        throw new Error(
+          `Duplicate documentation id "${metadata.id}" in Docs/${existingId} and Docs/${normalizedSource}`
+        );
+      }
+      claimedIds.set(metadata.id, normalizedSource);
+    }
 
     const target = path.join(contentRoot, relativeTarget);
-    const raw = await fs.readFile(source, 'utf8');
-    const withoutFrontmatter = stripFrontmatter(raw);
-    const fallback = path.basename(source, '.md');
-    const title = extractTitle(withoutFrontmatter, fallback);
-    const body = removeFirstH1(withoutFrontmatter).trimStart();
-    const historical = relativeTarget.startsWith('docs/history/');
-
-    const frontmatter = [
-      '---',
-      `title: ${yamlString(title)}`,
-      `description: ${yamlString(`Synchronized from Docs/${toPosix(relativeSource)}`)}`,
-      historical ? 'badge:' : null,
-      historical ? '  text: Historical' : null,
-      historical ? '  variant: default' : null,
-      '---',
-      ''
-    ].filter(Boolean).join('\n');
-
+    const body = removeFirstH1(sourceDoc.body).trimStart();
     const sourceNote = historical
-      ? '> Historical implementation record. For current behavior, prefer canonical Architecture and System documentation.\n\n'
+      ? '> **Historical record.** For current behavior, prefer canonical Architecture and System documentation.\n\n'
       : '';
 
     await fs.mkdir(path.dirname(target), { recursive: true });
-    await fs.writeFile(target, frontmatter + sourceNote + body + '\n', 'utf8');
+    await fs.writeFile(
+      target,
+      renderGeneratedFrontmatter(metadata, historical) +
+        sourceNote +
+        body +
+        '\n',
+      'utf8'
+    );
+
     generated.push(toPosix(path.relative(contentRoot, target)));
 
     if (historical) {
@@ -163,18 +401,23 @@ async function syncDocs() {
   const historyIndex = path.join(contentRoot, historyIndexRelative);
   const historyBody = [
     '---',
-    'title: Development History',
-    'description: Historical phase and implementation documents synchronized from the Nocturne repository.',
+    'title: "Development History"',
+    'description: "Historical phase and implementation documents synchronized from the Nocturne repository."',
+    'doc_type: "historical-phase"',
+    'canonical: false',
+    'status: "historical"',
     'tableOfContents: false',
     '---',
     '',
     'These pages preserve the implementation history of Nocturne Engine.',
     '',
-    '> Historical documents do not override current canonical Architecture/System documentation.',
+    '> **Historical record.** These documents do not override current canonical Architecture/System documentation.',
     '',
     '## Synchronized documents',
     '',
-    ...historicalPages.map((page) => `- [${page.title}](/docs/history/${page.slug}/)`),
+    ...historicalPages.map(
+      (page) => `- [${page.title}](/docs/history/${page.slug}/)`
+    ),
     ''
   ].join('\n');
 
@@ -184,16 +427,28 @@ async function syncDocs() {
 
   await fs.writeFile(
     manifestPath,
-    JSON.stringify({ schemaVersion: 1, files: generated.sort() }, null, 2) + '\n',
+    JSON.stringify(
+      {
+        schemaVersion: 2,
+        generatedAtBuildTime: true,
+        canonicalIds: [...claimedIds.keys()].sort(),
+        files: generated.sort()
+      },
+      null,
+      2
+    ) + '\n',
     'utf8'
   );
 
-  return generated.length;
+  return {
+    generatedCount: generated.length,
+    canonicalCount: claimedIds.size
+  };
 }
 
 function cssList(values) {
   return values
-    .map((value) => value.includes(' ') ? `"${value}"` : value)
+    .map((value) => (value.includes(' ') ? `"${value}"` : value))
     .join(', ');
 }
 
@@ -260,9 +515,9 @@ async function syncBrandAsset() {
 }
 
 await generateTheme();
-const count = await syncDocs();
+const docs = await syncDocs();
 const copiedLogo = await syncBrandAsset();
 
 console.log(
-  `Prepared Nocturne website: ${count} docs synchronized; logo ${copiedLogo ? 'copied' : 'not found'}.`
+  `Prepared Nocturne website: ${docs.generatedCount} docs synchronized (${docs.canonicalCount} canonical IDs); logo ${copiedLogo ? 'copied' : 'not found'}.`
 );
