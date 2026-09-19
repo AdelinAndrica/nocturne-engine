@@ -13,16 +13,16 @@ Historical Phase documents must not override current canonical behavior.
 
 ## Canonical documentation
 
-- [Nocturne Engine — Architecture Overview](Docs/nocturne_engine_architecture.md) — Canonical layered/subsystem architecture, dependency direction, ownership and engine/application policy boundary. [noc.architecture.overview]
-- [Nocturne Engine — Production Engineering Standard](Docs/Production Engineering Standard.md) — Canonical engineering quality, CI, validation and production-readiness standard for Nocturne Engine. [noc.development.production-standard]
-- [Release Process](Docs/Development/Release Process.md) — Canonical release packaging, artifact validation, manifest promotion and Downloads publication contract. [noc.development.release-process]
-- [Documentation Model](Docs/Development/Documentation Model.md) — Canonical source-of-truth, metadata, precedence and generated-documentation rules for Nocturne technical documentation. [noc.documentation.model]
-- [Editor](Docs/Systems/Editor.md) — Canonical Nocturne Editor shell, runtime boundary, viewport, selection and authoring-tool contract. [noc.editor]
-- [Rendering](Docs/Systems/Rendering.md) — Canonical renderer ownership, frame handoff, DirectX 12 backend and editor render-target integration contract. [noc.render]
-- [Resources](Docs/Systems/Resources.md) — Canonical virtual file system, resource loading, typed resource and runtime asset-lifetime contract. [noc.resources]
-- [Runtime](Docs/Systems/Runtime.md) — Canonical runtime ownership, lifecycle, frame execution, configuration and subsystem orchestration contract. [noc.runtime]
-- [Nocturne Website — Design & Technical Specification](Docs/Web/Nocturne Website — Design & Technical Specification.md) — Canonical product and technical specification for the Nocturne Engine website and documentation surface. [noc.web.spec]
-- [World & ECS](Docs/Systems/World & ECS.md) — Canonical runtime entity identity, component ownership, transform hierarchy, camera and render-extraction contract. [noc.world]
+- [Nocturne Engine — Architecture Overview](/docs/architecture/overview/) — Canonical layered/subsystem architecture, dependency direction, ownership and engine/application policy boundary. [noc.architecture.overview] — Source: Docs/nocturne_engine_architecture.md
+- [Nocturne Engine — Production Engineering Standard](/docs/development/production-engineering-standard/) — Canonical engineering quality, CI, validation and production-readiness standard for Nocturne Engine. [noc.development.production-standard] — Source: Docs/Production Engineering Standard.md
+- [Release Process](/docs/development/release-process/) — Canonical release packaging, artifact validation, manifest promotion and Downloads publication contract. [noc.development.release-process] — Source: Docs/Development/Release Process.md
+- [Documentation Model](/docs/development/documentation-model/) — Canonical source-of-truth, metadata, precedence and generated-documentation rules for Nocturne technical documentation. [noc.documentation.model] — Source: Docs/Development/Documentation Model.md
+- [Editor](/docs/systems/editor/) — Canonical Nocturne Editor shell, runtime boundary, viewport, selection and authoring-tool contract. [noc.editor] — Source: Docs/Systems/Editor.md
+- [Rendering](/docs/systems/rendering/) — Canonical renderer ownership, frame handoff, DirectX 12 backend and editor render-target integration contract. [noc.render] — Source: Docs/Systems/Rendering.md
+- [Resources](/docs/systems/resources/) — Canonical virtual file system, resource loading, typed resource and runtime asset-lifetime contract. [noc.resources] — Source: Docs/Systems/Resources.md
+- [Runtime](/docs/systems/runtime/) — Canonical runtime ownership, lifecycle, frame execution, configuration and subsystem orchestration contract. [noc.runtime] — Source: Docs/Systems/Runtime.md
+- [Nocturne Website — Design & Technical Specification](/docs/development/website-specification/) — Canonical product and technical specification for the Nocturne Engine website and documentation surface. [noc.web.spec] — Source: Docs/Web/Nocturne Website — Design & Technical Specification.md
+- [World & ECS](/docs/systems/world-ecs/) — Canonical runtime entity identity, component ownership, transform hierarchy, camera and render-extraction contract. [noc.world] — Source: Docs/Systems/World & ECS.md
 
 ## Machine-readable entry points
 
