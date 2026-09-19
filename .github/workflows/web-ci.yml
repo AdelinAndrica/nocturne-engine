@@ -1,0 +1,50 @@
+name: Nocturne Website CI
+
+on:
+  push:
+    paths:
+      - "Website/**"
+      - "Design/**"
+      - "Docs/**"
+      - ".github/workflows/web-ci.yml"
+  pull_request:
+    paths:
+      - "Website/**"
+      - "Design/**"
+      - "Docs/**"
+      - ".github/workflows/web-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  static-site:
+    name: Astro + Starlight static build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: Website
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install website dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build static website
+        run: npm run build
+
+      - name: Verify primary routes
+        shell: bash
+        run: |
+          test -f dist/index.html
+          test -f dist/download/index.html
+          test -f dist/docs/index.html
