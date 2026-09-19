@@ -1,31 +1,38 @@
 ---
 title: Nocturne Engine Documentation
-description: Architecture, systems, editor, development standards and implementation history for Nocturne Engine.
+description: Architecture, canonical systems, development standards and implementation history for Nocturne Engine.
 tableOfContents: false
 ---
 
 Nocturne Engine targets **Windows**, uses **Modern C++ (C++20+)**, and is being developed for a **first-person survival horror** game.
 
-The documentation portal is built around one rule: **current canonical architecture must be distinguishable from historical implementation phases**.
+This portal separates **current canonical behavior** from **implementation history**.
 
 ## Start here
 
-- [Architecture overview](/docs/architecture/overview/)
-- [Production Engineering Standard](/docs/development/production-engineering-standard/)
-- [Website design & technical specification](/docs/development/website-specification/)
-- [Development history](/docs/history/)
-
-## Documentation model
-
-| Surface | Purpose |
+| Area | Current reference |
 |---|---|
-| Architecture | Current global contracts and dependency rules |
-| Systems | Current subsystem behavior as canonical pages are introduced |
-| Development | Engineering standards and workflows |
-| Development History | Phase-by-phase implementation record |
+| Architecture | [Architecture Overview](/docs/architecture/overview/) |
+| Runtime | [Runtime](/docs/systems/runtime/) |
+| Resources | [Resources](/docs/systems/resources/) |
+| Rendering | [Rendering](/docs/systems/rendering/) |
+| World model | [World & ECS](/docs/systems/world-ecs/) |
+| Editor | [Editor](/docs/systems/editor/) |
+| Engineering quality | [Production Engineering Standard](/docs/development/production-engineering-standard/) |
+| Documentation rules | [Documentation Model](/docs/development/documentation-model/) |
 
-> Phase documents explain **how Nocturne was built**. Canonical Architecture/System pages describe **how Nocturne works now**.
+## How to read these docs
+
+**Canonical** pages describe how Nocturne works now.
+
+**History** pages preserve phase plans, implementation reports and completion evidence. They remain searchable, but they do not override later canonical contracts.
+
+> For an exact current implementation detail, follow the source-file references on the canonical page and inspect the code.
 
 ## Source of truth
 
-The authored Markdown remains in the repository-root `Docs/` directory. The website synchronizes those files into Starlight before local development and production builds. Generated copies are never edited by hand.
+The authored Markdown remains in repository-root `Docs/`.
+
+The website synchronizes that content into Starlight before development and production builds. Generated synchronized copies are never edited by hand.
+
+See [Documentation Model](/docs/development/documentation-model/) for precedence, metadata and stable-ID rules.
