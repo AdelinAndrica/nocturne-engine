@@ -253,7 +253,7 @@ Registry:
 - [ ] post-freeze registration rejected.
 - [ ] schema validation pass.
 - [ ] referenced TypeIds validation.
-- [ ] registry dump diagnostics.
+- [x] registry dump diagnostics.
 - [ ] shutdown/leak tests.
 
 Performance:

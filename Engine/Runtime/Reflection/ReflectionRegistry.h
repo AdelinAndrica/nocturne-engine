@@ -82,6 +82,12 @@ namespace noc
         return "Unknown";
     }
 
+    // Design choice (not directly from the book): schema diagnostics use a
+    // callback instead of STL/string ownership in the runtime reflection API.
+    // Each callback receives one complete, null-terminated line.
+    using ReflectionSchemaDumpWriteFn =
+        bool (*)(void* userData, const char* line) noexcept;
+
     class ReflectionRegistry
     {
     public:
@@ -154,6 +160,13 @@ namespace noc
         [[nodiscard]] uint32_t ComponentTypeCount() const noexcept;
         [[nodiscard]] const TypeMetadata* ComponentTypeAt(
             uint32_t componentIndex) const noexcept;
+
+        // Frozen-only deterministic diagnostic dump. No heap allocation is
+        // performed by this method. Returning false means wrong state,
+        // invalid writer, line-format overflow, or writer rejection.
+        [[nodiscard]] bool DumpSchema(
+            ReflectionSchemaDumpWriteFn writer,
+            void* userData) const noexcept;
 
     private:
         struct Impl;

@@ -502,7 +502,15 @@ The Phase 16 allocation gate now has both corrective changes and evidence:
 
 This closes the Phase 16 allocation-discipline gate without claiming that `DebugAlloc` observes unrelated CRT or Win32 internal allocations.
 
-### 11.6 Reflection function/performance gate — VERIFIED
+### 11.6 Reflection schema diagnostics — VERIFIED
+
+`ReflectionRegistry::DumpSchema()` now closes the dedicated reflection-contract debug-tooling gap. It is Frozen-only, deterministic and callback-based, emits registry/type/property/attribute/enum/container/component/function/parameter records, and performs no internal heap allocation.
+
+Automated tests verify type/property/enum, foundation component, function signature/parameter and fixed/dynamic container diagnostics, plus invalid state/writer rejection.
+
+**Design choice (not directly from the book):** the public diagnostic seam uses a line callback rather than `std::string`/STL ownership so the runtime reflection API remains lightweight and allocation policy stays explicit.
+
+### 11.7 Reflection function/performance gate — VERIFIED
 
 **Design choice (not directly from the book):** the first real reflected function set is attached to the engine's \`Vec3\` schema as static math operations matching the existing free functions:
 
@@ -515,7 +523,7 @@ Automated proof covers stable FunctionId lookup, canonical-name lookup, return/p
 
 The reflection performance baseline now measures TypeId lookup, canonical-name lookup, property lookup/read/enumeration, function lookup, raw function invocation, generic validated function invocation and reflected component enumeration. Frozen lookup/enumeration/raw-invoke paths are asserted not to call the reflection allocator. Generic invocation reports its OwnedReflectedValue allocation cost separately.
 
-### 11.7 Prefab prototype seam — VERIFIED
+### 11.8 Prefab prototype seam — VERIFIED
 
 \`TransientEntityPrototype\` now makes the Phase 16 prototype seam explicit while reusing \`ReflectedEntitySubtreeSnapshot\` as the only reflected subtree template representation.
 
@@ -533,7 +541,7 @@ Automated coverage verifies:
 
 The reusable seam for Phase 17 is therefore the reflected schema plus subtree capture/instantiate mechanics, not the transient runtime handles.
 
-### 11.8 Build/project hygiene — VERIFIED
+### 11.9 Build/project hygiene — VERIFIED
 
 The active project definition now removes the historical Phase 13 \`EditorShell.cpp\` / \`EditorControls.cpp\` pair from compilation. Their source files remain only as historical provenance; \`EditorShellV3\` remains the runtime/editor authority.
 
@@ -548,7 +556,7 @@ The existing \`.gitignore\` already ignores \`DerivedDataCache/\`, object/interm
 Windows CI on the hygiene baseline validates Host Debug, Phase 15 + Phase 16 tests, Editor Debug, all Development x64 projects and solution Debug.
 
 
-### 11.9 Manual regression and soak
+### 11.10 Manual regression and soak
 
 Before completion, validate the preserved editor baseline plus new authoring operations:
 
@@ -569,7 +577,7 @@ Before completion, validate the preserved editor baseline plus new authoring ope
 
 ---
 
-### 11.10 Implementation report — IMPLEMENTED
+### 11.11 Implementation report — IMPLEMENTED
 
 `Docs/Phase 16 — Implementation Report.md` records the implemented runtime reflection/editor architecture, milestone chronology, ownership, threading, performance/allocation hardening, transient prototype boundary and deliberate deferrals. It explicitly does not declare Phase 16 complete.
 

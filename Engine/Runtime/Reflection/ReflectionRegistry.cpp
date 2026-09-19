@@ -3,7 +3,9 @@
 #include "Core/Memory/Allocator.h"
 
 #include <cmath>
+#include <cstdarg>
 #include <cstddef>
+#include <cstdio>
 #include <cstring>
 #include <new>
 
@@ -11,6 +13,196 @@ namespace noc
 {
     namespace
     {
+        [[nodiscard]] const char* TypeKindName(
+            TypeKind kind) noexcept
+        {
+            switch (kind)
+            {
+            case TypeKind::Invalid: return "Invalid";
+            case TypeKind::Bool: return "Bool";
+            case TypeKind::SignedInteger: return "SignedInteger";
+            case TypeKind::UnsignedInteger: return "UnsignedInteger";
+            case TypeKind::FloatingPoint: return "FloatingPoint";
+            case TypeKind::String: return "String";
+            case TypeKind::Enum: return "Enum";
+            case TypeKind::Struct: return "Struct";
+            case TypeKind::Component: return "Component";
+            case TypeKind::EntityReference: return "EntityReference";
+            case TypeKind::ResourceReference: return "ResourceReference";
+            case TypeKind::FixedArray: return "FixedArray";
+            case TypeKind::DynamicSequence: return "DynamicSequence";
+            case TypeKind::Function: return "Function";
+            case TypeKind::Opaque: return "Opaque";
+            }
+            return "Unknown";
+        }
+
+        [[nodiscard]] const char* AttributeKindName(
+            AttributeKind kind) noexcept
+        {
+            switch (kind)
+            {
+            case AttributeKind::Invalid: return "Invalid";
+            case AttributeKind::DisplayName: return "DisplayName";
+            case AttributeKind::Category: return "Category";
+            case AttributeKind::Tooltip: return "Tooltip";
+            case AttributeKind::NumericRange: return "NumericRange";
+            case AttributeKind::NumericStep: return "NumericStep";
+            case AttributeKind::Units: return "Units";
+            case AttributeKind::Angle: return "Angle";
+            case AttributeKind::Color: return "Color";
+            case AttributeKind::Multiline: return "Multiline";
+            case AttributeKind::ResourceTypeConstraint: return "ResourceTypeConstraint";
+            case AttributeKind::EditorWidgetHint: return "EditorWidgetHint";
+            case AttributeKind::SerializationAlias: return "SerializationAlias";
+            case AttributeKind::ScriptingAlias: return "ScriptingAlias";
+            case AttributeKind::ReadOnlyReason: return "ReadOnlyReason";
+            }
+            return "Unknown";
+        }
+
+        [[nodiscard]] const char* AttributeValueKindName(
+            AttributeValueKind kind) noexcept
+        {
+            switch (kind)
+            {
+            case AttributeValueKind::None: return "None";
+            case AttributeValueKind::String: return "String";
+            case AttributeValueKind::Number: return "Number";
+            case AttributeValueKind::Range: return "Range";
+            case AttributeValueKind::TypeId: return "TypeId";
+            case AttributeValueKind::Boolean: return "Boolean";
+            }
+            return "Unknown";
+        }
+
+        [[nodiscard]] bool EmitSchemaDumpLine(
+            ReflectionSchemaDumpWriteFn writer,
+            void* userData,
+            const char* format,
+            ...) noexcept
+        {
+            if (!writer || !format)
+                return false;
+
+            char line[2048]{};
+
+            va_list arguments;
+            va_start(arguments, format);
+            const int written =
+                std::vsnprintf(
+                    line,
+                    sizeof(line),
+                    format,
+                    arguments);
+            va_end(arguments);
+
+            if (written < 0
+                || static_cast<std::size_t>(written)
+                    >= sizeof(line))
+            {
+                return false;
+            }
+
+            return writer(userData, line);
+        }
+
+        [[nodiscard]] bool EmitAttributeDumpLine(
+            ReflectionSchemaDumpWriteFn writer,
+            void* userData,
+            const char* scope,
+            const char* ownerName,
+            const char* propertyName,
+            const AttributeMetadata& attribute) noexcept
+        {
+            const char* safeScope =
+                scope ? scope : "unknown";
+            const char* safeOwner =
+                ownerName ? ownerName : "<null>";
+            const char* safeProperty =
+                propertyName ? propertyName : "-";
+
+            switch (attribute.valueKind)
+            {
+            case AttributeValueKind::String:
+                return EmitSchemaDumpLine(
+                    writer,
+                    userData,
+                    "attribute scope=%s owner=%s property=%s kind=%s value_kind=%s value=%s",
+                    safeScope,
+                    safeOwner,
+                    safeProperty,
+                    AttributeKindName(attribute.kind),
+                    AttributeValueKindName(attribute.valueKind),
+                    attribute.stringValue
+                        ? attribute.stringValue
+                        : "<null>");
+
+            case AttributeValueKind::Number:
+                return EmitSchemaDumpLine(
+                    writer,
+                    userData,
+                    "attribute scope=%s owner=%s property=%s kind=%s value_kind=%s value=%.17g",
+                    safeScope,
+                    safeOwner,
+                    safeProperty,
+                    AttributeKindName(attribute.kind),
+                    AttributeValueKindName(attribute.valueKind),
+                    attribute.numberA);
+
+            case AttributeValueKind::Range:
+                return EmitSchemaDumpLine(
+                    writer,
+                    userData,
+                    "attribute scope=%s owner=%s property=%s kind=%s value_kind=%s min=%.17g max=%.17g",
+                    safeScope,
+                    safeOwner,
+                    safeProperty,
+                    AttributeKindName(attribute.kind),
+                    AttributeValueKindName(attribute.valueKind),
+                    attribute.numberA,
+                    attribute.numberB);
+
+            case AttributeValueKind::TypeId:
+                return EmitSchemaDumpLine(
+                    writer,
+                    userData,
+                    "attribute scope=%s owner=%s property=%s kind=%s value_kind=%s type_id=%llu",
+                    safeScope,
+                    safeOwner,
+                    safeProperty,
+                    AttributeKindName(attribute.kind),
+                    AttributeValueKindName(attribute.valueKind),
+                    static_cast<unsigned long long>(
+                        attribute.typeIdValue.value));
+
+            case AttributeValueKind::Boolean:
+                return EmitSchemaDumpLine(
+                    writer,
+                    userData,
+                    "attribute scope=%s owner=%s property=%s kind=%s value_kind=%s value=%s",
+                    safeScope,
+                    safeOwner,
+                    safeProperty,
+                    AttributeKindName(attribute.kind),
+                    AttributeValueKindName(attribute.valueKind),
+                    attribute.boolValue ? "true" : "false");
+
+            case AttributeValueKind::None:
+                break;
+            }
+
+            return EmitSchemaDumpLine(
+                writer,
+                userData,
+                "attribute scope=%s owner=%s property=%s kind=%s value_kind=%s",
+                safeScope,
+                safeOwner,
+                safeProperty,
+                AttributeKindName(attribute.kind),
+                AttributeValueKindName(attribute.valueKind));
+        }
+
         [[nodiscard]] bool IsPowerOfTwo(uint32_t value) noexcept
         {
             return value != 0 && (value & (value - 1u)) == 0;
@@ -1373,6 +1565,268 @@ namespace noc
         }
 
         return nullptr;
+    }
+
+    bool ReflectionRegistry::DumpSchema(
+        ReflectionSchemaDumpWriteFn writer,
+        void* userData) const noexcept
+    {
+        if (!writer
+            || !impl_
+            || impl_->state != ReflectionRegistryState::Frozen)
+        {
+            return false;
+        }
+
+        if (!EmitSchemaDumpLine(
+                writer,
+                userData,
+                "registry state=Frozen types=%u components=%u",
+                impl_->count,
+                ComponentTypeCount()))
+        {
+            return false;
+        }
+
+        for (uint32_t typeIndex = 0;
+             typeIndex < impl_->count;
+             ++typeIndex)
+        {
+            const TypeMetadata& type =
+                impl_->entries[typeIndex].metadata;
+
+            if (!EmitSchemaDumpLine(
+                    writer,
+                    userData,
+                    "type id=%llu name=%s kind=%s version=%u size=%u alignment=%u flags=0x%08X properties=%u attributes=%u functions=%u",
+                    static_cast<unsigned long long>(
+                        type.typeId.value),
+                    type.canonicalName
+                        ? type.canonicalName
+                        : "<null>",
+                    TypeKindName(type.kind),
+                    type.version,
+                    type.size,
+                    type.alignment,
+                    static_cast<unsigned int>(type.flags),
+                    type.propertyCount,
+                    type.attributeCount,
+                    type.functionCount))
+            {
+                return false;
+            }
+
+            for (uint32_t attributeIndex = 0;
+                 attributeIndex < type.attributeCount;
+                 ++attributeIndex)
+            {
+                if (!EmitAttributeDumpLine(
+                        writer,
+                        userData,
+                        "type",
+                        type.canonicalName,
+                        nullptr,
+                        type.attributes[attributeIndex]))
+                {
+                    return false;
+                }
+            }
+
+            for (uint32_t propertyIndex = 0;
+                 propertyIndex < type.propertyCount;
+                 ++propertyIndex)
+            {
+                const PropertyMetadata& property =
+                    type.properties[propertyIndex];
+
+                if (!EmitSchemaDumpLine(
+                        writer,
+                        userData,
+                        "property owner=%s id=%llu name=%s value_type=%llu flags=0x%08X attributes=%u read=%u write=%u const_address=%u mutable_address=%u validate=%u default=%u",
+                        type.canonicalName,
+                        static_cast<unsigned long long>(
+                            property.propertyId.value),
+                        property.canonicalName,
+                        static_cast<unsigned long long>(
+                            property.valueTypeId.value),
+                        static_cast<unsigned int>(
+                            property.flags),
+                        property.attributeCount,
+                        property.read ? 1u : 0u,
+                        property.write ? 1u : 0u,
+                        property.constAddress ? 1u : 0u,
+                        property.mutableAddress ? 1u : 0u,
+                        property.validate ? 1u : 0u,
+                        property.defaultValue ? 1u : 0u))
+                {
+                    return false;
+                }
+
+                for (uint32_t attributeIndex = 0;
+                     attributeIndex
+                        < property.attributeCount;
+                     ++attributeIndex)
+                {
+                    if (!EmitAttributeDumpLine(
+                            writer,
+                            userData,
+                            "property",
+                            type.canonicalName,
+                            property.canonicalName,
+                            property.attributes[
+                                attributeIndex]))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            if (type.enumMetadata)
+            {
+                const EnumMetadata& enumMetadata =
+                    *type.enumMetadata;
+
+                if (!EmitSchemaDumpLine(
+                        writer,
+                        userData,
+                        "enum owner=%s underlying_type=%llu is_flags=%u values=%u",
+                        type.canonicalName,
+                        static_cast<unsigned long long>(
+                            enumMetadata
+                                .underlyingTypeId.value),
+                        enumMetadata.isFlags ? 1u : 0u,
+                        enumMetadata.valueCount))
+                {
+                    return false;
+                }
+
+                for (uint32_t valueIndex = 0;
+                     valueIndex < enumMetadata.valueCount;
+                     ++valueIndex)
+                {
+                    const EnumValueMetadata& value =
+                        enumMetadata.values[valueIndex];
+
+                    if (!EmitSchemaDumpLine(
+                            writer,
+                            userData,
+                            "enum_value owner=%s id=%llu name=%s raw=%llu",
+                            type.canonicalName,
+                            static_cast<unsigned long long>(
+                                value.valueId.value),
+                            value.canonicalName,
+                            static_cast<unsigned long long>(
+                                value.rawValue)))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            if (type.containerMetadata)
+            {
+                const ContainerMetadata& container =
+                    *type.containerMetadata;
+
+                if (!EmitSchemaDumpLine(
+                        writer,
+                        userData,
+                        "container owner=%s element_type=%llu fixed_count=%u read_only=%u count=%u capacity=%u const_element=%u mutable_element=%u resize=%u insert_default=%u remove=%u",
+                        type.canonicalName,
+                        static_cast<unsigned long long>(
+                            container.elementTypeId.value),
+                        container.fixedCount,
+                        container.readOnly ? 1u : 0u,
+                        container.count ? 1u : 0u,
+                        container.capacity ? 1u : 0u,
+                        container.constElement ? 1u : 0u,
+                        container.mutableElement ? 1u : 0u,
+                        container.resize ? 1u : 0u,
+                        container.insertDefault ? 1u : 0u,
+                        container.remove ? 1u : 0u))
+                {
+                    return false;
+                }
+            }
+
+            if (type.componentMetadata)
+            {
+                const ComponentMetadata& component =
+                    *type.componentMetadata;
+
+                if (!EmitSchemaDumpLine(
+                        writer,
+                        userData,
+                        "component owner=%s flags=0x%08X has=%u add=%u remove=%u get_const=%u get_mutable=%u",
+                        type.canonicalName,
+                        static_cast<unsigned int>(
+                            component.flags),
+                        component.has ? 1u : 0u,
+                        component.add ? 1u : 0u,
+                        component.remove ? 1u : 0u,
+                        component.getConst ? 1u : 0u,
+                        component.getMutable ? 1u : 0u))
+                {
+                    return false;
+                }
+            }
+
+            for (uint32_t functionIndex = 0;
+                 functionIndex < type.functionCount;
+                 ++functionIndex)
+            {
+                const FunctionMetadata& function =
+                    type.functions[functionIndex];
+
+                if (!EmitSchemaDumpLine(
+                        writer,
+                        userData,
+                        "function owner=%s id=%llu name=%s return_type=%llu flags=0x%08X parameters=%u invoke=%u",
+                        type.canonicalName,
+                        static_cast<unsigned long long>(
+                            function.functionId.value),
+                        function.canonicalName,
+                        static_cast<unsigned long long>(
+                            function.returnTypeId.value),
+                        static_cast<unsigned int>(
+                            function.flags),
+                        function.parameterCount,
+                        function.invoke ? 1u : 0u))
+                {
+                    return false;
+                }
+
+                for (uint32_t parameterIndex = 0;
+                     parameterIndex
+                        < function.parameterCount;
+                     ++parameterIndex)
+                {
+                    const FunctionParameterMetadata&
+                        parameter =
+                            function.parameters[
+                                parameterIndex];
+
+                    if (!EmitSchemaDumpLine(
+                            writer,
+                            userData,
+                            "function_parameter owner=%s function=%s index=%u name=%s type=%llu",
+                            type.canonicalName,
+                            function.canonicalName,
+                            parameterIndex,
+                            parameter.canonicalName,
+                            static_cast<unsigned long long>(
+                                parameter.typeId.value)))
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        return EmitSchemaDumpLine(
+            writer,
+            userData,
+            "registry end");
     }
 
     const FunctionMetadata* ReflectionRegistry::FindFunctionByName(

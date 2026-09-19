@@ -23,6 +23,50 @@
 
 namespace
 {
+    struct SchemaDumpCapture
+    {
+        char text[65536]{};
+        std::size_t size = 0;
+
+        [[nodiscard]] bool Contains(
+            const char* needle) const noexcept
+        {
+            return needle
+                && std::strstr(text, needle) != nullptr;
+        }
+    };
+
+    bool CaptureSchemaDumpLine(
+        void* userData,
+        const char* line) noexcept
+    {
+        if (!userData || !line)
+            return false;
+
+        auto& capture =
+            *static_cast<SchemaDumpCapture*>(userData);
+
+        const std::size_t length =
+            std::strlen(line);
+
+        if (capture.size
+                + length
+                + 2u
+            > sizeof(capture.text))
+        {
+            return false;
+        }
+
+        std::memcpy(
+            capture.text + capture.size,
+            line,
+            length);
+        capture.size += length;
+        capture.text[capture.size++] = '\n';
+        capture.text[capture.size] = '\0';
+        return true;
+    }
+
     bool CheckReflectionRegistry(bool condition, const char* message)
     {
         if (!condition)
@@ -272,6 +316,16 @@ bool RunPhase16ReflectionRegistryTests()
 
     bool ok = true;
 
+    SchemaDumpCapture invalidStateDump{};
+    ok &= CheckReflectionRegistry(
+        !registry.DumpSchema(
+            &CaptureSchemaDumpLine,
+            &invalidStateDump)
+            && !registry.DumpSchema(
+                nullptr,
+                &invalidStateDump),
+        "Schema dump accepted invalid writer or Uninitialized registry");
+
     ok &= CheckReflectionRegistry(
         registry.State() == noc::ReflectionRegistryState::Uninitialized,
         "Registry must begin Uninitialized");
@@ -283,6 +337,12 @@ bool RunPhase16ReflectionRegistryTests()
     ok &= CheckReflectionRegistry(
         registry.Init(allocator, 1),
         "ReflectionRegistry::Init failed");
+
+    ok &= CheckReflectionRegistry(
+        !registry.DumpSchema(
+            &CaptureSchemaDumpLine,
+            &invalidStateDump),
+        "Schema dump accepted Building registry");
 
     constexpr noc::TypeId kIntType{ 50 };
     constexpr noc::TypeId kTypeA{ 100 };
@@ -781,6 +841,25 @@ bool RunPhase16ReflectionRegistryTests()
         builtinRegistry.Freeze(),
         "Builtin/enum reflection Freeze failed");
 
+    SchemaDumpCapture builtinSchemaDump{};
+    ok &= CheckReflectionRegistry(
+        builtinRegistry.DumpSchema(
+            &CaptureSchemaDumpLine,
+            &builtinSchemaDump)
+            && builtinSchemaDump.Contains(
+                "registry state=Frozen")
+            && builtinSchemaDump.Contains(
+                "name=Nocturne.Vec3 kind=Struct")
+            && builtinSchemaDump.Contains(
+                "property owner=Nocturne.Vec3")
+            && builtinSchemaDump.Contains(
+                "enum owner=Nocturne.Tests.TestAccess")
+            && builtinSchemaDump.Contains(
+                "enum_value owner=Nocturne.Tests.TestAccess")
+            && builtinSchemaDump.Contains(
+                "registry end"),
+        "Frozen builtin schema dump missing type/property/enum diagnostics");
+
     const noc::TypeMetadata* reflectedEnum =
         builtinRegistry.FindType(enumType.typeId);
     ok &= CheckReflectionRegistry(
@@ -864,6 +943,17 @@ bool RunPhase16ReflectionRegistryTests()
         ok &= CheckReflectionRegistry(
             componentRegistry.Freeze(),
             "Foundation component reflection Freeze failed");
+
+        SchemaDumpCapture componentSchemaDump{};
+        ok &= CheckReflectionRegistry(
+            componentRegistry.DumpSchema(
+                &CaptureSchemaDumpLine,
+                &componentSchemaDump)
+                && componentSchemaDump.Contains(
+                    "component owner=Nocturne.Transform")
+                && componentSchemaDump.Contains(
+                    "component owner=Nocturne.Camera"),
+            "Component schema dump missing foundation component diagnostics");
 
         ok &= CheckReflectionRegistry(
             componentRegistry.ComponentTypeCount() == 4,
@@ -1209,6 +1299,19 @@ bool RunPhase16ReflectionRegistryTests()
                 && functionRegistry.Freeze(),
             "Function reflection schema failed");
 
+        SchemaDumpCapture functionSchemaDump{};
+        ok &= CheckReflectionRegistry(
+            functionRegistry.DumpSchema(
+                &CaptureSchemaDumpLine,
+                &functionSchemaDump)
+                && functionSchemaDump.Contains(
+                    "function owner=Nocturne.Tests.FunctionOwner")
+                && functionSchemaDump.Contains(
+                    "name=AddWithBase")
+                && functionSchemaDump.Contains(
+                    "function_parameter owner=Nocturne.Tests.FunctionOwner function=AddWithBase index=0 name=a"),
+            "Function schema dump missing signature diagnostics");
+
         mutableParameterName[0] = 'X';
 
         const noc::FunctionMetadata* addFunction =
@@ -1388,6 +1491,17 @@ bool RunPhase16ReflectionRegistryTests()
                 && containerRegistry.RegisterType(fixedType)
                 && containerRegistry.Freeze(),
             "Container reflection schema failed");
+
+        SchemaDumpCapture containerSchemaDump{};
+        ok &= CheckReflectionRegistry(
+            containerRegistry.DumpSchema(
+                &CaptureSchemaDumpLine,
+                &containerSchemaDump)
+                && containerSchemaDump.Contains(
+                    "container owner=Nocturne.Tests.FixedInt3")
+                && containerSchemaDump.Contains(
+                    "container owner=Nocturne.Tests.SmallSequence"),
+            "Container schema dump missing adapter diagnostics");
 
         const noc::ContainerMetadata* reflectedFixed =
             containerRegistry.FindContainer(kFixedType);

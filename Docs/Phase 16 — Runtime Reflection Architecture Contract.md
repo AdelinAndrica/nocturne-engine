@@ -782,6 +782,9 @@ Nu creează un al doilea native schema registry.
 
 ## 37. Reflection și Debug Tooling
 
+> **Implementation note — 2026-09-19:** `ReflectionRegistry::DumpSchema()` now provides a Frozen-only, deterministic, allocation-free, callback-based diagnostic dump covering registry/type/property/attribute/enum/container/component/function/parameter records. The runtime header exposes no STL ownership. Automated tests cover successful dumps plus invalid state/writer rejection.
+
+
 Reflection trebuie să permită:
 
 - generic entity/component inspector;
