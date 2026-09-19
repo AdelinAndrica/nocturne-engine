@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nocturne.engine/schemas/terminology.schema.json",
+  "title": "Nocturne Engine Terminology",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "project", "terms"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "project": { "const": "nocturne-engine" },
+    "terms": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "term","documentId","definition","aliases","deprecatedAliases"
+        ],
+        "properties": {
+          "term": { "type": "string", "minLength": 1 },
+          "documentId": {
+            "type": "string",
+            "pattern": "^noc\\.[a-z0-9][a-z0-9._-]*$"
+          },
+          "definition": { "type": "string", "minLength": 1 },
+          "aliases": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "deprecatedAliases": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    }
+  }
+}
