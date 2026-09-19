@@ -1,0 +1,43 @@
+# Nocturne Engine
+
+> Custom Windows game engine written in C++20+, targeting a first-person survival horror game.
+
+## Source precedence
+
+1. Current canonical Architecture / Systems / Development documentation.
+2. Current source code for exact implementation behavior.
+3. Completion/implementation reports as delivered-work evidence.
+4. Historical Phase documents for chronology only.
+
+Historical Phase documents must not override current canonical behavior.
+
+## Canonical documentation
+
+- [Nocturne Engine — Architecture Overview](Docs/nocturne_engine_architecture.md) — Canonical layered/subsystem architecture, dependency direction, ownership and engine/application policy boundary. [noc.architecture.overview]
+- [Nocturne Engine — Production Engineering Standard](Docs/Production Engineering Standard.md) — Canonical engineering quality, CI, validation and production-readiness standard for Nocturne Engine. [noc.development.production-standard]
+- [Release Process](Docs/Development/Release Process.md) — Canonical release packaging, artifact validation, manifest promotion and Downloads publication contract. [noc.development.release-process]
+- [Documentation Model](Docs/Development/Documentation Model.md) — Canonical source-of-truth, metadata, precedence and generated-documentation rules for Nocturne technical documentation. [noc.documentation.model]
+- [Editor](Docs/Systems/Editor.md) — Canonical Nocturne Editor shell, runtime boundary, viewport, selection and authoring-tool contract. [noc.editor]
+- [Rendering](Docs/Systems/Rendering.md) — Canonical renderer ownership, frame handoff, DirectX 12 backend and editor render-target integration contract. [noc.render]
+- [Resources](Docs/Systems/Resources.md) — Canonical virtual file system, resource loading, typed resource and runtime asset-lifetime contract. [noc.resources]
+- [Runtime](Docs/Systems/Runtime.md) — Canonical runtime ownership, lifecycle, frame execution, configuration and subsystem orchestration contract. [noc.runtime]
+- [Nocturne Website — Design & Technical Specification](Docs/Web/Nocturne Website — Design & Technical Specification.md) — Canonical product and technical specification for the Nocturne Engine website and documentation surface. [noc.web.spec]
+- [World & ECS](Docs/Systems/World & ECS.md) — Canonical runtime entity identity, component ownership, transform hierarchy, camera and render-extraction contract. [noc.world]
+
+## Machine-readable entry points
+
+- Knowledge/manifest.json — stable canonical document index and source relationships.
+- Knowledge/terminology.json — canonical terms, aliases and deprecated aliases.
+- Schemas/knowledge-manifest.schema.json — manifest contract.
+- Schemas/terminology.schema.json — terminology contract.
+- llms-full.txt — generated canonical-only documentation export.
+
+## Agent rules
+
+- Prefer canonical documents over Phase/history documents for current behavior.
+- Inspect referenced source files when exact implementation detail matters.
+- Do not introduce upward engine dependencies.
+- Engine provides mechanisms; applications provide policies.
+- Engine namespace: noc::.
+- Game/application namespace: game::.
+- Do not treat roadmap scope as proof that a feature is implemented.
