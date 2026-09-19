@@ -226,6 +226,17 @@ The website manifest is deliberately a separate reviewed source.
 
 A GitHub Release existing by itself does not cause the website to claim support automatically.
 
+Promotion tool:
+
+```powershell
+cd Website
+npm run promote:release -- <release-record-x86_64.json> [additional-records...]
+npm run validate:releases
+npm run build
+```
+
+`Website/scripts/promote-release.mjs` verifies that all supplied records agree on version, channel, date, release notes and source commit. It rejects duplicate architecture tuples and refuses to overwrite an existing published version.
+
 **Design choice (not directly from the book):** manifest promotion remains an explicit source-controlled action so a malformed/partial publication cannot silently change the public support matrix.
 
 ## Website publication
