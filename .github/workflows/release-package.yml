@@ -32,7 +32,7 @@ on:
           - stable
   push:
     tags:
-      - "v[0-9]+.[0-9]+.[0-9]+*"
+      - "v*.*.*"
 
 permissions:
   contents: read
@@ -69,7 +69,7 @@ jobs:
           }
           elseif ("${{ github.event_name }}" -eq "push") {
             $version = "${{ github.ref_name }}".TrimStart("v")
-            $channel = "development"
+            $channel = if ($version.Contains("-")) { "preview" } else { "stable" }
           }
           else {
             $version = "0.0.0-pr${{ github.event.pull_request.number }}"
