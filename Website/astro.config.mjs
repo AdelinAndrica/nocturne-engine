@@ -46,6 +46,7 @@ export default defineConfig({
           items: [
             { slug: 'docs/development/documentation-model' },
             { slug: 'docs/development/production-engineering-standard' },
+            { slug: 'docs/development/release-process' },
             { slug: 'docs/development/website-specification' }
           ]
         },
