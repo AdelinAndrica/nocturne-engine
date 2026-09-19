@@ -463,7 +463,7 @@ async function generateKnowledge(canonicalDocuments) {
     '',
     ...manifest.documents.map(
       (document) =>
-        `- [${document.title}](${document.sourcePath}) — ${document.description} [${document.id}]`
+        `- [${document.title}](${document.webPath}) — ${document.description} [${document.id}] — Source: ${document.sourcePath}`
     ),
     '',
     '## Machine-readable entry points',
