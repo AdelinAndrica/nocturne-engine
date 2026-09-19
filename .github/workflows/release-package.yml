@@ -100,7 +100,6 @@ jobs:
               /m `
               /p:Configuration=Ship `
               /p:Platform=${{ matrix.msbuild_platform }} `
-              /p:PlatformToolset=v143 `
               "/p:SolutionDir=$root" `
               "/p:OutDir=$out"
 
