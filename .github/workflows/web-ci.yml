@@ -95,7 +95,7 @@ jobs:
           
           Assert-Contains "dist/index.html" "EditorShellV3"
           Assert-Contains "dist/index.html" "Interface schematic"
-          Assert-Contains "dist/index.html" "Phases 1–15 implemented"
+          Assert-Contains "dist/index.html" ("Phases 1{0}15 implemented" -f [char]0x2013)
           Assert-Contains "dist/index.html" "noc.runtime"
           Assert-Contains "dist/index.html" "noc.resources"
           Assert-Contains "dist/index.html" "noc.render"
