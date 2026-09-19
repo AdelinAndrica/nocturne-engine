@@ -9,6 +9,8 @@ description: "Canonical runtime ownership, lifecycle, frame execution, configura
 source_files: ["Engine/Runtime/Engine.h","Engine/Runtime/Engine.cpp","Engine/Runtime/MainLoop.h","Engine/Runtime/MainLoop.cpp","Engine/Runtime/EngineConfig.h"]
 source_docs: ["Docs/nocturne_engine_architecture.md","Docs/Phase 6 — Job System & Async Infrastructure.md","Docs/Production Engineering Standard.md"]
 book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §8.2 The Game Loop","Jason Gregory — Game Engine Architecture (3rd ed.), §8.6 Multiprocessor Game Loops"]
+aliases: ["Runtime","Engine Runtime","Main Loop"]
+deprecated_aliases: []
 ---
 
 # Runtime
