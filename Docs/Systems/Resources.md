@@ -9,6 +9,8 @@ description: "Canonical virtual file system, resource loading, typed resource an
 source_files: ["Engine/Resources/VirtualFileSystem.h","Engine/Resources/ResourceManager.h","Engine/Resources/ResourceManager.cpp","Engine/Resources/ResourceHandle.h","Engine/Resources/Typed/ResourceLoaderRegistry.h"]
 source_docs: ["Docs/nocturne_engine_architecture.md","Docs/Phase 4 — Resource Manager.md","Docs/Phase 5 — Typed Resources & Loader Registry.md","Docs/Phase 11 — Asset Import Pipeline.md"]
 book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §7.2 The Resource Manager","Jason Gregory — Game Engine Architecture (3rd ed.), §7.2.2 Runtime Resource Management"]
+aliases: ["Resources","Resource Manager","VFS","Virtual File System"]
+deprecated_aliases: []
 ---
 
 # Resources
