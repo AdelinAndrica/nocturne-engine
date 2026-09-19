@@ -1,6 +1,10 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  knowledgeManifestSchema,
+  terminologySchema
+} from '../src/data/knowledge-schema.mjs';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const websiteRoot = path.resolve(scriptDir, '..');
@@ -11,6 +15,12 @@ const themePath = path.join(repoRoot, 'Design', 'nocturne-theme.json');
 const generatedThemeDir = path.join(websiteRoot, 'src', 'styles', 'generated');
 const generatedThemePath = path.join(generatedThemeDir, 'nocturne-theme.css');
 const manifestPath = path.join(websiteRoot, '.generated-docs.json');
+const knowledgeRoot = path.join(repoRoot, 'Knowledge');
+const knowledgeManifestPath = path.join(knowledgeRoot, 'manifest.json');
+const terminologyPath = path.join(knowledgeRoot, 'terminology.json');
+const llmsPath = path.join(repoRoot, 'llms.txt');
+const llmsFullPath = path.join(repoRoot, 'llms-full.txt');
+const publicRoot = path.join(websiteRoot, 'public');
 
 const allowedSourceMetadata = new Set([
   'id',
@@ -22,7 +32,9 @@ const allowedSourceMetadata = new Set([
   'description',
   'source_files',
   'source_docs',
-  'book_grounding'
+  'book_grounding',
+  'aliases',
+  'deprecated_aliases'
 ]);
 
 function toPosix(value) {
@@ -73,7 +85,7 @@ function parseSourceDocument(markdown, relativeSource) {
 
   const rawLines = match[1].split(/\r?\n/);
   const looksLikeFrontmatter = rawLines.some((line) =>
-    /^(?:id|doc_type|canonical|status|description|subsystem|phase_introduced|source_files|source_docs|book_grounding):/.test(
+    /^(?:id|doc_type|canonical|status|description|subsystem|phase_introduced|source_files|source_docs|book_grounding|aliases|deprecated_aliases):/.test(
       line.trim()
     )
   );
@@ -267,7 +279,9 @@ function renderGeneratedFrontmatter(metadata, historical) {
     'phase_introduced',
     'source_files',
     'source_docs',
-    'book_grounding'
+    'book_grounding',
+    'aliases',
+    'deprecated_aliases'
   ];
 
   const lines = ['---'];
