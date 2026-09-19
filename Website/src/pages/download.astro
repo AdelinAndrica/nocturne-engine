@@ -2,7 +2,22 @@
 import SiteLayout from '../layouts/SiteLayout.astro';
 import releaseData from '../data/releases.json';
 
-const releases = releaseData.releases;
+interface ReleaseBuild {
+  platform: string;
+  architecture: string;
+  configuration: string;
+  status: string;
+  url?: string;
+}
+
+interface Release {
+  version: string;
+  channel: string;
+  publishedAt: string;
+  builds: ReleaseBuild[];
+}
+
+const releases = releaseData.releases as Release[];
 const hasReleases = releases.length > 0;
 ---
 
@@ -39,7 +54,11 @@ const hasReleases = releases.length > 0;
                     <strong>{build.platform} · {build.architecture}</strong>
                     <small>{build.configuration} · {build.status}</small>
                   </div>
-                  <a href={build.url ?? '#'} aria-disabled={!build.url}>Download</a>
+                  {build.url ? (
+                    <a href={build.url}>Download</a>
+                  ) : (
+                    <span class="unavailable">Unavailable</span>
+                  )}
                 </div>
               ))}
             </div>
@@ -183,15 +202,25 @@ const hasReleases = releases.length > 0;
     color: var(--noc-text-muted);
   }
 
-  .build a {
+  .build a,
+  .unavailable {
     padding: 0.55rem 0.8rem;
-    border: 1px solid var(--noc-accent);
     border-radius: var(--noc-radius-sm);
+    font-size: 0.78rem;
+    font-weight: 650;
+  }
+
+  .build a {
+    border: 1px solid var(--noc-accent);
     background: var(--noc-accent);
     color: white;
     text-decoration: none;
-    font-size: 0.78rem;
-    font-weight: 650;
+  }
+
+  .unavailable {
+    border: 1px solid var(--noc-border);
+    background: var(--noc-input-bg);
+    color: var(--noc-text-muted);
   }
 
   .empty-state {
