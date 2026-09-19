@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "project": "nocturne-engine",
+  "terms": [
+    {
+      "term": "Nocturne Engine — Architecture Overview",
+      "documentId": "noc.architecture.overview",
+      "definition": "Canonical layered/subsystem architecture, dependency direction, ownership and engine/application policy boundary.",
+      "aliases": [
+        "Nocturne Engine",
+        "Architecture Overview",
+        "Engine Architecture"
+      ],
+      "deprecatedAliases": []
+    },
+    {
+      "term": "Nocturne Engine — Production Engineering Standard",
+      "documentId": "noc.development.production-standard",
+      "definition": "Canonical engineering quality, CI, validation and production-readiness standard for Nocturne Engine.",
+      "aliases": [
+        "Production Engineering Standard",
+        "Production Standard"
+      ],
+      "deprecatedAliases": []
+    },
+    {
+      "term": "Release Process",
+      "documentId": "noc.development.release-process",
+      "definition": "Canonical release packaging, artifact validation, manifest promotion and Downloads publication contract.",
+      "aliases": [
+        "Release Process",
+        "Downloads Pipeline",
+        "Release Packaging"
+      ],
+      "deprecatedAliases": []
+    },
+    {
+      "term": "Documentation Model",
+      "documentId": "noc.documentation.model",
+      "definition": "Canonical source-of-truth, metadata, precedence and generated-documentation rules for Nocturne technical documentation.",
+      "aliases": [
+        "Documentation Model",
+        "Canonical Documentation",
+        "Docs Model"
+      ],
+      "deprecatedAliases": []
+    },
+    {
+      "term": "Editor",
+      "documentId": "noc.editor",
+      "definition": "Canonical Nocturne Editor shell, runtime boundary, viewport, selection and authoring-tool contract.",
+      "aliases": [
+        "Editor",
+        "Nocturne Editor",
+        "EditorShellV3"
+      ],
+      "deprecatedAliases": [
+        "EditorShell",
+        "EditorControls"
+      ]
+    },
+    {
+      "term": "Rendering",
+      "documentId": "noc.render",
+      "definition": "Canonical renderer ownership, frame handoff, DirectX 12 backend and editor render-target integration contract.",
+      "aliases": [
+        "Rendering",
+        "Renderer",
+        "Render System",
+        "DirectX 12 Renderer"
+      ],
+      "deprecatedAliases": []
+    },
+    {
+      "term": "Resources",
+      "documentId": "noc.resources",
+      "definition": "Canonical virtual file system, resource loading, typed resource and runtime asset-lifetime contract.",
+      "aliases": [
+        "Resources",
+        "Resource Manager",
+        "VFS",
+        "Virtual File System"
+      ],
+      "deprecatedAliases": []
+    },
+    {
+      "term": "Runtime",
+      "documentId": "noc.runtime",
+      "definition": "Canonical runtime ownership, lifecycle, frame execution, configuration and subsystem orchestration contract.",
+      "aliases": [
+        "Runtime",
+        "Engine Runtime",
+        "Main Loop"
+      ],
+      "deprecatedAliases": []
+    },
+    {
+      "term": "Nocturne Website — Design & Technical Specification",
+      "documentId": "noc.web.spec",
+      "definition": "Canonical product and technical specification for the Nocturne Engine website and documentation surface.",
+      "aliases": [
+        "Website Specification",
+        "Nocturne Website"
+      ],
+      "deprecatedAliases": []
+    },
+    {
+      "term": "World & ECS",
+      "documentId": "noc.world",
+      "definition": "Canonical runtime entity identity, component ownership, transform hierarchy, camera and render-extraction contract.",
+      "aliases": [
+        "World",
+        "ECS",
+        "Entity Component System",
+        "World & ECS"
+      ],
+      "deprecatedAliases": []
+    }
+  ]
+}
