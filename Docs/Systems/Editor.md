@@ -9,6 +9,8 @@ description: "Canonical Nocturne Editor shell, runtime boundary, viewport, selec
 source_files: ["Apps/NocturneEditor/EditorShellV3.h","Apps/NocturneEditor/EditorShellV3.cpp","Apps/NocturneEditor/EditorTheme.h","Apps/NocturneEditor/EditorTheme.cpp","Apps/NocturneEditor/EditorViewportController.h","Apps/NocturneEditor/EditorViewportController.cpp"]
 source_docs: ["Docs/nocturne_engine_architecture.md","Docs/Phase 13 — Completion Report.md","Docs/Phase 14 — Completion Report.md","Docs/Phase 15 — Completion Report.md"]
 book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §15.4 The Game World Editor","Jason Gregory — Game Engine Architecture (3rd ed.), §15.4.1 Typical Features of a Game World Editor"]
+aliases: ["Editor","Nocturne Editor","EditorShellV3"]
+deprecated_aliases: ["EditorShell","EditorControls"]
 ---
 
 # Editor
