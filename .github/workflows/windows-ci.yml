@@ -48,7 +48,6 @@ jobs:
             /m `
             /p:Configuration=Debug `
             /p:Platform=x64 `
-            /p:PlatformToolset=v143 `
             "/p:SolutionDir=$root" `
             "/p:OutDir=$out"
 
@@ -74,8 +73,7 @@ jobs:
           msbuild "Ide\VS2026\NocturneEditor\NocturneEditor.vcxproj" `
             /m `
             /p:Configuration=Debug `
-            /p:Platform=x64 `
-            /p:PlatformToolset=v143
+            /p:Platform=x64
 
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
@@ -94,8 +92,7 @@ jobs:
             msbuild $project `
               /m `
               /p:Configuration=Development `
-              /p:Platform=x64 `
-              /p:PlatformToolset=v143
+              /p:Platform=x64
 
             if ($LASTEXITCODE -ne 0) {
               exit $LASTEXITCODE
@@ -111,7 +108,6 @@ jobs:
             /m `
             /p:Configuration=Debug `
             /p:Platform=x64 `
-            /p:PlatformToolset=v143 `
             "/p:SolutionDir=$root"
 
           if ($LASTEXITCODE -ne 0) {
