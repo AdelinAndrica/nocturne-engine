@@ -374,6 +374,10 @@ Deterministic allocator-injection coverage now forces two partial-mutation risks
 
 **Design choice (not directly from the book):** a switchable allocator wrapper is test-only fault injection; production allocation policy is unchanged.
 
+### 11.1E Optional component subtree snapshot proof — IMPLEMENTED; CI PENDING
+
+Delete/undo and duplicate subtree coverage now includes a Camera on the root and a Renderable on the child, with semantic camera lens/enabled state and renderable ResourceHandle/local bounds/enabled state verified after restore/duplicate. This proves the reflection-backed snapshot does not only handle Name + Transform.
+
 ### 11.1B Transient snapshot source-to-current remap — IMPLEMENTED; CI PENDING
 
 `ReflectedEntitySubtreeSnapshot::CurrentEntityForSource()` exposes the source→current runtime mapping already maintained by snapshot nodes. This is transient editor bookkeeping only, never persistent identity. Automated coverage validates root and child mappings after destruction/reinstantiation.

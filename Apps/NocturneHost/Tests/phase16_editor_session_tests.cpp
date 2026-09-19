@@ -3349,13 +3349,39 @@ bool RunPhase16EditorSessionTests()
         const noc::EntityHandle childEntity =
             world.CreateEntity();
 
+        const noc::ResourceHandle subtreeMesh{
+            42u,
+            7u
+        };
+        const noc::AABB subtreeBounds{
+            noc::Vec3{ -1.0f, -2.0f, -3.0f },
+            noc::Vec3{ 4.0f, 5.0f, 6.0f }
+        };
+
         ok &= CheckEditorSession(
             parentEntity.IsValid()
                 && childEntity.IsValid()
                 && world.AddName(parentEntity, "Delete Parent")
                 && world.AddTransform(parentEntity)
+                && world.AddCamera(parentEntity)
+                && world.SetCameraPerspective(
+                    parentEntity,
+                    0.85f,
+                    1.77f,
+                    0.25f,
+                    750.0f)
+                && world.SetCameraEnabled(
+                    parentEntity,
+                    false)
                 && world.AddName(childEntity, "Delete Child")
                 && world.AddTransform(childEntity)
+                && world.AddRenderable(
+                    childEntity,
+                    subtreeMesh,
+                    subtreeBounds)
+                && world.SetRenderableEnabled(
+                    childEntity,
+                    false)
                 && world.SetLocalTRS(
                     childEntity,
                     noc::Vec3{ 3.0f, 0.0f, 0.0f },
@@ -3413,7 +3439,29 @@ bool RunPhase16EditorSessionTests()
                     == restoredParent
                 && world.GetTransform(restoredChild)
                 && world.GetTransform(restoredChild)
-                    ->localTranslation.x == 3.0f,
+                    ->localTranslation.x == 3.0f
+                && world.HasCamera(restoredParent)
+                && world.GetCamera(restoredParent)
+                && world.GetCamera(restoredParent)
+                    ->fovYRadians == 0.85f
+                && world.GetCamera(restoredParent)
+                    ->aspect == 1.77f
+                && world.GetCamera(restoredParent)
+                    ->nearZ == 0.25f
+                && world.GetCamera(restoredParent)
+                    ->farZ == 750.0f
+                && !world.GetCamera(restoredParent)
+                    ->enabled
+                && world.HasRenderable(restoredChild)
+                && world.GetRenderable(restoredChild)
+                && world.GetRenderable(restoredChild)
+                    ->mesh == subtreeMesh
+                && world.GetRenderable(restoredChild)
+                    ->localBounds.min.x == -1.0f
+                && world.GetRenderable(restoredChild)
+                    ->localBounds.max.z == 6.0f
+                && !world.GetRenderable(restoredChild)
+                    ->enabled,
             "Delete undo did not restore reflected subtree state");
 
         ok &= CheckEditorSession(
@@ -3475,7 +3523,21 @@ bool RunPhase16EditorSessionTests()
                     world.GetName(duplicateChild)->value,
                     "Delete Child") == 0
                 && world.ParentOf(duplicateChild)
-                    == duplicateRoot,
+                    == duplicateRoot
+                && world.HasCamera(duplicateRoot)
+                && world.GetCamera(duplicateRoot)
+                && world.GetCamera(duplicateRoot)
+                    ->fovYRadians == 0.85f
+                && !world.GetCamera(duplicateRoot)
+                    ->enabled
+                && world.HasRenderable(duplicateChild)
+                && world.GetRenderable(duplicateChild)
+                && world.GetRenderable(duplicateChild)
+                    ->mesh == subtreeMesh
+                && world.GetRenderable(duplicateChild)
+                    ->localBounds.max.y == 5.0f
+                && !world.GetRenderable(duplicateChild)
+                    ->enabled,
             "Duplicate subtree state mismatch");
 
         ok &= CheckEditorSession(

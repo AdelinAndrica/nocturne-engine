@@ -427,8 +427,8 @@ Reflection milestone:
 - [ ] Snapshot copiază Name.
 - [ ] Snapshot copiază Transform local TRS.
 - [ ] Snapshot copiază Transform internal parent relationships.
-- [ ] Snapshot copiază Renderable.
-- [ ] Snapshot copiază Camera.
+- [x] Snapshot copiază Renderable.
+- [x] Snapshot copiază Camera.
 - [ ] Snapshot păstrează component presence.
 - [ ] Snapshot nu păstrează runtime EntityHandle drept persistent identity.
 - [ ] Internal snapshot references folosesc snapshot-local IDs/indices.
@@ -440,9 +440,9 @@ Reflection milestone:
 - [ ] Snapshot nu este expus ca scene serialization API.
 - [ ] Snapshot format nu este numit stable/persistent.
 - [ ] Test non-trivial hierarchy restore.
-- [ ] Test missing optional components.
+- [x] Test missing optional components.
 - [ ] Test duplicate names.
-- [ ] Test camera component in subtree.
+- [x] Test camera component in subtree.
 - [x] Leak tests.
 
 ---
@@ -480,7 +480,7 @@ Reflection milestone:
 
 - [ ] Capture source snapshot.
 - [ ] Instantiate with new EntityHandles.
-- [ ] Preserve component presence.
+- [x] Preserve component presence.
 - [ ] Preserve local TRS.
 - [ ] Preserve internal hierarchy.
 - [ ] Parent copy policy explicit.
@@ -495,7 +495,7 @@ Reflection milestone:
 - [ ] External references boundary documented.
 - [ ] Test one entity.
 - [ ] Test hierarchy.
-- [ ] Test camera/renderable.
+- [x] Test camera/renderable.
 - [ ] Test 1k subtree stress.
 
 ---
