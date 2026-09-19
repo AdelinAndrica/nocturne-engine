@@ -13,9 +13,11 @@ Local/static website for Nocturne Engine.
 
 ```powershell
 cd Website
-npm install
+npm ci
 npm run dev
 ```
+
+The committed `package-lock.json` is authoritative for website dependency resolution.
 
 The `predev` hook runs `scripts/prepare.mjs`, which:
 
@@ -34,6 +36,7 @@ Primary routes:
 ## Production build
 
 ```powershell
+npm ci
 npm run build
 npm run preview
 ```
