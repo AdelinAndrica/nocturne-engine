@@ -68,3 +68,21 @@ jobs:
           grep -q "noc.render" dist/docs/systems/rendering/index.html
           grep -q "noc.world" dist/docs/systems/world-ecs/index.html
           grep -q "noc.editor" dist/docs/systems/editor/index.html
+
+          test -f dist/icons/box.svg
+          test -f dist/icons/device-desktop.svg
+          test -f dist/icons/world.svg
+          test -f dist/icons/hierarchy-2.svg
+          test -f dist/icons/layout-grid.svg
+          test -f dist/icons/terminal-2.svg
+          test -f dist/icons/file-text.svg
+
+          grep -q "EditorShellV3" dist/index.html
+          grep -q "Interface schematic" dist/index.html
+          grep -q "Phases 1–15 implemented" dist/index.html
+          grep -q "noc.runtime" dist/index.html
+          grep -q "noc.resources" dist/index.html
+          grep -q "noc.render" dist/index.html
+          grep -q "noc.world" dist/index.html
+          grep -q "noc.editor" dist/index.html
+          grep -q "Skip to content" dist/index.html
