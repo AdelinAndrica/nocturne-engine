@@ -39,6 +39,14 @@ jobs:
       - name: Install website dependencies
         run: npm install --no-audit --no-fund
 
+      - name: Capture generated dependency lock
+        uses: actions/upload-artifact@v4
+        with:
+          name: nocturne-website-package-lock
+          path: Website/package-lock.json
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Build static website
         run: npm run build
 
