@@ -14,7 +14,8 @@
     "prebuild": "npm run validate:releases && npm run prepare:nocturne",
     "build": "astro build",
     "preview": "astro preview",
-    "sync": "npm run validate:releases && npm run prepare:nocturne"
+    "sync": "npm run validate:releases && npm run prepare:nocturne",
+    "promote:release": "node scripts/promote-release.mjs"
   },
   "dependencies": {
     "@astrojs/starlight": "0.42.2",
