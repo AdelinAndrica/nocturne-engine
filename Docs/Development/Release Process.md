@@ -9,6 +9,8 @@ description: "Canonical release packaging, artifact validation, manifest promoti
 source_files: [".github/workflows/release-package.yml",".github/scripts/package-release.ps1","Schemas/release.schema.json","Website/src/data/releases.json","Website/src/data/release-schema.mjs","Website/src/pages/download.astro"]
 source_docs: ["Docs/Production Engineering Standard.md","Docs/Web/Nocturne Website — Design & Technical Specification.md"]
 book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §1.7 Tools and the Asset Pipeline"]
+aliases: ["Release Process","Downloads Pipeline","Release Packaging"]
+deprecated_aliases: []
 ---
 
 # Release Process
