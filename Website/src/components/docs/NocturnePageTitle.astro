@@ -1,0 +1,113 @@
+---
+const data = Astro.locals.starlightRoute.entry.data as typeof Astro.locals.starlightRoute.entry.data & {
+  id?: string;
+  doc_type?: string;
+  canonical?: boolean;
+  status?: string;
+  subsystem?: string;
+};
+
+const historical = data.doc_type === 'historical-phase' || data.canonical === false;
+const authorityLabel = historical ? 'HISTORY' : data.canonical ? 'CANONICAL' : 'REFERENCE';
+const typeLabel = data.subsystem
+  ? data.subsystem.toUpperCase()
+  : data.doc_type
+    ? data.doc_type.replaceAll('-', ' ').toUpperCase()
+    : 'DOCUMENTATION';
+const statusLabel = data.status?.toUpperCase();
+---
+
+<div class="noc-page-title">
+  <div class="noc-page-title__meta" data-pagefind-ignore>
+    <span class:list={['noc-chip', historical ? 'noc-chip--history' : 'noc-chip--authority']}>
+      {authorityLabel}
+    </span>
+    <span class="noc-chip noc-chip--type">{typeLabel}</span>
+    {statusLabel && (
+      <span class:list={['noc-chip', `noc-chip--status-${data.status}`]}>
+        {statusLabel}
+      </span>
+    )}
+  </div>
+
+  <h1 id="_top">{data.title}</h1>
+
+  {data.id && (
+    <div class="noc-page-title__id" data-pagefind-ignore>
+      {data.id}
+    </div>
+  )}
+</div>
+
+<style>
+  .noc-page-title {
+    margin-bottom: 1.5rem;
+  }
+
+  .noc-page-title__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .noc-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.45rem;
+    padding: 0 0.45rem;
+    border: 1px solid var(--noc-border);
+    border-radius: 4px;
+    background: var(--noc-input-bg);
+    color: var(--noc-text-muted);
+    font-family: var(--noc-font-mono);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+
+  .noc-chip--authority {
+    border-color: color-mix(in srgb, var(--noc-accent) 52%, var(--noc-border));
+    background: color-mix(in srgb, var(--noc-accent) 12%, var(--noc-input-bg));
+    color: #a9d4ff;
+  }
+
+  .noc-chip--history {
+    border-color: color-mix(in srgb, var(--noc-text-muted) 36%, var(--noc-border));
+    color: var(--noc-text-muted);
+  }
+
+  .noc-chip--status-implemented,
+  .noc-chip--status-foundation {
+    border-color: color-mix(in srgb, var(--noc-success) 42%, var(--noc-border));
+    color: #a8e7b9;
+  }
+
+  .noc-chip--status-active {
+    border-color: color-mix(in srgb, var(--noc-accent) 45%, var(--noc-border));
+    color: #a9d4ff;
+  }
+
+  .noc-chip--status-planned {
+    border-color: color-mix(in srgb, var(--noc-warning) 42%, var(--noc-border));
+    color: #efd19b;
+  }
+
+  .noc-chip--status-historical {
+    color: var(--noc-text-muted);
+  }
+
+  h1 {
+    margin: 0;
+    color: var(--noc-text-primary);
+    font-family: var(--noc-font-display);
+    letter-spacing: -0.035em;
+  }
+
+  .noc-page-title__id {
+    margin-top: 0.55rem;
+    color: var(--noc-text-muted);
+    font-family: var(--noc-font-mono);
+    font-size: 0.72rem;
+  }
+</style>
