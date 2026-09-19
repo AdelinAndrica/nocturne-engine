@@ -7,13 +7,14 @@
     "node": ">=22.12.0"
   },
   "scripts": {
+    "validate:releases": "node scripts/validate-releases.mjs",
     "prepare:nocturne": "node scripts/prepare.mjs",
-    "predev": "npm run prepare:nocturne",
+    "predev": "npm run validate:releases && npm run prepare:nocturne",
     "dev": "astro dev",
-    "prebuild": "npm run prepare:nocturne",
+    "prebuild": "npm run validate:releases && npm run prepare:nocturne",
     "build": "astro build",
     "preview": "astro preview",
-    "sync": "npm run prepare:nocturne"
+    "sync": "npm run validate:releases && npm run prepare:nocturne"
   },
   "dependencies": {
     "@astrojs/starlight": "0.42.2",
