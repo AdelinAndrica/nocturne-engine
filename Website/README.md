@@ -54,3 +54,36 @@ The production output is static and is written to `Website/dist/`.
 See:
 
 `Docs/Web/Nocturne Website — Design & Technical Specification.md`
+
+
+## Release metadata
+
+Validate the current public Downloads manifest:
+
+```powershell
+npm run validate:releases
+```
+
+Release candidate jobs produce one `release-record-<architecture>.json` file per architecture.
+
+After the matching GitHub Release assets exist, promote the reviewed records into the website manifest with:
+
+```powershell
+npm run promote:release -- <record-x86_64.json> <record-x86.json>
+npm run validate:releases
+npm run build
+```
+
+The promotion command:
+
+- requires all records to describe the same release;
+- rejects duplicate platform/architecture/configuration tuples;
+- rejects an already-published version;
+- validates the final manifest before writing it;
+- sets the promoted release as `latest`.
+
+Do not add an architecture manually merely because a Visual Studio configuration exists.
+
+Canonical process:
+
+`Docs/Development/Release Process.md`
