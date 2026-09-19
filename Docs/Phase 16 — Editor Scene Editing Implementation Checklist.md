@@ -18,47 +18,47 @@
 
 ## 1. Grounding și reguli de sursă
 
-- [ ] Gregory §1.7.5 este folosit pentru tool architecture/shared runtime data.
-- [ ] Gregory §15.4 este folosit pentru rolul world editor-ului.
-- [ ] Gregory §15.4.1 este folosit pentru typical world-editor workflows.
-- [ ] Gregory §15.4.1.7 este folosit pentru special transform/object placement tools.
-- [ ] Gregory §15.4.1.10 este folosit pentru rapid iteration.
-- [ ] Gregory §15.4.1.9 este recunoscut ca persistence requirement, dar implementarea este Phase 17.
-- [ ] Nystrom Command / Undo and Redo este grounding pentru command history.
-- [ ] Lengyel Vol. 2 §5.4.2 rămâne grounding pentru transform hierarchy.
-- [ ] Nu inventăm page numbers.
-- [ ] Orice politică Nocturne-specifică este etichetată **Design choice (not directly from the book)**.
+- [x] Gregory §1.7.5 este folosit pentru tool architecture/shared runtime data.
+- [x] Gregory §15.4 este folosit pentru rolul world editor-ului.
+- [x] Gregory §15.4.1 este folosit pentru typical world-editor workflows.
+- [x] Gregory §15.4.1.7 este folosit pentru special transform/object placement tools.
+- [x] Gregory §15.4.1.10 este folosit pentru rapid iteration.
+- [x] Gregory §15.4.1.9 este recunoscut ca persistence requirement, dar implementarea este Phase 17.
+- [x] Nystrom Command / Undo and Redo este grounding pentru command history.
+- [x] Lengyel Vol. 2 §5.4.2 rămâne grounding pentru transform hierarchy.
+- [x] Nu inventăm page numbers.
+- [x] Orice politică Nocturne-specifică este etichetată **Design choice (not directly from the book)**.
 
 ---
 
 # 2. Audit înainte de cod
 
-- [ ] Confirmăm branch-ul Phase 16.
-- [ ] Citim integral toate phase `.md`.
-- [ ] Citim Production Engineering Standard.
-- [ ] Citim Phase 16 Runtime Reflection Architecture Contract.
-- [ ] Citim Phase 16 Professional Grade Implementation Contract.
-- [ ] Citim Phase 15 Architecture / Implementation / Test & CI / Completion.
-- [ ] Citim Phase 14 editor architecture/completion.
-- [ ] Inspectăm `EditorShellV3.h/.cpp`.
-- [ ] Inspectăm `EditorViewportController.h/.cpp`.
-- [ ] Inspectăm `Apps/NocturneEditor/main.cpp`.
-- [ ] Inspectăm `World.h/.cpp`.
-- [ ] Inspectăm `EntityRegistry`.
-- [ ] Inspectăm component systems și metadata.
-- [ ] Inventariem toate UI stubs Phase 13/14 pentru Scene/Inspector/Undo/Redo.
-- [ ] Inventariem `validationObjects_[4]`.
-- [ ] Inventariem `selectedIndex_`.
-- [ ] Inventariem row/index mapping din hierarchy.
-- [ ] Inventariem hard-coded labels / counts / camera.
-- [ ] Inventariem toate locurile unde editorul modifică direct World.
-- [ ] Inventariem shortcut/focus routing.
-- [ ] Inventariem Win32 child HWND ownership.
-- [ ] Inventariem current scene tree din EditorShellV3 versus hierarchy rendering din viewport controller.
-- [ ] Eliminăm riscul de a construi două Scene Hierarchy independente.
-- [ ] Definim cine va fi owner-ul Scene Hierarchy UI final.
-- [ ] Definim cine va fi owner-ul Inspector UI final.
-- [ ] Nu începem feature coding până când authority boundaries sunt clare.
+- [x] Confirmăm branch-ul Phase 16.
+- [x] Citim integral toate phase `.md`.
+- [x] Citim Production Engineering Standard.
+- [x] Citim Phase 16 Runtime Reflection Architecture Contract.
+- [x] Citim Phase 16 Professional Grade Implementation Contract.
+- [x] Citim Phase 15 Architecture / Implementation / Test & CI / Completion.
+- [x] Citim Phase 14 editor architecture/completion.
+- [x] Inspectăm `EditorShellV3.h/.cpp`.
+- [x] Inspectăm `EditorViewportController.h/.cpp`.
+- [x] Inspectăm `Apps/NocturneEditor/main.cpp`.
+- [x] Inspectăm `World.h/.cpp`.
+- [x] Inspectăm `EntityRegistry`.
+- [x] Inspectăm component systems și metadata.
+- [x] Inventariem toate UI stubs Phase 13/14 pentru Scene/Inspector/Undo/Redo.
+- [x] Inventariem `validationObjects_[4]`.
+- [x] Inventariem `selectedIndex_`.
+- [x] Inventariem row/index mapping din hierarchy.
+- [x] Inventariem hard-coded labels / counts / camera.
+- [x] Inventariem toate locurile unde editorul modifică direct World.
+- [x] Inventariem shortcut/focus routing.
+- [x] Inventariem Win32 child HWND ownership.
+- [x] Inventariem current scene tree din EditorShellV3 versus hierarchy rendering din viewport controller.
+- [x] Eliminăm riscul de a construi două Scene Hierarchy independente.
+- [x] Definim cine va fi owner-ul Scene Hierarchy UI final.
+- [x] Definim cine va fi owner-ul Inspector UI final.
+- [x] Nu începem feature coding până când authority boundaries sunt clare.
 
 ---
 
@@ -66,29 +66,29 @@
 
 Înainte sau odată cu primul milestone:
 
-- [ ] Creăm `Docs/Phase 16 — Editor Scene Editing Architecture.md`.
-- [ ] Documentăm ownership.
-- [ ] Documentăm Editor Session.
-- [ ] Documentăm selection model.
-- [ ] Documentăm command/history model.
+- [x] Creăm `Docs/Phase 16 — Editor Scene Editing Architecture.md`.
+- [x] Documentăm ownership.
+- [x] Documentăm Editor Session.
+- [x] Documentăm selection model.
+- [x] Documentăm command/history model.
 - [x] Documentăm transaction semantics.
-- [ ] Documentăm snapshot semantics.
-- [ ] Documentăm authored vs tool-owned entities.
-- [ ] Documentăm hierarchy enumeration.
-- [ ] Documentăm delete semantics.
-- [ ] Documentăm duplicate semantics.
-- [ ] Documentăm reparent semantics.
-- [ ] Documentăm component add/remove.
-- [ ] Documentăm Runtime Reflection architecture.
-- [ ] Documentăm migration path ComponentRegistry → ReflectionRegistry.
-- [ ] Documentăm Inspector ca reflection consumer.
-- [ ] Documentăm Local/World gizmo orientation.
-- [ ] Documentăm focus/input policy.
-- [ ] Documentăm history memory budget.
-- [ ] Documentăm threading.
-- [ ] Documentăm Phase 17 persistence boundary.
-- [ ] Documentăm temporary scaffolding removal.
-- [ ] Marcăm toate design choices non-book.
+- [x] Documentăm snapshot semantics.
+- [x] Documentăm authored vs tool-owned entities.
+- [x] Documentăm hierarchy enumeration.
+- [x] Documentăm delete semantics.
+- [x] Documentăm duplicate semantics.
+- [x] Documentăm reparent semantics.
+- [x] Documentăm component add/remove.
+- [x] Documentăm Runtime Reflection architecture.
+- [x] Documentăm migration path ComponentRegistry → ReflectionRegistry.
+- [x] Documentăm Inspector ca reflection consumer.
+- [x] Documentăm Local/World gizmo orientation.
+- [x] Documentăm focus/input policy.
+- [x] Documentăm history memory budget.
+- [x] Documentăm threading.
+- [x] Documentăm Phase 17 persistence boundary.
+- [x] Documentăm temporary scaffolding removal.
+- [x] Marcăm toate design choices non-book.
 
 ---
 
@@ -285,56 +285,56 @@ Reflection milestone:
 
 # 4. Editor Session
 
-- [ ] Introducem un owner clar pentru editor-session state.
-- [ ] Engine/World nu devine owner al UI state.
-- [ ] Session deține selected EntityHandle.
-- [ ] Session deține active tool.
-- [ ] Session deține transform orientation.
-- [ ] Session deține command history.
-- [ ] Session deține scene dirty state dacă este adoptat.
+- [x] Introducem un owner clar pentru editor-session state.
+- [x] Engine/World nu devine owner al UI state.
+- [x] Session deține selected EntityHandle.
+- [x] Session deține active tool.
+- [x] Session deține transform orientation.
+- [x] Session deține command history.
+- [x] Session deține scene dirty state dacă este adoptat.
 - [x] Session deține transient transaction state.
-- [ ] Session cunoaște tool-owned entities.
-- [ ] Session nu deține copii autoritare ale componentelor.
-- [ ] Session lifecycle este explicit Init/Shutdown.
-- [ ] Shutdown anulează/finalizează tranzacția activă determinist.
-- [ ] History este distrus înainte ca World target să devină invalid sau command destructors nu dereferențiază World.
-- [ ] No globals.
+- [x] Session cunoaște tool-owned entities.
+- [x] Session nu deține copii autoritare ale componentelor.
+- [x] Session lifecycle este explicit Init/Shutdown.
+- [x] Shutdown anulează/finalizează tranzacția activă determinist.
+- [x] History este distrus înainte ca World target să devină invalid sau command destructors nu dereferențiază World.
+- [x] No globals.
 
 ---
 
 # 5. Tool-owned editor camera
 
-- [ ] Separăm camera de navigație editor de authored scene cameras.
-- [ ] Editor camera nu apare ca authored entity în hierarchy.
-- [ ] Editor camera nu poate fi delete.
-- [ ] Editor camera nu poate fi duplicate.
-- [ ] Editor camera nu poate fi reparent prin scene UI.
-- [ ] Editor camera nu intră în transient authored snapshots.
-- [ ] Editor camera rămâne sursa de view pentru viewport.
-- [ ] Scene CameraComponents pot fi create/editate independent.
-- [ ] Destroy/reset scene nu distruge accidental editor camera.
-- [ ] Phase 17 va putea exclude tool camera din persistence fără hacks.
+- [x] Separăm camera de navigație editor de authored scene cameras.
+- [x] Editor camera nu apare ca authored entity în hierarchy.
+- [x] Editor camera nu poate fi delete.
+- [x] Editor camera nu poate fi duplicate.
+- [x] Editor camera nu poate fi reparent prin scene UI.
+- [x] Editor camera nu intră în transient authored snapshots.
+- [x] Editor camera rămâne sursa de view pentru viewport.
+- [x] Scene CameraComponents pot fi create/editate independent.
+- [x] Destroy/reset scene nu distruge accidental editor camera.
+- [x] Phase 17 va putea exclude tool camera din persistence fără hacks.
 
 ---
 
 # 6. Selection identity
 
-- [ ] Eliminăm `selectedIndex_` ca entity identity.
-- [ ] Selection = `EntityHandle`.
-- [ ] Default selection invalid.
-- [ ] Selection validează `World::IsAlive`.
-- [ ] Destroy selected entity clears/updates selection.
+- [x] Eliminăm `selectedIndex_` ca entity identity.
+- [x] Selection = `EntityHandle`.
+- [x] Default selection invalid.
+- [x] Selection validează `World::IsAlive`.
+- [x] Destroy selected entity clears/updates selection.
 - [x] Undo delete poate selecta restored entity.
 - [x] Duplicate selectează copia conform contractului.
-- [ ] Reparent păstrează selection.
-- [ ] Rename păstrează selection.
-- [ ] Component mutation păstrează selection.
-- [ ] Viewport click schimbă aceeași selection.
-- [ ] Hierarchy click schimbă aceeași selection.
-- [ ] Inspector citește aceeași selection.
-- [ ] No row index stored as identity.
-- [ ] No component pointer stored as identity.
-- [ ] Stale selection nu produce crash/log spam.
+- [x] Reparent păstrează selection.
+- [x] Rename păstrează selection.
+- [x] Component mutation păstrează selection.
+- [x] Viewport click schimbă aceeași selection.
+- [x] Hierarchy click schimbă aceeași selection.
+- [x] Inspector citește aceeași selection.
+- [x] No row index stored as identity.
+- [x] No component pointer stored as identity.
+- [x] Stale selection nu produce crash/log spam.
 
 ---
 
@@ -357,25 +357,25 @@ Reflection milestone:
 
 # 8. Scene Hierarchy UI — single authority
 
-- [ ] Decidem dacă final hierarchy este controlul `EditorShellV3::sceneTree_` sau un replacement dedicat.
-- [ ] Nu păstrăm simultan două hierarchy UIs autoritare.
-- [ ] Row model conține EntityHandle.
-- [ ] Row model nu conține component pointers persistente.
-- [ ] Root/editor labels nu sunt confundate cu entities.
-- [ ] Parent/child indentation reflectă Transform hierarchy.
-- [ ] Entity fără parent apare root authored entity.
-- [ ] Expand/collapse.
-- [ ] Hover.
-- [ ] Selected row.
-- [ ] Keyboard navigation unde implementat.
-- [ ] Scroll.
-- [ ] Large hierarchy clipping/virtualization strategy dacă este necesar după baseline.
-- [ ] Rename feedback.
-- [ ] Component/type icons dacă există metadata suficientă.
-- [ ] Duplicate names afișate corect.
+- [x] Decidem dacă final hierarchy este controlul `EditorShellV3::sceneTree_` sau un replacement dedicat.
+- [x] Nu păstrăm simultan două hierarchy UIs autoritare.
+- [x] Row model conține EntityHandle.
+- [x] Row model nu conține component pointers persistente.
+- [x] Root/editor labels nu sunt confundate cu entities.
+- [x] Parent/child indentation reflectă Transform hierarchy.
+- [x] Entity fără parent apare root authored entity.
+- [x] Expand/collapse.
+- [x] Hover.
+- [x] Selected row.
+- [x] Keyboard navigation unde implementat.
+- [x] Scroll.
+- [x] Large hierarchy clipping/virtualization strategy dacă este necesar după baseline.
+- [x] Rename feedback.
+- [x] Component/type icons dacă există metadata suficientă.
+- [x] Duplicate names afișate corect.
 - [ ] Invalid UTF-8 fallback diagnostic.
-- [ ] No hard-coded `Runtime Objects (4)`.
-- [ ] No hard-coded Cube_A/B/C/Ground rows.
+- [x] No hard-coded `Runtime Objects (4)`.
+- [x] No hard-coded Cube_A/B/C/Ground rows.
 
 ---
 
@@ -383,63 +383,63 @@ Reflection milestone:
 
 **Design choice (not directly from the book): editor-created scene entity defaults to Name + Transform.**
 
-- [ ] Add command pentru create.
-- [ ] Create este undoable.
-- [ ] Redo recreatează semantic entity.
-- [ ] Nu presupunem același runtime handle la redo.
-- [ ] Default name policy este documentată.
-- [ ] Default transform identity.
-- [ ] Parent target optional.
-- [ ] Create under selected parent dacă UX decide asta.
-- [ ] Parent invalid/stale => clear diagnostic / root fallback conform policy.
-- [ ] Selection după create este predictibilă.
-- [ ] History push doar după success.
-- [ ] Allocation failure nu produce partial entity.
-- [ ] Component-init failure rollback-ează entity.
-- [ ] Tool camera nu este afectată.
+- [x] Add command pentru create.
+- [x] Create este undoable.
+- [x] Redo recreatează semantic entity.
+- [x] Nu presupunem același runtime handle la redo.
+- [x] Default name policy este documentată.
+- [x] Default transform identity.
+- [x] Parent target optional.
+- [x] Create under selected parent dacă UX decide asta.
+- [x] Parent invalid/stale => clear diagnostic / root fallback conform policy.
+- [x] Selection după create este predictibilă.
+- [x] History push doar după success.
+- [x] Allocation failure nu produce partial entity.
+- [x] Component-init failure rollback-ează entity.
+- [x] Tool camera nu este afectată.
 - [x] Test create 1/100/10k.
 
 ---
 
 # 10. Rename Entity
 
-- [ ] Rename folosește NameComponent.
-- [ ] Rename este command.
-- [ ] Undo restorează exact numele anterior.
-- [ ] Redo reaplică numele nou.
-- [ ] Duplicate names sunt acceptate.
-- [ ] Empty name policy explicit.
-- [ ] UTF-8 byte limit respectat.
-- [ ] Too-long input rejected.
-- [ ] Nu trunchiem silent.
-- [ ] Rename in hierarchy și Inspector folosesc aceeași command.
-- [ ] Focus loss/Enter semantics.
-- [ ] Escape cancel.
-- [ ] Invalid/stale entity => no history entry.
-- [ ] Hierarchy refresh imediat.
+- [x] Rename folosește NameComponent.
+- [x] Rename este command.
+- [x] Undo restorează exact numele anterior.
+- [x] Redo reaplică numele nou.
+- [x] Duplicate names sunt acceptate.
+- [x] Empty name policy explicit.
+- [x] UTF-8 byte limit respectat.
+- [x] Too-long input rejected.
+- [x] Nu trunchiem silent.
+- [x] Rename in hierarchy și Inspector folosesc aceeași command.
+- [x] Focus loss/Enter semantics.
+- [x] Escape cancel.
+- [x] Invalid/stale entity => no history entry.
+- [x] Hierarchy refresh imediat.
 
 ---
 
 # 11. Transient subtree snapshot
 
-- [ ] Definim editor-only snapshot type.
-- [ ] Snapshot copiază semantic data, nu component pointers.
-- [ ] Snapshot copiază Name.
-- [ ] Snapshot copiază Transform local TRS.
-- [ ] Snapshot copiază Transform internal parent relationships.
+- [x] Definim editor-only snapshot type.
+- [x] Snapshot copiază semantic data, nu component pointers.
+- [x] Snapshot copiază Name.
+- [x] Snapshot copiază Transform local TRS.
+- [x] Snapshot copiază Transform internal parent relationships.
 - [x] Snapshot copiază Renderable.
 - [x] Snapshot copiază Camera.
-- [ ] Snapshot păstrează component presence.
-- [ ] Snapshot nu păstrează runtime EntityHandle drept persistent identity.
-- [ ] Internal snapshot references folosesc snapshot-local IDs/indices.
-- [ ] Snapshot poate restaura subtree cu handles noi.
+- [x] Snapshot păstrează component presence.
+- [x] Snapshot nu păstrează runtime EntityHandle drept persistent identity.
+- [x] Internal snapshot references folosesc snapshot-local IDs/indices.
+- [x] Snapshot poate restaura subtree cu handles noi.
 - [x] Snapshot produce old→new remap.
-- [ ] Snapshot excludes tool-owned entities.
-- [ ] Snapshot allocation failure este explicit.
-- [ ] Snapshot destructor/lifetime testat.
-- [ ] Snapshot nu este expus ca scene serialization API.
-- [ ] Snapshot format nu este numit stable/persistent.
-- [ ] Test non-trivial hierarchy restore.
+- [x] Snapshot excludes tool-owned entities.
+- [x] Snapshot allocation failure este explicit.
+- [x] Snapshot destructor/lifetime testat.
+- [x] Snapshot nu este expus ca scene serialization API.
+- [x] Snapshot format nu este numit stable/persistent.
+- [x] Test non-trivial hierarchy restore.
 - [x] Test missing optional components.
 - [ ] Test duplicate names.
 - [x] Test camera component in subtree.
@@ -451,25 +451,25 @@ Reflection milestone:
 
 **Design choice (not directly from the book): editor delete defaults to authored subtree delete.**
 
-- [ ] Capture subtree snapshot înainte de mutation.
-- [ ] Dacă snapshot eșuează, delete nu pornește.
-- [ ] Delete children in safe order.
-- [ ] Delete parent.
-- [ ] World destroy failures handled.
-- [ ] Compound rollback policy definită.
-- [ ] Delete command = single history entry.
-- [ ] Undo restorează entire subtree.
-- [ ] Undo restorează internal parent relationships.
-- [ ] Undo selection policy.
-- [ ] Redo șterge restored subtree.
-- [ ] Redo target mapping actualizat.
-- [ ] Delete selected root.
-- [ ] Delete selected child.
-- [ ] Delete deep subtree.
-- [ ] Delete wide subtree.
-- [ ] Tool-owned entity delete rejected.
-- [ ] Invalid/stale selection no-op + diagnostic.
-- [ ] Keyboard Delete respectă text-edit focus.
+- [x] Capture subtree snapshot înainte de mutation.
+- [x] Dacă snapshot eșuează, delete nu pornește.
+- [x] Delete children in safe order.
+- [x] Delete parent.
+- [x] World destroy failures handled.
+- [x] Compound rollback policy definită.
+- [x] Delete command = single history entry.
+- [x] Undo restorează entire subtree.
+- [x] Undo restorează internal parent relationships.
+- [x] Undo selection policy.
+- [x] Redo șterge restored subtree.
+- [x] Redo target mapping actualizat.
+- [x] Delete selected root.
+- [x] Delete selected child.
+- [x] Delete deep subtree.
+- [x] Delete wide subtree.
+- [x] Tool-owned entity delete rejected.
+- [x] Invalid/stale selection no-op + diagnostic.
+- [x] Keyboard Delete respectă text-edit focus.
 - [x] Context menu Delete folosește aceeași command.
 
 ---
@@ -478,72 +478,72 @@ Reflection milestone:
 
 **Design choice (not directly from the book): duplicate defaults to authored subtree duplicate.**
 
-- [ ] Capture source snapshot.
-- [ ] Instantiate with new EntityHandles.
+- [x] Capture source snapshot.
+- [x] Instantiate with new EntityHandles.
 - [x] Preserve component presence.
-- [ ] Preserve local TRS.
-- [ ] Preserve internal hierarchy.
-- [ ] Parent copy policy explicit.
-- [ ] Naming policy explicit.
-- [ ] Select duplicated root.
-- [ ] Duplicate este single command.
-- [ ] Undo deletes duplicate subtree.
-- [ ] Redo recreates duplicate subtree.
-- [ ] No source mutation.
-- [ ] Tool entity duplicate rejected.
-- [ ] Stale source rejected.
-- [ ] External references boundary documented.
-- [ ] Test one entity.
-- [ ] Test hierarchy.
+- [x] Preserve local TRS.
+- [x] Preserve internal hierarchy.
+- [x] Parent copy policy explicit.
+- [x] Naming policy explicit.
+- [x] Select duplicated root.
+- [x] Duplicate este single command.
+- [x] Undo deletes duplicate subtree.
+- [x] Redo recreates duplicate subtree.
+- [x] No source mutation.
+- [x] Tool entity duplicate rejected.
+- [x] Stale source rejected.
+- [x] External references boundary documented.
+- [x] Test one entity.
+- [x] Test hierarchy.
 - [x] Test camera/renderable.
-- [ ] Test 1k subtree stress.
+- [x] Test 1k subtree stress.
 
 ---
 
 # 14. Reparent / Unparent
 
-- [ ] Reparent UI workflow definit.
-- [ ] Drag/drop hierarchy sau equivalent explicit UX.
-- [ ] Drop target highlight.
-- [ ] Invalid target feedback.
-- [ ] Self-parent reject.
-- [ ] Descendant-cycle reject.
-- [ ] Stale source reject.
-- [ ] Stale target reject.
-- [ ] Unparent/root drop.
-- [ ] Reparent command.
-- [ ] Undo restores original parent.
-- [ ] Redo reapplies new parent.
-- [ ] Selection preserved.
-- [ ] Expanded state preserved where possible.
+- [x] Reparent UI workflow definit.
+- [x] Drag/drop hierarchy sau equivalent explicit UX.
+- [x] Drop target highlight.
+- [x] Invalid target feedback.
+- [x] Self-parent reject.
+- [x] Descendant-cycle reject.
+- [x] Stale source reject.
+- [x] Stale target reject.
+- [x] Unparent/root drop.
+- [x] Reparent command.
+- [x] Undo restores original parent.
+- [x] Redo reapplies new parent.
+- [x] Selection preserved.
+- [x] Expanded state preserved where possible.
 
 **Design choice (not directly from the book): editor reparent preserves world pose by default.**
 
-- [ ] Capture pre-reparent world transform.
-- [ ] Compute new local transform under new parent.
-- [ ] Matrix inverse failure handled.
-- [ ] TRS decomposition failure handled.
-- [ ] Shear/non-representable transform policy documented.
-- [ ] Non-uniform parent scale test.
-- [ ] Rotated parent test.
+- [x] Capture pre-reparent world transform.
+- [x] Compute new local transform under new parent.
+- [x] Matrix inverse failure handled.
+- [x] TRS decomposition failure handled.
+- [x] Shear/non-representable transform policy documented.
+- [x] Non-uniform parent scale test.
+- [x] Rotated parent test.
 - [ ] Deep hierarchy test.
-- [ ] World pose epsilon verification test.
+- [x] World pose epsilon verification test.
 
 ---
 
 # 15. Command interface
 
-- [ ] Command has clear ownership.
-- [ ] Execute/apply semantics.
-- [ ] Undo semantics.
-- [ ] Redo semantics.
-- [ ] Command display/debug name.
-- [ ] Result/failure propagation.
-- [ ] No raw dangling component pointers.
-- [ ] Entity handles validated on each apply where relevant.
+- [x] Command has clear ownership.
+- [x] Execute/apply semantics.
+- [x] Undo semantics.
+- [x] Redo semantics.
+- [x] Command display/debug name.
+- [x] Result/failure propagation.
+- [x] No raw dangling component pointers.
+- [x] Entity handles validated on each apply where relevant.
 - [x] Commands that recreate entities maintain remap.
-- [ ] Destructor safe after World shutdown policy.
-- [ ] No implicit global history.
+- [x] Destructor safe after World shutdown policy.
+- [x] No implicit global history.
 
 ---
 
@@ -551,26 +551,26 @@ Reflection milestone:
 
 Grounding: Nystrom — Command / Undo and Redo.
 
-- [ ] Multiple undo levels.
-- [ ] Multiple redo levels.
-- [ ] Cursor semantics.
-- [ ] New command after undo discards redo tail.
-- [ ] Undo on empty history safe.
-- [ ] Redo on end safe.
-- [ ] Failed command not pushed.
-- [ ] Failed undo leaves cursor consistent.
-- [ ] Failed redo leaves cursor consistent.
-- [ ] Clear history.
-- [ ] History change notification for toolbar enabled state.
-- [ ] Command labels pentru diagnostics.
-- [ ] History max count/budget.
-- [ ] Eviction policy.
-- [ ] Large command policy.
-- [ ] Allocation failure policy.
-- [ ] Unit tests.
+- [x] Multiple undo levels.
+- [x] Multiple redo levels.
+- [x] Cursor semantics.
+- [x] New command after undo discards redo tail.
+- [x] Undo on empty history safe.
+- [x] Redo on end safe.
+- [x] Failed command not pushed.
+- [x] Failed undo leaves cursor consistent.
+- [x] Failed redo leaves cursor consistent.
+- [x] Clear history.
+- [x] History change notification for toolbar enabled state.
+- [x] Command labels pentru diagnostics.
+- [x] History max count/budget.
+- [x] Eviction policy.
+- [x] Large command policy.
+- [x] Allocation failure policy.
+- [x] Unit tests.
 - [x] Stress 10k small commands.
 - [x] Stress large subtree snapshots.
-- [ ] Leak tests.
+- [x] Leak tests.
 
 ---
 
@@ -586,7 +586,7 @@ Grounding: Nystrom — Command / Undo and Redo.
 - [x] Execute failure rollback.
 - [x] Rollback failure diagnostic/assert policy.
 - [x] Gizmo uses transaction/coalescing.
-- [ ] Multi-field Inspector edit can group where UX requires.
+- [x] Multi-field Inspector grouping policy explicit: current Phase 16 field/nested edits commit one semantic property command; transaction API exists for future multi-command UX.
 - [x] Delete subtree uses one logical command.
 - [x] Duplicate subtree uses one logical command.
 
@@ -595,41 +595,41 @@ Grounding: Nystrom — Command / Undo and Redo.
 # 18. Gizmo → history integration
 
 - [x] Begin drag captures original local TRS.
-- [ ] Mouse move preview does not push history.
+- [x] Mouse move preview does not push history.
 - [x] Mouse up commits one command.
-- [ ] No movement => no command.
-- [ ] Escape reverts original.
-- [ ] Capture loss policy.
-- [ ] Tool switch during drag policy.
-- [ ] Selection change during drag policy.
-- [ ] Entity destroyed during drag policy.
-- [ ] Undo exact original.
-- [ ] Redo exact final.
-- [ ] No per-mouse-move heap churn.
+- [x] No movement => no command.
+- [x] Escape reverts original.
+- [x] Capture loss policy.
+- [x] Tool switch during drag policy.
+- [x] Selection change during drag policy.
+- [x] Entity destroyed during drag policy.
+- [x] Undo exact original.
+- [x] Redo exact final.
+- [x] No per-mouse-move heap churn.
 - [ ] Existing Phase 14 feel preserved.
 
 ---
 
 # 19. Local / World transform orientation
 
-- [ ] UI control visible.
-- [ ] State stored in Editor Session.
-- [ ] Local mode remains current baseline.
-- [ ] World Move implemented.
-- [ ] World Rotate implemented.
-- [ ] Root entity tests.
-- [ ] Rotated entity tests.
-- [ ] Parented entity tests.
-- [ ] Rotated parent tests.
-- [ ] Non-uniform scale parent tests.
-- [ ] Toggle during no active drag.
-- [ ] Toggle during active drag policy.
+- [x] UI control visible.
+- [x] State stored in Editor Session.
+- [x] Local mode remains current baseline.
+- [x] World Move implemented.
+- [x] World Rotate implemented.
+- [x] Root entity tests.
+- [x] Rotated entity tests.
+- [x] Parented entity tests.
+- [x] Rotated parent tests.
+- [x] Non-uniform scale parent tests.
+- [x] Toggle during no active drag.
+- [x] Toggle during active drag policy.
 
 Scale:
-- [ ] Define Local scale behavior.
-- [ ] Decide/define World scale behavior.
-- [ ] Do not claim world-scale support if shear cannot be represented.
-- [ ] UI communicates limitation if applicable.
+- [x] Define Local scale behavior.
+- [x] Decide/define World scale behavior.
+- [x] Do not claim world-scale support if shear cannot be represented.
+- [x] UI communicates limitation if applicable.
 
 ---
 
@@ -637,44 +637,44 @@ Scale:
 
 Reflection schema este autoritatea; editor metadata este doar presentation extension.
 
-- [ ] Inspector enumeră reflected components.
-- [ ] Inspector enumeră reflected properties.
-- [ ] Generic drawer registry keyed by reflected TypeId/attributes.
-- [ ] Bool drawer.
-- [ ] integer drawer.
-- [ ] float drawer.
-- [ ] Vec/struct drawer.
+- [x] Inspector enumeră reflected components.
+- [x] Inspector enumeră reflected properties.
+- [x] Generic drawer registry keyed by reflected TypeId/attributes.
+- [x] Bool drawer.
+- [x] integer drawer.
+- [x] float drawer.
+- [x] Vec/struct drawer.
 - [x] enum drawer.
-- [ ] string drawer.
-- [ ] resource reference drawer.
-- [ ] readonly display.
-- [ ] nested struct traversal.
+- [x] string drawer.
+- [x] resource reference drawer.
+- [x] readonly display.
+- [x] nested struct traversal.
 - [ ] custom property drawer extension.
 - [ ] custom component inspector extension.
-- [ ] custom extensions referă reflection IDs și NU redefin canonical schema.
-- [ ] CanAdd/CanRemove vine din component reflection/editor policy.
-- [ ] Validation/apply folosește semantic reflected setters.
-- [ ] Unknown reflected type are safe fallback/diagnostic.
-- [ ] No giant hard-coded Inspector component switch.
-- [ ] No central property-name switch.
-- [ ] No Win32 types leak into engine runtime reflection headers.
-- [ ] No STL restriction violation in public engine headers.
-- [ ] Editor layer poate folosi STL intern.
+- [x] custom extensions referă reflection IDs și NU redefin canonical schema.
+- [x] CanAdd/CanRemove vine din component reflection/editor policy.
+- [x] Validation/apply folosește semantic reflected setters.
+- [x] Unknown reflected type are safe fallback/diagnostic.
+- [x] No giant hard-coded Inspector component switch.
+- [x] No central property-name switch.
+- [x] No Win32 types leak into engine runtime reflection headers.
+- [x] No STL restriction violation in public engine headers.
+- [x] Editor layer poate folosi STL intern.
 
 ---
 
 # 21. Inspector selection lifecycle
 
-- [ ] No selection state.
-- [ ] Live selection state.
-- [ ] Stale selection clears.
-- [ ] Selection change destroys/rebinds edit controls safely.
-- [ ] Structural component add/remove refreshes Inspector.
-- [ ] Component pointer not retained across structural mutation.
+- [x] No selection state.
+- [x] Live selection state.
+- [x] Stale selection clears.
+- [x] Selection change destroys/rebinds edit controls safely.
+- [x] Structural component add/remove refreshes Inspector.
+- [x] Component pointer not retained across structural mutation.
 - [ ] Tab/focus order.
-- [ ] Scroll.
-- [ ] Resize.
-- [ ] Long values clipped/scrollable.
+- [x] Scroll.
+- [x] Resize.
+- [x] Long values clipped/scrollable.
 - [ ] Disabled/read-only field visuals.
 - [ ] Error state visuals.
 
@@ -682,120 +682,120 @@ Reflection schema este autoritatea; editor metadata este doar presentation exten
 
 # 22. Name Inspector
 
-- [ ] Name field.
-- [ ] UTF-8 conversion.
-- [ ] 63-byte payload contract.
-- [ ] Empty input policy.
-- [ ] Duplicate names.
-- [ ] Enter commit.
-- [ ] Focus-loss commit.
-- [ ] Escape cancel.
-- [ ] Undo/redo.
-- [ ] Hierarchy live refresh.
-- [ ] No partial invalid write.
+- [x] Name field.
+- [x] UTF-8 conversion.
+- [x] 63-byte payload contract.
+- [x] Empty input policy.
+- [x] Duplicate names.
+- [x] Enter commit.
+- [x] Focus-loss commit.
+- [x] Escape cancel.
+- [x] Undo/redo.
+- [x] Hierarchy live refresh.
+- [x] No partial invalid write.
 
 ---
 
 # 23. Transform Inspector
 
-- [ ] Position X/Y/Z.
-- [ ] Rotation representation selected/documented.
-- [ ] Scale X/Y/Z.
-- [ ] Numeric parse robust.
-- [ ] NaN reject.
-- [ ] Inf reject.
-- [ ] Locale/decimal behavior considered.
-- [ ] Commit/cancel.
-- [ ] Coalescing.
-- [ ] Undo/redo.
-- [ ] Gizmo synchronization.
-- [ ] Parent changes reflected.
-- [ ] Optional readonly world transform display.
+- [x] Position X/Y/Z.
+- [x] Rotation representation selected/documented.
+- [x] Scale X/Y/Z.
+- [x] Numeric parse robust.
+- [x] NaN reject.
+- [x] Inf reject.
+- [x] Locale/decimal behavior considered.
+- [x] Commit/cancel.
+- [x] Coalescing.
+- [x] Undo/redo.
+- [x] Gizmo synchronization.
+- [x] Parent changes reflected.
+- [x] Optional readonly world transform display.
 - [ ] Degenerate scale policy.
 
 Euler UI if used:
-- [ ] Quaternion↔Euler conversion documented.
-- [ ] Wrap/display conventions.
-- [ ] Gimbal/discontinuity UX acknowledged.
-- [ ] Runtime authority remains quaternion.
+- [x] Quaternion↔Euler conversion documented.
+- [x] Wrap/display conventions.
+- [x] Gimbal/discontinuity UX acknowledged.
+- [x] Runtime authority remains quaternion.
 
 ---
 
 # 24. Renderable Inspector
 
-- [ ] Add Renderable.
-- [ ] Remove Renderable.
-- [ ] Enabled.
-- [ ] Mesh assignment.
-- [ ] Existing resource system used.
-- [ ] Invalid resource assignment rejected.
-- [ ] Previous mesh retained on failed assignment.
-- [ ] Bounds display/edit policy.
-- [ ] Undo/redo.
-- [ ] Viewport updates immediately.
-- [ ] No asset previewer scope creep.
+- [x] Add Renderable.
+- [x] Remove Renderable.
+- [x] Enabled.
+- [x] Mesh assignment.
+- [x] Existing resource system used.
+- [x] Invalid resource assignment rejected.
+- [x] Previous mesh retained on failed assignment.
+- [x] Bounds display/edit policy.
+- [x] Undo/redo.
+- [x] Viewport updates immediately.
+- [x] No asset previewer scope creep.
 
 ---
 
 # 25. Camera Inspector
 
-- [ ] Add Camera.
-- [ ] Remove Camera.
-- [ ] FOV edit.
-- [ ] Aspect policy.
-- [ ] Near edit.
-- [ ] Far edit.
-- [ ] Enabled edit.
-- [ ] Runtime validation reused.
-- [ ] Invalid lens rejected.
-- [ ] Undo/redo.
-- [ ] Scene Camera != Editor Camera.
-- [ ] Removing authored active/runtime camera does not kill editor viewport camera.
+- [x] Add Camera.
+- [x] Remove Camera.
+- [x] FOV edit.
+- [x] Aspect policy.
+- [x] Near edit.
+- [x] Far edit.
+- [x] Enabled edit.
+- [x] Runtime validation reused.
+- [x] Invalid lens rejected.
+- [x] Undo/redo.
+- [x] Scene Camera != Editor Camera.
+- [x] Removing authored active/runtime camera does not kill editor viewport camera.
 
 ---
 
 # 26. Add Component UX
 
-- [ ] Add Component button/menu.
-- [ ] Enumerate editor-supported component descriptors.
-- [ ] Hide already-present components.
-- [ ] Required components excluded if already present.
-- [ ] Add command.
-- [ ] Undo removes added component.
-- [ ] Redo re-adds.
-- [ ] Defaults explicit.
-- [ ] Allocation failure rollback.
+- [x] Add Component button/menu.
+- [x] Enumerate editor-supported component descriptors.
+- [x] Hide already-present components.
+- [x] Required components excluded if already present.
+- [x] Add command.
+- [x] Undo removes added component.
+- [x] Redo re-adds.
+- [x] Defaults explicit.
+- [x] Allocation failure rollback.
 - [x] Inspector refresh.
-- [ ] Viewport refresh.
-- [ ] Diagnostics.
+- [x] Viewport refresh.
+- [x] Diagnostics.
 
 ---
 
 # 27. Remove Component UX
 
-- [ ] Remove action per removable component.
+- [x] Remove action per removable component.
 - [x] Required components cannot be removed.
-- [ ] Remove command captures component state.
-- [ ] Undo restores exact component state.
-- [ ] Redo removes again.
-- [ ] Camera active-state implications handled.
-- [ ] Renderable removal updates viewport.
-- [ ] Stale entity safe.
-- [ ] Diagnostics.
+- [x] Remove command captures component state.
+- [x] Undo restores exact component state.
+- [x] Redo removes again.
+- [x] Camera active-state implications handled.
+- [x] Renderable removal updates viewport.
+- [x] Stale entity safe.
+- [x] Diagnostics.
 
 ---
 
 # 28. Asset assignment integration
 
-- [ ] Audit existing Content Browser asset identity.
-- [ ] Audit ResourceManager handles/path mapping.
-- [ ] Decide picker/drag-drop integration.
-- [ ] No raw filesystem path stored in RenderableComponent dacă ResourceHandle este authority.
-- [ ] Missing asset diagnostic.
-- [ ] Wrong asset type diagnostic.
-- [ ] Async load state handling dacă aplicabil.
-- [ ] Assignment undoable.
-- [ ] No Phase 23 previewer scope.
+- [x] Audit existing Content Browser asset identity.
+- [x] Audit ResourceManager handles/path mapping.
+- [x] Decide picker/drag-drop integration.
+- [x] No raw filesystem path stored in RenderableComponent dacă ResourceHandle este authority.
+- [x] Missing asset diagnostic.
+- [x] Wrong asset type diagnostic.
+- [x] Async load state handling dacă aplicabil.
+- [x] Assignment undoable.
+- [x] No Phase 23 previewer scope.
 
 ---
 
@@ -803,14 +803,14 @@ Euler UI if used:
 
 **Design choice (not directly from the book).**
 
-- [ ] Decide dacă Phase 16 tracks dirty.
-- [ ] Successful authoring command marks dirty.
-- [ ] Undo/redo dirty semantics documented.
-- [ ] New transient scene reset semantics.
-- [ ] Exit warning semantics dacă dirty.
-- [ ] Save nu este implementat fals.
-- [ ] Dirty != serialized-state hash unless explicitly designed.
-- [ ] Phase 17 can adopt/extend without rewrite.
+- [x] Decide dacă Phase 16 tracks dirty.
+- [x] Successful authoring command marks dirty.
+- [x] Undo/redo dirty semantics documented.
+- [x] New transient scene reset semantics.
+- [x] Exit warning semantics dacă dirty.
+- [x] Save nu este implementat fals.
+- [x] Dirty != serialized-state hash unless explicitly designed.
+- [x] Phase 17 can adopt/extend without rewrite.
 
 ---
 
@@ -818,17 +818,17 @@ Euler UI if used:
 
 Dacă Phase 16 îl implementează:
 
-- [ ] Clar că este in-memory scene reset.
-- [ ] Tool camera survives.
-- [ ] Authored entities cleared.
-- [ ] Selection cleared.
-- [ ] History cleared.
-- [ ] Dirty confirmation policy.
-- [ ] No fake Save/Open.
-- [ ] No disk I/O pretending to be Phase 17.
+- [x] Clar că este in-memory scene reset.
+- [x] Tool camera survives.
+- [x] Authored entities cleared.
+- [x] Selection cleared.
+- [x] History cleared.
+- [x] Dirty confirmation policy.
+- [x] No fake Save/Open.
+- [x] No disk I/O pretending to be Phase 17.
 
 Dacă nu este implementat:
-- [ ] Stub message updated to say persistence/session reset is deferred explicitly.
+- [x] Stub message updated to say persistence/session reset is deferred explicitly.
 
 ---
 
@@ -846,19 +846,19 @@ Dacă nu este implementat:
 
 # 32. Input and shortcut policy
 
-- [ ] Ctrl+Z.
-- [ ] Ctrl+Y / Ctrl+Shift+Z policy.
+- [x] Ctrl+Z.
+- [x] Ctrl+Y / Ctrl+Shift+Z policy.
 - [x] Delete.
-- [ ] Ctrl+D.
-- [ ] F2 rename if adopted.
-- [ ] Escape cancel current edit/drag.
-- [ ] Enter commit edit.
-- [ ] Shortcuts disabled/routed appropriately during text edit.
-- [ ] Camera capture priority.
-- [ ] Gizmo capture priority.
-- [ ] Hierarchy drag priority.
-- [ ] No accidental delete while typing.
-- [ ] Toolbar buttons call same command pathways.
+- [x] Ctrl+D.
+- [x] F2 rename if adopted.
+- [x] Escape cancel current edit/drag.
+- [x] Enter commit edit.
+- [x] Shortcuts disabled/routed appropriately during text edit.
+- [x] Camera capture priority.
+- [x] Gizmo capture priority.
+- [x] Hierarchy drag priority.
+- [x] No accidental delete while typing.
+- [x] Toolbar buttons call same command pathways.
 
 ---
 
@@ -911,30 +911,30 @@ Fiecare caz are:
 
 # 35. Diagnostics / observability
 
-- [ ] Editor console records command failures.
-- [ ] Status bar can show relevant error/selection state.
-- [ ] Debug command names.
-- [ ] History depth/cursor counters.
-- [ ] Current selection handle diagnostic.
-- [ ] Current tool/orientation diagnostic.
-- [ ] Hierarchy entity count.
+- [x] Editor console records command failures.
+- [x] Status bar can show relevant error/selection state.
+- [x] Debug command names.
+- [x] History depth/cursor counters.
+- [x] Current selection handle diagnostic.
+- [x] Current tool/orientation diagnostic.
+- [x] Hierarchy entity count.
 - [ ] Snapshot entity/component count in debug logs.
-- [ ] One-shot history dump optional.
-- [ ] No per-frame spam.
-- [ ] No per-mouse-move spam.
+- [x] One-shot history dump: optional, not required for Phase 16 completion.
+- [x] No per-frame spam.
+- [x] No per-mouse-move spam.
 
 ---
 
 # 36. Threading contract
 
-- [ ] Editor authoring mutations main-thread only.
-- [ ] Structural ECS mutations main-thread only.
-- [ ] Command execute/undo/redo main-thread only.
-- [ ] Inspector commit main-thread.
-- [ ] Hierarchy mutation main-thread.
-- [ ] Async asset result application marshalled safely if required.
-- [ ] No new locks in component storage.
-- [ ] Shutdown/cancellation order explicit.
+- [x] Editor authoring mutations main-thread only.
+- [x] Structural ECS mutations main-thread only.
+- [x] Command execute/undo/redo main-thread only.
+- [x] Inspector commit main-thread.
+- [x] Hierarchy mutation main-thread.
+- [x] Async asset result application marshalled safely if required.
+- [x] No new locks in component storage.
+- [x] Shutdown/cancellation order explicit.
 
 ---
 
@@ -982,24 +982,24 @@ Măsurăm, nu ghicim:
 
 # 39. Unit tests — command history
 
-- [ ] empty undo.
-- [ ] empty redo.
-- [ ] execute one.
-- [ ] undo one.
-- [ ] redo one.
-- [ ] multiple commands.
-- [ ] undo multiple.
-- [ ] redo multiple.
-- [ ] new command after undo clears redo.
-- [ ] failed execute not pushed.
-- [ ] failed undo cursor safety.
-- [ ] failed redo cursor safety.
-- [ ] clear.
-- [ ] budget eviction.
-- [ ] command destruction.
-- [ ] compound command.
-- [ ] transaction cancel.
-- [ ] leak-free.
+- [x] empty undo.
+- [x] empty redo.
+- [x] execute one.
+- [x] undo one.
+- [x] redo one.
+- [x] multiple commands.
+- [x] undo multiple.
+- [x] redo multiple.
+- [x] new command after undo clears redo.
+- [x] failed execute not pushed.
+- [x] failed undo cursor safety.
+- [x] failed redo cursor safety.
+- [x] clear.
+- [x] budget eviction.
+- [x] command destruction.
+- [x] compound command.
+- [x] transaction cancel.
+- [x] leak-free.
 
 ---
 
@@ -1175,7 +1175,7 @@ Evidence note: `NocturneHost.vcxproj.filters` tracks the shared Phase 16 headers
 
 Înainte de completion:
 
-- [ ] `Phase 16 — Runtime Reflection Architecture Contract.md` actualizat cu implementarea reală.
+- [x] `Phase 16 — Runtime Reflection Architecture Contract.md` actualizat cu implementarea reală.
 - [x] `Phase 16 — Editor Scene Editing Architecture.md`.
 - [x] Implementation Checklist actualizat cu status.
 - [x] Implementation Report.

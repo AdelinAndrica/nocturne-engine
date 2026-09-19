@@ -623,6 +623,12 @@ Before completion, validate the preserved editor baseline plus new authoring ope
 
 `Docs/Phase 16 — Implementation Report.md` records the implemented runtime reflection/editor architecture, milestone chronology, ownership, threading, performance/allocation hardening, transient prototype boundary and deliberate deferrals. It explicitly does not declare Phase 16 complete.
 
+### 11.12 Checklist evidence reconciliation pass — ACTIVE
+
+Implementation/test evidence has now been reconciled across EditorSession ownership, tool-camera protection, EntityHandle selection, create/rename/delete/duplicate, reflected snapshots, command/history, gizmo/orientation, Name/Renderable/Camera Inspector flows, component add/remove, asset assignment, dirty/New Scene, shortcuts, threading and command-history tests.
+
+Remaining unchecked items are intentionally limited to specific proof/policy gaps and manual validation rather than representing missing core subsystems. Manual UI fidelity/feel, Phase 13/14/15 regression, soak, Completion Report and Phase 17 transition remain completion gates.
+
 ## 12. Current development sequence
 
 The implementation sequence completed so far is:

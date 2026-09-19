@@ -3690,9 +3690,46 @@ bool RunPhase16EditorSessionTests()
         auto toolDelete =
             std::make_unique<
                 nocturne::editor::DeleteEntityCommand>();
+        auto toolDuplicate =
+            std::make_unique<
+                nocturne::editor::DuplicateEntityCommand>();
+        auto toolReparent =
+            std::make_unique<
+                nocturne::editor::ReparentEntityCommand>();
+        auto authoredToToolParent =
+            std::make_unique<
+                nocturne::editor::ReparentEntityCommand>();
+
+        const noc::EntityHandle staleDuplicateSource =
+            world.CreateEntity();
+
         ok &= CheckEditorSession(
-            !toolDelete->Init(context, camera),
-            "Tool-owned editor camera accepted delete command");
+            staleDuplicateSource.IsValid()
+                && world.DestroyEntity(
+                    staleDuplicateSource),
+            "Stale duplicate-source setup failed");
+
+        auto staleDuplicate =
+            std::make_unique<
+                nocturne::editor::DuplicateEntityCommand>();
+
+        ok &= CheckEditorSession(
+            !toolDelete->Init(context, camera)
+                && !toolDuplicate->Init(
+                    context,
+                    camera)
+                && !toolReparent->Init(
+                    context,
+                    camera,
+                    noc::EntityHandle::Invalid())
+                && !authoredToToolParent->Init(
+                    context,
+                    authored,
+                    camera)
+                && !staleDuplicate->Init(
+                    context,
+                    staleDuplicateSource),
+            "Tool-owned/stale structural command rejection failed");
     }
 
     {

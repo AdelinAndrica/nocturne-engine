@@ -726,6 +726,14 @@ Custom UI may extend special types/components but is keyed by reflection identit
 
 ---
 
+### Threading / mutation ownership policy
+
+**Design choice (not directly from the book):** Phase 16 editor authoring is main-thread owned. Win32 input/message handling, EditorSession mutation, command Execute/Undo/Redo, hierarchy structural edits, Inspector commits and gizmo transaction commit/cancel all execute on the editor/main thread.
+
+Runtime component storage remains lock-free from the editor's perspective; Phase 16 does not add storage locks. The mesh picker performs a bounded synchronous readiness validation before authoring the ResourceHandle, so there is no Phase 16 async completion callback mutating World from a worker thread. A future asynchronous authoring path must marshal results to the editor/main thread.
+
+Shutdown first cancels transient editor transactions and tears down editor/session consumers before the World/reflection lifetime ends.
+
 ## 22. Performance and allocation policy
 
 Frozen reflection lookup/enumeration/property read is allocation-free.
