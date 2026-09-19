@@ -9,6 +9,8 @@ description: "Canonical renderer ownership, frame handoff, DirectX 12 backend an
 source_files: ["Engine/Render/RenderSystem.h","Engine/Render/RenderSystem.cpp","Engine/Render/RenderQueue.h","Engine/Render/DX12/Dx12Renderer.h","Engine/Render/DX12/Dx12SwapChain.h"]
 source_docs: ["Docs/nocturne_engine_architecture.md","Docs/Phase 8 — Rendering Bootstrap (DirectX 12).md","Docs/Phase 9 — Rendering Engine Foundation.md","Docs/Phase 9.5 — GPU Resource Foundation (DX12 Memory, Descriptors, Asset-Backed GPU Resources).md","Docs/Phase 14 — Completion Report.md"]
 book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §11.2 The Rendering Pipeline","Jason Gregory — Game Engine Architecture (3rd ed.), §11.2.1 Overview of the Rendering Pipeline"]
+aliases: ["Rendering","Renderer","Render System","DirectX 12 Renderer"]
+deprecated_aliases: []
 ---
 
 # Rendering
