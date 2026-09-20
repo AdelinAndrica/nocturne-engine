@@ -28,7 +28,11 @@ export const knowledgeDocumentSchema = z.object({
   sourceDocs: z.array(nonEmpty),
   bookGrounding: z.array(nonEmpty),
   aliases: uniqueStrings,
-  deprecatedAliases: uniqueStrings
+  deprecatedAliases: uniqueStrings,
+  apiSymbols: z.array(z.object({
+    name: nonEmpty,
+    href: z.string().regex(/^\/api-symbol\//)
+  }).strict())
 }).strict();
 
 export const knowledgeManifestSchema = z.object({
