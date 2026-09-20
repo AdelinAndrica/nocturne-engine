@@ -5,18 +5,112 @@
 #include "ShaderCompiler.h"
 
 #include "Resources/ResourceManager.h"
+#include "Resources/Typed/MeshResource.h"
 #include "Render/RenderQueue.h"
+
+#include <algorithm>
+#include <cmath>
+#include <memory>
+#include <new>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 namespace noc
 {
-	struct PerFrameConstants
+	namespace
 	{
-		Mat4 viewProj;
+		constexpr uint32_t kMaxShaderLights = 32;
+
+		struct GpuLightConstants
+		{
+			Vec4 positionType{};
+			Vec4 directionRange{};
+			Vec4 colorIntensity{};
+			Vec4 spot{};
+		};
+
+		struct PerFrameConstants
+		{
+			Mat4 viewProj;
+			GpuLightConstants lights[kMaxShaderLights]{};
+			uint32_t lightCount = 0;
+			float padding[3]{};
+		};
+
+		struct GpuInstanceData
+		{
+			Mat4 world;
+			Mat4 normalWorld;
+		};
+
+		struct MeshVertexPN
+		{
+			float px = 0.0f;
+			float py = 0.0f;
+			float pz = 0.0f;
+			float nx = 0.0f;
+			float ny = 1.0f;
+			float nz = 0.0f;
+		};
+
+		[[nodiscard]] uint64_t MeshKey_(ResourceHandle handle) noexcept
+		{
+			return (static_cast<uint64_t>(handle.generation) << 32u)
+				| static_cast<uint64_t>(handle.index);
+		}
+
+		[[nodiscard]] Vec3 NormalizeSafe_(
+			const Vec3& value,
+			const Vec3& fallback = Vec3{ 0.0f, 1.0f, 0.0f }) noexcept
+		{
+			const float length = Length(value);
+			return length > 1.0e-8f
+				? value * (1.0f / length)
+				: fallback;
+		}
+
+		[[nodiscard]] Mat4 NormalMatrix_(const Mat4& world) noexcept
+		{
+			Mat4 inverse{};
+			if (!TryInverseAffine(world, inverse))
+				return Mat4::Identity();
+
+			Mat4 result = Mat4::Identity();
+			for (uint32_t row = 0; row < 3; ++row)
+			{
+				for (uint32_t column = 0; column < 3; ++column)
+					M(result, row, column) = M(inverse, column, row);
+			}
+			return result;
+		}
+
+		static uint64_t HashInputLayoutPN_()
+		{
+			return 0xA0C0CA12u;
+		}
+	}
+
+	struct MeshPass::GpuMesh
+	{
+		GpuBuffer vertexBuffer;
+		GpuBuffer indexBuffer;
+		uint32_t indexCount = 0;
+		bool ready = false;
+		bool failed = false;
 	};
 
-	static uint64_t HashInputLayoutPC_()
+	struct MeshPass::Impl
 	{
-		return 0xA0C0CA11u;
+		std::unordered_map<uint64_t, std::unique_ptr<GpuMesh>> meshes;
+		std::unordered_set<uint64_t> resourceFailureLogged;
+		bool lightOverflowWarned = false;
+	};
+
+	MeshPass::~MeshPass()
+	{
+		delete impl_;
+		impl_ = nullptr;
 	}
 
 	bool MeshPass::Init(
@@ -35,15 +129,24 @@ namespace noc
 		rootReady_ = false;
 		psoReady_ = false;
 		gridPsoReady_ = false;
-		meshReady_ = false;
 		gridReady_ = false;
 		cbReady_ = false;
-		instReady_ = false;
 
 		if (!perFrameCB_.Init(device, 64 * 1024))
 			return false;
 
-		instanceCapacity_ = 1024;
+		if (!impl_)
+		{
+			impl_ = new (std::nothrow) Impl();
+			if (!impl_)
+			{
+				perFrameCB_.Shutdown();
+				return false;
+			}
+		}
+
+		for (uint32_t i = 0; i < dx12::kFrameCount; ++i)
+			instanceCapacity_[i] = 0;
 		return true;
 	}
 
@@ -67,8 +170,21 @@ namespace noc
 		defer(rootSig_);
 
 		gridVb_.ShutdownNow();
-		vb_.ShutdownNow();
-		ib_.ShutdownNow();
+
+		if (impl_)
+		{
+			for (auto& entry : impl_->meshes)
+			{
+				if (entry.second)
+				{
+					entry.second->vertexBuffer.ShutdownNow();
+					entry.second->indexBuffer.ShutdownNow();
+				}
+			}
+			impl_->meshes.clear();
+			impl_->resourceFailureLogged.clear();
+			impl_->lightOverflowWarned = false;
+		}
 
 		for (uint32_t i = 0; i < dx12::kFrameCount; ++i)
 		{
@@ -76,6 +192,7 @@ namespace noc
 				instanceBuf_[i]->Unmap(0, nullptr);
 			instanceMapped_[i] = nullptr;
 			instanceBuf_[i].Reset();
+			instanceCapacity_[i] = 0;
 
 			if (selectionUpload_[i] && selectionMapped_[i])
 				selectionUpload_[i]->Unmap(0, nullptr);
@@ -103,45 +220,96 @@ namespace noc
 		cbReady_ = true;
 	}
 
-	void MeshPass::EnsurePerFrameInstanceSrv_(ID3D12Device* device)
+	bool MeshPass::EnsureInstanceBuffer_(
+		ID3D12Device* device,
+		uint32_t frameIndex,
+		uint32_t requiredCapacity)
 	{
-		if (instReady_ || !device || !cbvSrvUav_)
-			return;
-
-		for (uint32_t i = 0; i < dx12::kFrameCount; ++i)
+		if (!device
+			|| !cbvSrvUav_
+			|| frameIndex >= dx12::kFrameCount)
 		{
-			instanceSrv_[i] = cbvSrvUav_->Allocate();
-			const UINT64 bytes = (UINT64)instanceCapacity_ * sizeof(Mat4);
-
-			D3D12_HEAP_PROPERTIES hp{};
-			hp.Type = D3D12_HEAP_TYPE_UPLOAD;
-			D3D12_RESOURCE_DESC d = dx12::BufferDesc(bytes);
-			if (!dx12::HrOk(device->CreateCommittedResource(
-				&hp,
-				D3D12_HEAP_FLAG_NONE,
-				&d,
-				D3D12_RESOURCE_STATE_GENERIC_READ,
-				nullptr,
-				IID_PPV_ARGS(&instanceBuf_[i])), "CreateCommittedResource(InstanceUpload)"))
-				return;
-
-			void* mapped = nullptr;
-			D3D12_RANGE r{ 0, 0 };
-			if (!dx12::HrOk(instanceBuf_[i]->Map(0, &r, &mapped), "InstanceUpload.Map"))
-				return;
-			instanceMapped_[i] = (uint8_t*)mapped;
-
-			D3D12_SHADER_RESOURCE_VIEW_DESC sd{};
-			sd.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-			sd.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			sd.Buffer.FirstElement = 0;
-			sd.Buffer.NumElements = instanceCapacity_;
-			sd.Buffer.StructureByteStride = sizeof(Mat4);
-			sd.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-			sd.Format = DXGI_FORMAT_UNKNOWN;
-			device->CreateShaderResourceView(instanceBuf_[i].Get(), &sd, instanceSrv_[i].cpu);
+			return false;
 		}
-		instReady_ = true;
+
+		if (requiredCapacity == 0)
+			return true;
+
+		if (instanceMapped_[frameIndex]
+			&& instanceCapacity_[frameIndex] >= requiredCapacity)
+		{
+			return true;
+		}
+
+		uint32_t newCapacity = 64;
+		while (newCapacity < requiredCapacity)
+		{
+			if (newCapacity > 0x40000000u)
+				return false;
+			newCapacity *= 2u;
+		}
+
+		if (instanceBuf_[frameIndex] && instanceMapped_[frameIndex])
+			instanceBuf_[frameIndex]->Unmap(0, nullptr);
+		instanceMapped_[frameIndex] = nullptr;
+		instanceBuf_[frameIndex].Reset();
+		instanceCapacity_[frameIndex] = 0;
+
+		if (instanceSrv_[frameIndex].cpu.ptr == 0)
+			instanceSrv_[frameIndex] = cbvSrvUav_->Allocate();
+		if (instanceSrv_[frameIndex].cpu.ptr == 0)
+			return false;
+
+		const UINT64 bytes =
+			static_cast<UINT64>(newCapacity)
+			* sizeof(GpuInstanceData);
+		D3D12_HEAP_PROPERTIES heap{};
+		heap.Type = D3D12_HEAP_TYPE_UPLOAD;
+		D3D12_RESOURCE_DESC desc = dx12::BufferDesc(bytes);
+		if (!dx12::HrOk(
+				device->CreateCommittedResource(
+					&heap,
+					D3D12_HEAP_FLAG_NONE,
+					&desc,
+					D3D12_RESOURCE_STATE_GENERIC_READ,
+					nullptr,
+					IID_PPV_ARGS(&instanceBuf_[frameIndex])),
+				"CreateCommittedResource(InstanceUpload)"))
+		{
+			return false;
+		}
+
+		void* mapped = nullptr;
+		D3D12_RANGE noRead{ 0, 0 };
+		if (!dx12::HrOk(
+				instanceBuf_[frameIndex]->Map(
+					0,
+					&noRead,
+					&mapped),
+				"InstanceUpload.Map"))
+		{
+			instanceBuf_[frameIndex].Reset();
+			return false;
+		}
+
+		instanceMapped_[frameIndex] =
+			static_cast<uint8_t*>(mapped);
+		instanceCapacity_[frameIndex] = newCapacity;
+
+		D3D12_SHADER_RESOURCE_VIEW_DESC srv{};
+		srv.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+		srv.Shader4ComponentMapping =
+			D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		srv.Buffer.FirstElement = 0;
+		srv.Buffer.NumElements = newCapacity;
+		srv.Buffer.StructureByteStride = sizeof(GpuInstanceData);
+		srv.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+		srv.Format = DXGI_FORMAT_UNKNOWN;
+		device->CreateShaderResourceView(
+			instanceBuf_[frameIndex].Get(),
+			&srv,
+			instanceSrv_[frameIndex].cpu);
+		return true;
 	}
 
 	bool MeshPass::EnsureSkyPso_(ID3D12Device* device, ResourceManager* rm)
@@ -270,7 +438,7 @@ namespace noc
 		key.rootSig = rootSig_.Get();
 		key.rtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 		key.dsvFormat = Dx12SwapChain::kDepthFormat;
-		key.inputLayoutHash = HashInputLayoutPC_();
+		key.inputLayoutHash = HashInputLayoutPN_();
 		if (auto* cached = cache.Find(key))
 		{
 			pso_ = cached;
@@ -282,8 +450,8 @@ namespace noc
 		layout[0].SemanticName = "POSITION";
 		layout[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
 		layout[0].InputSlot = 0;
-		layout[1].SemanticName = "COLOR";
-		layout[1].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+		layout[1].SemanticName = "NORMAL";
+		layout[1].Format = DXGI_FORMAT_R32G32B32_FLOAT;
 		layout[1].InputSlot = 0;
 		layout[1].AlignedByteOffset = 12;
 
@@ -400,46 +568,187 @@ namespace noc
 		return true;
 	}
 
-	bool MeshPass::EnsureValidationCubeUploaded_(
+	MeshPass::GpuMesh* MeshPass::EnsureMeshUploaded_(
 		ID3D12Device* device,
 		ID3D12GraphicsCommandList* cmd,
 		Dx12DeferredReleaseQueue& deferred,
 		const Dx12FrameSync& sync,
-		uint32_t frameIndex)
+		uint32_t frameIndex,
+		ResourceManager& resources,
+		ResourceHandle handle)
 	{
-		if (meshReady_)
-			return true;
-
-		CpuMeshPC cpu{};
-		auto vertex = [](float x, float y, float z, float r, float g, float b)
+		if (!impl_
+			|| !device
+			|| !cmd
+			|| !handle.IsValid())
 		{
-			return MeshVertexPC{ x, y, z, r, g, b, 1.0f };
-		};
-		auto addFace = [&](const MeshVertexPC& a, const MeshVertexPC& b, const MeshVertexPC& c, const MeshVertexPC& d)
+			return nullptr;
+		}
+
+		const uint64_t key = MeshKey_(handle);
+		const auto cached = impl_->meshes.find(key);
+		if (cached != impl_->meshes.end())
 		{
-			const uint16_t base = static_cast<uint16_t>(cpu.vertices.size());
-			cpu.vertices.push_back(a); cpu.vertices.push_back(b); cpu.vertices.push_back(c); cpu.vertices.push_back(d);
-			cpu.indices.push_back(base + 0); cpu.indices.push_back(base + 1); cpu.indices.push_back(base + 2);
-			cpu.indices.push_back(base + 0); cpu.indices.push_back(base + 2); cpu.indices.push_back(base + 3);
-		};
+			return cached->second && cached->second->ready
+				? cached->second.get()
+				: nullptr;
+		}
 
-		addFace(vertex(-1,-1,-1, 0.18f,0.45f,0.95f), vertex(-1, 1,-1, 0.18f,0.45f,0.95f), vertex( 1, 1,-1, 0.18f,0.45f,0.95f), vertex( 1,-1,-1, 0.18f,0.45f,0.95f));
-		addFace(vertex( 1,-1, 1, 0.13f,0.30f,0.72f), vertex( 1, 1, 1, 0.13f,0.30f,0.72f), vertex(-1, 1, 1, 0.13f,0.30f,0.72f), vertex(-1,-1, 1, 0.13f,0.30f,0.72f));
-		addFace(vertex(-1,-1, 1, 0.80f,0.22f,0.28f), vertex(-1, 1, 1, 0.80f,0.22f,0.28f), vertex(-1, 1,-1, 0.80f,0.22f,0.28f), vertex(-1,-1,-1, 0.80f,0.22f,0.28f));
-		addFace(vertex( 1,-1,-1, 0.20f,0.72f,0.38f), vertex( 1, 1,-1, 0.20f,0.72f,0.38f), vertex( 1, 1, 1, 0.20f,0.72f,0.38f), vertex( 1,-1, 1, 0.20f,0.72f,0.38f));
-		addFace(vertex(-1, 1,-1, 0.92f,0.67f,0.22f), vertex(-1, 1, 1, 0.92f,0.67f,0.22f), vertex( 1, 1, 1, 0.92f,0.67f,0.22f), vertex( 1, 1,-1, 0.92f,0.67f,0.22f));
-		addFace(vertex(-1,-1, 1, 0.26f,0.29f,0.34f), vertex(-1,-1,-1, 0.26f,0.29f,0.34f), vertex( 1,-1,-1, 0.26f,0.29f,0.34f), vertex( 1,-1, 1, 0.26f,0.29f,0.34f));
+		const ResourceHandleT<MeshResource> typed{ handle };
+		const MeshResource* resource = resources.GetMesh(typed);
+		if (!resource)
+		{
+			if (resources.HasFailed(handle)
+				&& impl_->resourceFailureLogged.insert(key).second)
+			{
+				NOC_LOG_ERROR(
+					"Render",
+					"Mesh resource failed to load (handle=%u:%u): %s",
+					handle.index,
+					handle.generation,
+					resources.GetError(handle));
+			}
+			return nullptr;
+		}
 
-		indexCount_ = static_cast<uint32_t>(cpu.indices.size());
-		if (!vb_.CreateStatic(device, cmd, deferred, sync, frameIndex, GpuBuffer::Kind::Vertex,
-			cpu.vertices.data(), cpu.vertices.size() * sizeof(MeshVertexPC), sizeof(MeshVertexPC)))
-			return false;
-		if (!ib_.CreateStatic(device, cmd, deferred, sync, frameIndex, GpuBuffer::Kind::Index,
-			cpu.indices.data(), cpu.indices.size() * sizeof(uint16_t), 0))
-			return false;
+		const IntermediateMesh& cpu = resource->CpuMesh();
+		const uint32_t vertexCount =
+			static_cast<uint32_t>(cpu.positions.size() / 3u);
+		if (vertexCount == 0
+			|| cpu.positions.size() != static_cast<size_t>(vertexCount) * 3u
+			|| cpu.indices.empty()
+			|| (cpu.indices.size() % 3u) != 0u)
+		{
+			NOC_LOG_ERROR(
+				"Render",
+				"Mesh resource has invalid triangle geometry (handle=%u:%u)",
+				handle.index,
+				handle.generation);
+			return nullptr;
+		}
 
-		meshReady_ = true;
-		return true;
+		std::vector<Vec3> normals(vertexCount, Vec3::Zero());
+		const bool hasNormals =
+			cpu.normals.size()
+				== static_cast<size_t>(vertexCount) * 3u;
+
+		if (hasNormals)
+		{
+			for (uint32_t i = 0; i < vertexCount; ++i)
+			{
+				normals[i] = NormalizeSafe_(Vec3{
+					cpu.normals[i * 3u + 0u],
+					cpu.normals[i * 3u + 1u],
+					cpu.normals[i * 3u + 2u]
+				});
+			}
+		}
+		else
+		{
+			for (size_t i = 0; i < cpu.indices.size(); i += 3u)
+			{
+				const uint32_t ia = cpu.indices[i + 0u];
+				const uint32_t ib = cpu.indices[i + 1u];
+				const uint32_t ic = cpu.indices[i + 2u];
+				if (ia >= vertexCount || ib >= vertexCount || ic >= vertexCount)
+				{
+					NOC_LOG_ERROR(
+						"Render",
+						"Mesh resource contains out-of-range index (handle=%u:%u)",
+						handle.index,
+						handle.generation);
+					return nullptr;
+				}
+
+				const Vec3 a{
+					cpu.positions[ia * 3u + 0u],
+					cpu.positions[ia * 3u + 1u],
+					cpu.positions[ia * 3u + 2u]
+				};
+				const Vec3 b{
+					cpu.positions[ib * 3u + 0u],
+					cpu.positions[ib * 3u + 1u],
+					cpu.positions[ib * 3u + 2u]
+				};
+				const Vec3 c{
+					cpu.positions[ic * 3u + 0u],
+					cpu.positions[ic * 3u + 1u],
+					cpu.positions[ic * 3u + 2u]
+				};
+				const Vec3 face = Cross(b - a, c - a);
+				normals[ia] = normals[ia] + face;
+				normals[ib] = normals[ib] + face;
+				normals[ic] = normals[ic] + face;
+			}
+
+			for (Vec3& normal : normals)
+				normal = NormalizeSafe_(normal);
+		}
+
+		for (const uint32_t index : cpu.indices)
+		{
+			if (index >= vertexCount)
+			{
+				NOC_LOG_ERROR(
+					"Render",
+					"Mesh resource contains out-of-range index (handle=%u:%u)",
+					handle.index,
+					handle.generation);
+				return nullptr;
+			}
+		}
+
+		std::vector<MeshVertexPN> vertices(vertexCount);
+		for (uint32_t i = 0; i < vertexCount; ++i)
+		{
+			vertices[i] = MeshVertexPN{
+				cpu.positions[i * 3u + 0u],
+				cpu.positions[i * 3u + 1u],
+				cpu.positions[i * 3u + 2u],
+				normals[i].x,
+				normals[i].y,
+				normals[i].z
+			};
+		}
+
+		auto owned = std::make_unique<GpuMesh>();
+		GpuMesh* gpuMesh = owned.get();
+		impl_->meshes.emplace(key, std::move(owned));
+
+		if (!gpuMesh->vertexBuffer.CreateStatic(
+				device,
+				cmd,
+				deferred,
+				sync,
+				frameIndex,
+				GpuBuffer::Kind::Vertex,
+				vertices.data(),
+				vertices.size() * sizeof(MeshVertexPN),
+				sizeof(MeshVertexPN))
+			|| !gpuMesh->indexBuffer.CreateStatic(
+				device,
+				cmd,
+				deferred,
+				sync,
+				frameIndex,
+				GpuBuffer::Kind::Index,
+				cpu.indices.data(),
+				cpu.indices.size() * sizeof(uint32_t),
+				0))
+		{
+			gpuMesh->failed = true;
+			NOC_LOG_ERROR(
+				"Render",
+				"GPU mesh upload failed (handle=%u:%u)",
+				handle.index,
+				handle.generation);
+			return nullptr;
+		}
+
+		gpuMesh->indexCount =
+			static_cast<uint32_t>(cpu.indices.size());
+		gpuMesh->ready = true;
+		return gpuMesh;
 	}
 
 	bool MeshPass::EnsureGridUploaded_(
@@ -538,7 +847,6 @@ namespace noc
 			return;
 
 		EnsurePerFrameCbv_(device);
-		EnsurePerFrameInstanceSrv_(device);
 
 		auto rtv = swap.CurrentRtv(frameIndex);
 		auto dsv = swap.DepthStencilView();
@@ -577,30 +885,115 @@ namespace noc
 		void* cpu = nullptr;
 		if (!perFrameCB_.Allocate(sizeof(PerFrameConstants), gpu, cpu))
 			return;
-		reinterpret_cast<PerFrameConstants*>(cpu)->viewProj = queue->view.viewProj;
+		auto* frameConstants =
+			reinterpret_cast<PerFrameConstants*>(cpu);
+		*frameConstants = {};
+		frameConstants->viewProj = queue->view.viewProj;
+
+		const uint32_t lightCount =
+			std::min(queue->lightCount, kMaxShaderLights);
+		frameConstants->lightCount = lightCount;
+		for (uint32_t i = 0; i < lightCount; ++i)
+		{
+			const RenderLight& light = queue->lights[i];
+			GpuLightConstants& out = frameConstants->lights[i];
+			out.positionType = Vec4{
+				light.position.x,
+				light.position.y,
+				light.position.z,
+				static_cast<float>(light.type)
+			};
+			out.directionRange = Vec4{
+				light.direction.x,
+				light.direction.y,
+				light.direction.z,
+				light.range
+			};
+			out.colorIntensity = Vec4{
+				light.color.x,
+				light.color.y,
+				light.color.z,
+				light.intensity
+			};
+			out.spot = Vec4{
+				light.innerConeCos,
+				light.outerConeCos,
+				0.0f,
+				0.0f
+			};
+		}
+
+		if (queue->lightCount > kMaxShaderLights
+			&& impl_
+			&& !impl_->lightOverflowWarned)
+		{
+			// Design choice (not directly from the book): the Phase 16 forward
+			// shader has a bounded analytic-light array. World extraction remains
+			// unbounded; later clustered/deferred lighting may replace this cap.
+			NOC_LOG_WARN(
+				"Render",
+				"Forward light budget exceeded: rendering first %u of %u lights",
+				kMaxShaderLights,
+				queue->lightCount);
+			impl_->lightOverflowWarned = true;
+		}
 
 		ID3D12DescriptorHeap* heaps[] = { cbvSrvUav_->Heap() };
 		cmd->SetDescriptorHeaps(1, heaps);
 
-		if (queue->instanceCount > 0 &&
-			EnsureRootSigAndPso_(device, *psoCache_, rm) &&
-			EnsureValidationCubeUploaded_(device, cmd, deferred, sync, frameIndex))
+		if (queue->instanceCount > 0
+			&& EnsureRootSigAndPso_(device, *psoCache_, rm)
+			&& EnsureInstanceBuffer_(
+				device,
+				frameIndex,
+				queue->instanceCount))
 		{
-			const uint32_t count = (queue->instanceCount > instanceCapacity_) ? instanceCapacity_ : queue->instanceCount;
-			Mat4* dst = reinterpret_cast<Mat4*>(instanceMapped_[frameIndex]);
-			for (uint32_t i = 0; i < count; ++i)
-				dst[i] = queue->instances[i].world;
+			auto* dst = reinterpret_cast<GpuInstanceData*>(
+				instanceMapped_[frameIndex]);
+			for (uint32_t i = 0; i < queue->instanceCount; ++i)
+			{
+				dst[i].world = queue->instances[i].world;
+				dst[i].normalWorld =
+					NormalMatrix_(queue->instances[i].world);
+			}
 
 			cmd->SetGraphicsRootSignature(rootSig_.Get());
 			cmd->SetPipelineState(pso_.Get());
-			cmd->SetGraphicsRootDescriptorTable(0, perFrameCbv_[frameIndex].gpu);
-			cmd->SetGraphicsRootDescriptorTable(1, instanceSrv_[frameIndex].gpu);
-			auto vbv = vb_.VertexView();
-			auto ibv = ib_.IndexView(DXGI_FORMAT_R16_UINT);
-			cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-			cmd->IASetVertexBuffers(0, 1, &vbv);
-			cmd->IASetIndexBuffer(&ibv);
-			cmd->DrawIndexedInstanced(indexCount_, count, 0, 0, 0);
+			cmd->SetGraphicsRootDescriptorTable(
+				0,
+				perFrameCbv_[frameIndex].gpu);
+			cmd->SetGraphicsRootDescriptorTable(
+				1,
+				instanceSrv_[frameIndex].gpu);
+			cmd->IASetPrimitiveTopology(
+				D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+			for (uint32_t i = 0; i < queue->instanceCount; ++i)
+			{
+				const RenderInstance& instance = queue->instances[i];
+				GpuMesh* mesh = EnsureMeshUploaded_(
+					device,
+					cmd,
+					deferred,
+					sync,
+					frameIndex,
+					*rm,
+					instance.mesh);
+				if (!mesh)
+					continue;
+
+				auto vbv = mesh->vertexBuffer.VertexView();
+				auto ibv = mesh->indexBuffer.IndexView(
+					DXGI_FORMAT_R32_UINT);
+				cmd->IASetVertexBuffers(0, 1, &vbv);
+				cmd->IASetIndexBuffer(&ibv);
+				cmd->DrawIndexedInstanced(
+					mesh->indexCount,
+					1,
+					0,
+					0,
+					i);
+			}
 		}
 
 		const bool linePassReady = EnsureGridPso_(device, rm);
