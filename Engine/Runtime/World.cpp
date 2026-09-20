@@ -990,6 +990,92 @@ namespace noc
         queue.instances = instances;
         queue.instanceCount = writeIndex;
 
+        uint32_t lightCount = 0;
+        for (uint32_t index = 0; index < capacity; ++index)
+        {
+            const EntityHandle entity =
+                impl_->entities.EntityAtIndex(index);
+            if (!entity.IsValid())
+                continue;
+
+            const LightComponent* light =
+                impl_->lights.Get(entity);
+            const TransformComponent* transform =
+                impl_->transforms.Get(entity);
+
+            if (light && transform && light->enabled)
+                ++lightCount;
+        }
+
+        queue.totalLights = lightCount;
+
+        if (lightCount > 0)
+        {
+            void* lightMemory =
+                frameArena.Allocate(
+                    sizeof(RenderLight) * lightCount,
+                    alignof(RenderLight));
+
+            if (!lightMemory)
+            {
+                NOC_LOG_ERROR(
+                    "World",
+                    "Light extraction failed: FrameArena could not allocate %zu bytes",
+                    sizeof(RenderLight)
+                        * static_cast<std::size_t>(lightCount));
+            }
+            else
+            {
+                auto* lights =
+                    static_cast<RenderLight*>(lightMemory);
+                uint32_t lightWrite = 0;
+
+                // Deterministic entity-index order, matching renderable extraction.
+                for (uint32_t index = 0; index < capacity; ++index)
+                {
+                    const EntityHandle entity =
+                        impl_->entities.EntityAtIndex(index);
+                    if (!entity.IsValid())
+                        continue;
+
+                    const LightComponent* light =
+                        impl_->lights.Get(entity);
+                    const TransformComponent* transform =
+                        impl_->transforms.Get(entity);
+                    if (!light || !transform || !light->enabled)
+                        continue;
+
+                    RenderLight& out = lights[lightWrite++];
+                    out.type = static_cast<uint32_t>(light->type);
+                    out.position = Vec3{
+                        M(transform->world, 0, 3),
+                        M(transform->world, 1, 3),
+                        M(transform->world, 2, 3)
+                    };
+
+                    Vec3 forward{
+                        M(transform->world, 0, 2),
+                        M(transform->world, 1, 2),
+                        M(transform->world, 2, 2)
+                    };
+                    const float forwardLength = Length(forward);
+                    out.direction = forwardLength > 1.0e-6f
+                        ? forward * (1.0f / forwardLength)
+                        : Vec3{ 0.0f, 0.0f, 1.0f };
+                    out.color = light->color;
+                    out.intensity = light->intensity;
+                    out.range = light->range;
+                    out.innerConeCos =
+                        std::cos(light->innerConeRadians);
+                    out.outerConeCos =
+                        std::cos(light->outerConeRadians);
+                }
+
+                queue.lights = lights;
+                queue.lightCount = lightWrite;
+            }
+        }
+
         lastStats_.visible = writeIndex;
         lastStats_.total = totalCount;
 
