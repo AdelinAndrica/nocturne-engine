@@ -6,8 +6,7 @@ status: "active"
 subsystem: "Documentation"
 phase_introduced: 16
 description: "Canonical contract for generated Nocturne C++ API documentation, symbol links and Doxygen XML tooling output."
-source_files: ["Docs/API/Doxyfile","Docs/API/MainPage.dox
-Docs/API/BeginnerGuide.dox","Docs/API/BeginnerGuide.dox","Website/scripts/prepare-api.ps1","Website/scripts/validate-api.ps1"]
+source_files: ["Docs/API/Doxyfile","Docs/API/MainPage.dox","Docs/API/BeginnerGuide.dox","Website/scripts/prepare-api.ps1","Website/scripts/validate-api.ps1"]
 source_docs: ["Docs/Development/Documentation Model.md","Docs/Web/Nocturne Website — Design & Technical Specification.md"]
 book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §1.7 Tools and the Asset Pipeline","Jason Gregory — Game Engine Architecture (3rd ed.), §7.2.2 Runtime Resource Management","Jason Gregory — Game Engine Architecture (3rd ed.), §8.2 Game Loop","Jason Gregory — Game Engine Architecture (3rd ed.), §11.2 Rendering Pipeline","Jason Gregory — Game Engine Architecture (3rd ed.), §15.4 Game World Editor","Jason Gregory — Game Engine Architecture (3rd ed.), §16.2 Runtime Object Model Architectures"]
 aliases: ["C++ API Reference","API Reference","Doxygen API"]
