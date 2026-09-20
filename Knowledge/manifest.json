@@ -35,7 +35,63 @@
         "Architecture Overview",
         "Engine Architecture"
       ],
-      "deprecatedAliases": []
+      "deprecatedAliases": [],
+      "apiSymbols": []
+    },
+    {
+      "id": "noc.development.cpp-api",
+      "title": "C++ API Reference",
+      "docType": "reference",
+      "canonical": true,
+      "status": "active",
+      "subsystem": "Documentation",
+      "phaseIntroduced": 16,
+      "sourcePath": "Docs/Development/C++ API Reference.md",
+      "webPath": "/docs/development/c-api-reference/",
+      "rawPath": "/raw/noc.development.cpp-api.md",
+      "aiPath": "/ai/noc.development.cpp-api.md",
+      "description": "Canonical contract for generated Nocturne C++ API documentation, symbol links and Doxygen XML tooling output.",
+      "sourceFiles": [
+        "Docs/API/Doxyfile",
+        "Docs/API/MainPage.dox",
+        "Website/scripts/prepare-api.ps1",
+        "Website/scripts/validate-api.ps1"
+      ],
+      "sourceDocs": [
+        "Docs/Development/Documentation Model.md",
+        "Docs/Web/Nocturne Website — Design & Technical Specification.md"
+      ],
+      "bookGrounding": [
+        "Jason Gregory — Game Engine Architecture (3rd ed.), §1.7 Tools and the Asset Pipeline"
+      ],
+      "aliases": [
+        "C++ API Reference",
+        "API Reference",
+        "Doxygen API"
+      ],
+      "deprecatedAliases": [],
+      "apiSymbols": [
+        {
+          "name": "noc::Engine",
+          "href": "/api-symbol/noc.Engine.html"
+        },
+        {
+          "name": "noc::ResourceManager",
+          "href": "/api-symbol/noc.ResourceManager.html"
+        },
+        {
+          "name": "noc::RenderSystem",
+          "href": "/api-symbol/noc.RenderSystem.html"
+        },
+        {
+          "name": "noc::World",
+          "href": "/api-symbol/noc.World.html"
+        },
+        {
+          "name": "nocturne::editor::EditorShellV3",
+          "href": "/api-symbol/nocturne.editor.EditorShellV3.html"
+        }
+      ]
     },
     {
       "id": "noc.development.production-standard",
@@ -56,7 +112,8 @@
         "Production Engineering Standard",
         "Production Standard"
       ],
-      "deprecatedAliases": []
+      "deprecatedAliases": [],
+      "apiSymbols": []
     },
     {
       "id": "noc.development.release-process",
@@ -91,7 +148,8 @@
         "Downloads Pipeline",
         "Release Packaging"
       ],
-      "deprecatedAliases": []
+      "deprecatedAliases": [],
+      "apiSymbols": []
     },
     {
       "id": "noc.documentation.model",
@@ -124,7 +182,8 @@
         "Canonical Documentation",
         "Docs Model"
       ],
-      "deprecatedAliases": []
+      "deprecatedAliases": [],
+      "apiSymbols": []
     },
     {
       "id": "noc.editor",
@@ -165,6 +224,20 @@
       "deprecatedAliases": [
         "EditorShell",
         "EditorControls"
+      ],
+      "apiSymbols": [
+        {
+          "name": "nocturne::editor::EditorShellV3",
+          "href": "/api-symbol/nocturne.editor.EditorShellV3.html"
+        },
+        {
+          "name": "nocturne::editor::EditorViewportController",
+          "href": "/api-symbol/nocturne.editor.EditorViewportController.html"
+        },
+        {
+          "name": "nocturne::editor::EditorTheme",
+          "href": "/api-symbol/nocturne.editor.EditorTheme.html"
+        }
       ]
     },
     {
@@ -204,7 +277,21 @@
         "Render System",
         "DirectX 12 Renderer"
       ],
-      "deprecatedAliases": []
+      "deprecatedAliases": [],
+      "apiSymbols": [
+        {
+          "name": "noc::RenderSystem",
+          "href": "/api-symbol/noc.RenderSystem.html"
+        },
+        {
+          "name": "noc::RenderQueue",
+          "href": "/api-symbol/noc.RenderQueue.html"
+        },
+        {
+          "name": "noc::Dx12Renderer",
+          "href": "/api-symbol/noc.Dx12Renderer.html"
+        }
+      ]
     },
     {
       "id": "noc.resources",
@@ -242,7 +329,21 @@
         "VFS",
         "Virtual File System"
       ],
-      "deprecatedAliases": []
+      "deprecatedAliases": [],
+      "apiSymbols": [
+        {
+          "name": "noc::VirtualFileSystem",
+          "href": "/api-symbol/noc.VirtualFileSystem.html"
+        },
+        {
+          "name": "noc::ResourceManager",
+          "href": "/api-symbol/noc.ResourceManager.html"
+        },
+        {
+          "name": "noc::ResourceHandle",
+          "href": "/api-symbol/noc.ResourceHandle.html"
+        }
+      ]
     },
     {
       "id": "noc.runtime",
@@ -278,7 +379,21 @@
         "Engine Runtime",
         "Main Loop"
       ],
-      "deprecatedAliases": []
+      "deprecatedAliases": [],
+      "apiSymbols": [
+        {
+          "name": "noc::Engine",
+          "href": "/api-symbol/noc.Engine.html"
+        },
+        {
+          "name": "noc::MainLoop",
+          "href": "/api-symbol/noc.MainLoop.html"
+        },
+        {
+          "name": "noc::World",
+          "href": "/api-symbol/noc.World.html"
+        }
+      ]
     },
     {
       "id": "noc.web.spec",
@@ -299,7 +414,8 @@
         "Website Specification",
         "Nocturne Website"
       ],
-      "deprecatedAliases": []
+      "deprecatedAliases": [],
+      "apiSymbols": []
     },
     {
       "id": "noc.world",
@@ -339,7 +455,21 @@
         "Entity Component System",
         "World & ECS"
       ],
-      "deprecatedAliases": []
+      "deprecatedAliases": [],
+      "apiSymbols": [
+        {
+          "name": "noc::World",
+          "href": "/api-symbol/noc.World.html"
+        },
+        {
+          "name": "noc::EntityHandle",
+          "href": "/api-symbol/noc.EntityHandle.html"
+        },
+        {
+          "name": "noc::EntityRegistry",
+          "href": "/api-symbol/noc.EntityRegistry.html"
+        }
+      ]
     }
   ]
 }
