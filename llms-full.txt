@@ -2746,7 +2746,7 @@ For public history pages, `Website/scripts/prepare.mjs` sanitizes known concrete
 
 Canonical source documents are not rewritten by that history-only publication sanitizer.
 
-A historical code comment in `AssetImportPipeline.cpp` was also changed from the machine-specific `D:/Projects/Nocturne/Data` example to `<repo>/Data`.
+A historical code comment in `AssetImportPipeline.cpp` was also changed from the machine-specific `<local-workspace>/Data` example to `<repo>/Data`.
 
 ## Performance baseline
 
