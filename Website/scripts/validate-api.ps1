@@ -23,21 +23,17 @@ function Assert-Contains {
 }
 
 function Get-DescriptionText {
-    param($Node)
+    param([System.Xml.XmlNode]$Node)
 
     if ($null -eq $Node) {
         return ""
     }
 
-    $brief = ""
-    $detail = ""
+    $briefNode = $Node.SelectSingleNode("briefdescription")
+    $detailNode = $Node.SelectSingleNode("detaileddescription")
 
-    if ($null -ne $Node.briefdescription) {
-        $brief = [string]$Node.briefdescription.InnerText
-    }
-    if ($null -ne $Node.detaileddescription) {
-        $detail = [string]$Node.detaileddescription.InnerText
-    }
+    $brief = if ($null -ne $briefNode) { [string]$briefNode.InnerText } else { "" }
+    $detail = if ($null -ne $detailNode) { [string]$detailNode.InnerText } else { "" }
 
     return ($brief + " " + $detail).Trim()
 }
