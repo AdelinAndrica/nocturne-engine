@@ -1,0 +1,93 @@
+# Nocturne Engine C++ API
+# Repository-owned Doxygen configuration.
+#
+# Design choice (not directly from the book): Doxygen is used as the generated
+# symbol/reference layer while Docs/ remains the authored architecture/system
+# documentation source.
+
+PROJECT_NAME           = "Nocturne Engine C++ API"
+PROJECT_BRIEF          = "Generated C++ symbol reference for current Nocturne engine, host and editor headers."
+PROJECT_NUMBER         = "Web 7"
+OUTPUT_DIRECTORY       = Build/Docs/Doxygen
+CREATE_SUBDIRS         = NO
+OUTPUT_LANGUAGE        = English
+ALLOW_UNICODE_NAMES    = YES
+
+FULL_PATH_NAMES        = YES
+STRIP_FROM_PATH        = .
+STRIP_FROM_INC_PATH    = .
+SHORT_NAMES            = NO
+
+MARKDOWN_SUPPORT       = YES
+AUTOLINK_SUPPORT       = YES
+BUILTIN_STL_SUPPORT    = YES
+JAVADOC_AUTOBRIEF      = YES
+QT_AUTOBRIEF           = YES
+MULTILINE_CPP_IS_BRIEF = YES
+INHERIT_DOCS           = YES
+
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = YES
+EXTRACT_PRIV_VIRTUAL   = YES
+EXTRACT_STATIC         = YES
+EXTRACT_LOCAL_CLASSES  = YES
+HIDE_UNDOC_MEMBERS     = NO
+HIDE_UNDOC_CLASSES     = NO
+HIDE_FRIEND_COMPOUNDS  = YES
+
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = NO
+WARN_IF_DOC_ERROR      = YES
+WARN_IF_INCOMPLETE_DOC = YES
+WARN_NO_PARAMDOC       = YES
+
+INPUT                   = Engine \
+                          Apps/NocturneEditor \
+                          Apps/NocturneHost \
+                          Docs/API/MainPage.dox
+FILE_PATTERNS           = *.h *.hpp *.inl *.dox
+RECURSIVE               = YES
+EXCLUDE                 = Engine/Render/DX12/d3dx12.h \
+                          Apps/NocturneEditor/EditorShell.h \
+                          Apps/NocturneEditor/EditorControls.h
+EXCLUDE_PATTERNS        = */Tests/* */ThirdParty/*
+EXCLUDE_SYMLINKS        = YES
+
+SOURCE_BROWSER          = YES
+INLINE_SOURCES          = NO
+STRIP_CODE_COMMENTS     = NO
+REFERENCED_BY_RELATION  = YES
+REFERENCES_RELATION     = YES
+REFERENCES_LINK_SOURCE  = YES
+USE_HTAGS               = NO
+
+ALPHABETICAL_INDEX      = YES
+GENERATE_TREEVIEW       = YES
+DISABLE_INDEX           = NO
+SEARCHENGINE            = YES
+SERVER_BASED_SEARCH     = NO
+HTML_COLORSTYLE         = DARK
+HTML_EXTRA_STYLESHEET   = Docs/API/nocturne-doxygen.css
+HTML_TIMESTAMP          = NO
+
+GENERATE_HTML           = YES
+HTML_OUTPUT             = html
+GENERATE_LATEX          = NO
+GENERATE_RTF            = NO
+GENERATE_MAN            = NO
+GENERATE_DOCBOOK        = NO
+
+GENERATE_XML            = YES
+XML_OUTPUT              = xml
+XML_PROGRAMLISTING      = NO
+XML_NS_MEMB_FILE_SCOPE  = YES
+
+GENERATE_TAGFILE        = Build/Docs/Doxygen/nocturne.tag
+
+HAVE_DOT                = NO
+CLASS_DIAGRAMS          = NO
+CALL_GRAPH              = NO
+CALLER_GRAPH            = NO
+DIRECTORY_GRAPH         = NO
+
+QUIET                   = NO
