@@ -14,7 +14,7 @@
 >
 > **Primary architectural source:** Jason Gregory, *Game Engine Architecture (3rd Edition)*
 >
-> **Web implementation status:** Web 6 AI Knowledge Layer implemented on `web-docs-foundation`; stable canonical IDs now feed generated `Knowledge/`, terminology, `llms.txt`, canonical-only `llms-full.txt`, per-document raw/AI Markdown exports and schema/stale-output validation. Web 5 Downloads remains artifact-driven and the production release manifest remains intentionally empty.
+> **Web implementation status:** Web 7 C++ API Reference implemented on `web-docs-foundation`; repository-owned Doxygen now generates human HTML, tooling XML, stable qualified-name symbol aliases and conceptual-doc → C++ symbol links. Web 6 canonical AI knowledge and Web 5 artifact-driven Downloads remain intact.
 
 ---
 
@@ -1222,11 +1222,22 @@ The machine-readable layer is generated from the same canonical `Docs/` metadata
 
 Scope:
 
-- Doxygen config;
-- API generation;
-- web integration;
-- XML output for tooling;
-- links between conceptual pages and C++ symbols.
+- [x] repository-owned Doxygen configuration;
+- [x] current Engine / Editor / Host header extraction;
+- [x] Nocturne-styled generated HTML at `/api/`;
+- [x] Doxygen XML at `/api-xml/`;
+- [x] generated Doxygen tag file;
+- [x] stable qualified-name redirect routes under `/api-symbol/`;
+- [x] generated `/api-symbols.json` symbol index;
+- [x] canonical `api_symbols` metadata;
+- [x] conceptual system pages → C++ symbol links;
+- [x] machine-readable `Knowledge/manifest.json -> apiSymbols`;
+- [x] dedicated hosted API-docs CI gate;
+- [x] generated API artifact upload.
+
+**Status:** COMPLETE. See `Docs/Web/Nocturne Website — Web 7 Implementation Report.md`.
+
+Validated extraction currently covers **97 Nocturne headers** and indexes **147 Doxygen compounds**. Vendored `d3dx12.h`, test directories and the deprecated `EditorShell` / `EditorControls` surfaces are excluded from the current API reference.
 
 ### Web 8 — CI, deployment and quality gates
 
@@ -1261,6 +1272,7 @@ Before the Website track can be treated as a durable product surface:
 - [x] Download page never exposes an architecture without a real release artifact.
 - [x] Release metadata validates against a schema.
 - [x] AI entry points identify canonical versus historical sources.
+- [x] Generated C++ API HTML/XML exists and canonical conceptual pages link to validated symbols.
 - [ ] No private credentials/paths appear in static output.
 - [ ] Keyboard navigation and focus states are functional.
 - [ ] Responsive docs remain readable at narrow widths.
@@ -1312,19 +1324,19 @@ All twelve items above are **Design choice (not directly from the book)** except
 
 ## 23. Next implementation handoff
 
-Start Web 7 with:
+Start Web 8 with:
 
-> Implement **Web 7 — C++ API Reference** on branch `web-docs-foundation` on top of the validated Web 6 AI Knowledge Layer. Add a repository-owned Doxygen configuration for the current public/internal C++ headers, generate HTML for human API browsing and XML for tooling, integrate API navigation into the Nocturne documentation surface, and connect conceptual canonical pages to relevant C++ symbols without replacing the existing `Docs/` architecture/system explanations. Treat exact Doxygen/web integration details as **Design choice (not directly from the book)**. Preserve the existing canonical-vs-history precedence, keep Website independent from engine/runtime dependencies, and do not merge draft PR #2 automatically.
+> Implement **Web 8 — CI, Deployment and Quality Gates** on branch `web-docs-foundation` on top of the validated Web 7 API reference, Web 6 AI knowledge layer and Web 5 release/download contract. Consolidate the website's production gates: broken internal-link validation, static-output privacy/secret/path auditing, automated accessibility baseline, responsive-browser checks, performance budget, production `site`/sitemap configuration, static deployment target and final release-page artifact integration. Preserve the current Nocturne visual/product contract, canonical-vs-history precedence and artifact honesty. Do not publish a fake engine release, do not make Website an engine/runtime dependency, and do not merge draft PR #2 automatically.
 
 Bring:
 
 - this specification;
-- `Docs/Web/Nocturne Website — Web 6 Implementation Report.md`;
+- `Docs/Web/Nocturne Website — Web 7 Implementation Report.md`;
 - `Docs/Development/Documentation Model.md`;
-- current canonical `Docs/Systems/` pages;
-- current `Knowledge/manifest.json`;
-- current `Website/scripts/prepare.mjs`;
-- current public engine/editor headers;
-- `Docs/Production Engineering Standard.md`;
-- Jason Gregory sections used by the relevant subsystem docs.
+- `Docs/Development/C++ API Reference.md`;
+- `Docs/Development/Release Process.md`;
+- current Website / API Docs / Windows / Release workflows;
+- current `Website/dist` route contract;
+- current `Knowledge/`, `Schemas/` and Doxygen outputs;
+- `Docs/Production Engineering Standard.md`.
 

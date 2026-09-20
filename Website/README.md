@@ -132,3 +132,44 @@ Do not hand-edit `Knowledge/*.json` or `llms*.txt`.
 CI regenerates them and fails if the committed repository-level outputs are stale relative to canonical `Docs/`.
 
 Canonical documentation pages expose **View Markdown**, **Copy Markdown** and **Copy for AI**. Historical Phase pages remain searchable but are not exported as canonical AI truth.
+
+
+## C++ API reference
+
+The generated symbol layer uses the repository-owned configuration:
+
+`Docs/API/Doxyfile`
+
+For a local Windows API build, install Doxygen and run:
+
+```powershell
+cd Website
+npm run api
+npm run validate:api
+npm run build
+```
+
+Or run the combined command:
+
+```powershell
+npm run build:api
+```
+
+Validated CI currently uses Doxygen 1.10.0.
+
+Generated public routes:
+
+```text
+/api/index.html
+/api/nocturne.tag
+/api-xml/index.xml
+/api-symbols.json
+/api-symbol/noc.Engine.html
+/api-symbol/nocturne.editor.EditorShellV3.html
+```
+
+Generated API files under `Website/public/api*` are ignored by Git and recreated from current headers.
+
+Canonical conceptual pages author `api_symbols` in repository-root `Docs/`; the website generator turns those names into stable `/api-symbol/` links and exposes the same relationships through `Knowledge/manifest.json`.
+
+The Doxygen layer is structural/source reference. It does not replace canonical Architecture/System/Development documentation.
