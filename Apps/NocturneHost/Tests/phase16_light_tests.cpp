@@ -11,6 +11,7 @@
 #include "Runtime/Reflection/PropertyAccess.h"
 #include "Runtime/Reflection/ReflectionRegistry.h"
 #include "Runtime/World.h"
+#include "Render/DX12/ShaderCompiler.h"
 
 #include <algorithm>
 #include <cmath>
@@ -504,6 +505,72 @@ bool RunPhase16PrimitiveAssetTests()
     NOC_LOG_INFO(
         "Phase16Primitive",
         "Built-in primitive asset tests %s",
+        ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+
+bool RunPhase16BasicShaderCompileTests()
+{
+    NOC_LOG_INFO(
+        "Phase16Shader",
+        "%s",
+        "Basic scene shader compile tests begin");
+
+#ifndef NOC_CONTENT_ROOT
+#define NOC_CONTENT_ROOT "Data"
+#endif
+
+    const std::filesystem::path shaderPath =
+        std::filesystem::path(NOC_CONTENT_ROOT)
+        / "Shaders"
+        / "Basic.hlsl";
+
+    std::ifstream stream(shaderPath, std::ios::binary);
+    if (!stream)
+    {
+        NOC_LOG_ERROR(
+            "Phase16Shader",
+            "Failed to open '%s'",
+            shaderPath.string().c_str());
+        return false;
+    }
+
+    const std::string source{
+        std::istreambuf_iterator<char>(stream),
+        std::istreambuf_iterator<char>()
+    };
+
+    noc::dx12::ComPtr<ID3DBlob> vertexShader;
+    noc::dx12::ComPtr<ID3DBlob> pixelShader;
+
+    const bool vertexOk =
+        noc::ShaderCompiler::CompileFromMemory(
+            "Shaders/Basic.hlsl",
+            source.data(),
+            source.size(),
+            "VSMain",
+            "vs_5_1",
+            vertexShader);
+
+    const bool pixelOk =
+        noc::ShaderCompiler::CompileFromMemory(
+            "Shaders/Basic.hlsl",
+            source.data(),
+            source.size(),
+            "PSMain",
+            "ps_5_1",
+            pixelShader);
+
+    const bool ok =
+        vertexOk
+        && pixelOk
+        && vertexShader
+        && pixelShader;
+
+    NOC_LOG_INFO(
+        "Phase16Shader",
+        "Basic scene shader compile tests %s",
         ok ? "PASS" : "FAIL");
     return ok;
 }
