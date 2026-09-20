@@ -20,6 +20,7 @@ This portal separates **current canonical behavior** from **implementation histo
 | Editor | [Editor](/docs/systems/editor/) |
 | Engineering quality | [Production Engineering Standard](/docs/development/production-engineering-standard/) |
 | Documentation rules | [Documentation Model](/docs/development/documentation-model/) |
+| C++ symbols | [C++ API Reference](/docs/development/c-api-reference/) · [Generated API](/api/index.html) |
 
 ## How to read these docs
 
@@ -50,6 +51,9 @@ Nocturne exposes generated machine-readable views of the same canonical document
 | [`/knowledge/terminology.json`](/knowledge/terminology.json) | Canonical terms, aliases and deprecated aliases |
 | [Knowledge manifest schema](/schemas/knowledge-manifest.schema.json) | Machine-readable manifest contract |
 | [Terminology schema](/schemas/terminology.schema.json) | Machine-readable terminology contract |
+| [`/api/index.html`](/api/index.html) | Generated human-readable C++ symbol reference |
+| [`/api-xml/index.xml`](/api-xml/index.xml) | Doxygen XML for symbol-level tooling |
+| [`/api-symbols.json`](/api-symbols.json) | Generated qualified-name → Doxygen symbol map |
 
 Canonical pages also expose **View Markdown**, **Copy Markdown** and **Copy for AI** actions.
 
