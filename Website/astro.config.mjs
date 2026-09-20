@@ -10,6 +10,7 @@ export default defineConfig({
     starlight({
       title: 'Nocturne Engine',
       description: 'Technical documentation for Nocturne Engine.',
+      favicon: '/nocturne-logo.png',
       pagefind: true,
       disable404Route: true,
       customCss: ['./src/styles/nocturne.css'],

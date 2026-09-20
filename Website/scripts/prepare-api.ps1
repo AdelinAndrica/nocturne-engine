@@ -116,6 +116,9 @@ foreach ($compound in $xml.doxygenindex.compound) {
     if ([string]::IsNullOrWhiteSpace($name) -or [string]::IsNullOrWhiteSpace($refid)) {
         continue
     }
+    if (-not ($name -eq "noc" -or $name.StartsWith("noc::") -or $name -eq "nocturne" -or $name.StartsWith("nocturne::"))) {
+        continue
+    }
 
     $alias = Get-SymbolAlias $name
     $target = "/api/$refid.html"
