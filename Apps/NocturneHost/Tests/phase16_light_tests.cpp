@@ -12,6 +12,7 @@
 #include "Runtime/Reflection/ReflectionRegistry.h"
 #include "Runtime/World.h"
 
+#include <algorithm>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
