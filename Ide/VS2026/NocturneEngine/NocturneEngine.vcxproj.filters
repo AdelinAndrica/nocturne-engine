@@ -177,6 +177,9 @@
     <ClInclude Include="..\..\..\Engine\Runtime\Components\CameraComponent.h">
       <Filter>Header Files\Runtime\Components</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Runtime\Components\LightComponent.h">
+      <Filter>Header Files\Runtime\Components</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\Engine\Runtime\Components\NameComponent.h">
       <Filter>Header Files\Runtime\Components</Filter>
     </ClInclude>
@@ -187,6 +190,9 @@
       <Filter>Header Files\Runtime\Components</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\Engine\Runtime\CameraSystem.h">
+      <Filter>Header Files\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Engine\Runtime\LightSystem.h">
       <Filter>Header Files\Runtime</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\Engine\Runtime\NameSystem.h">
@@ -353,10 +359,16 @@
     <ClCompile Include="..\..\..\Engine\Runtime\Reflection\FoundationComponents.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\Engine\Runtime\Reflection\LightReflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\Engine\Runtime\Reflection\ReflectionRegistry.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\Engine\Runtime\CameraSystem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Engine\Runtime\LightSystem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\Engine\Runtime\NameSystem.cpp">
