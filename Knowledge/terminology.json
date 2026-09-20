@@ -14,6 +14,17 @@
       "deprecatedAliases": []
     },
     {
+      "term": "C++ API Reference",
+      "documentId": "noc.development.cpp-api",
+      "definition": "Canonical contract for generated Nocturne C++ API documentation, symbol links and Doxygen XML tooling output.",
+      "aliases": [
+        "C++ API Reference",
+        "API Reference",
+        "Doxygen API"
+      ],
+      "deprecatedAliases": []
+    },
+    {
       "term": "Nocturne Engine — Production Engineering Standard",
       "documentId": "noc.development.production-standard",
       "definition": "Canonical engineering quality, CI, validation and production-readiness standard for Nocturne Engine.",
