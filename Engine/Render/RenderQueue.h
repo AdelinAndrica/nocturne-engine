@@ -29,7 +29,7 @@ namespace noc
 		float innerConeCos = 1.0f;
 		float outerConeCos = 1.0f;
 		uint32_t type = 0;
-	}
+	};
 
 	// Design choice (not directly from the book): a tiny editor/debug bridge is
 	// carried with the frame submission so the renderer can depth-test selection
