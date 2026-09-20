@@ -1,0 +1,173 @@
+name: Nocturne C++ API Docs
+
+on:
+  push:
+    paths:
+      - "Engine/**/*.h"
+      - "Engine/**/*.hpp"
+      - "Engine/**/*.inl"
+      - "Apps/NocturneEditor/**/*.h"
+      - "Apps/NocturneEditor/**/*.hpp"
+      - "Apps/NocturneHost/**/*.h"
+      - "Apps/NocturneHost/**/*.hpp"
+      - "Docs/API/**"
+      - "Docs/Systems/**"
+      - "Docs/Development/**"
+      - "Knowledge/**"
+      - "Schemas/knowledge-manifest.schema.json"
+      - "Website/scripts/prepare-api.ps1"
+      - "Website/scripts/validate-api.ps1"
+      - "Website/scripts/prepare.mjs"
+      - "Website/src/content.config.ts"
+      - "Website/astro.config.mjs"
+      - "Website/package.json"
+      - "Website/package-lock.json"
+      - ".github/workflows/api-docs-ci.yml"
+  pull_request:
+    paths:
+      - "Engine/**/*.h"
+      - "Engine/**/*.hpp"
+      - "Engine/**/*.inl"
+      - "Apps/NocturneEditor/**/*.h"
+      - "Apps/NocturneEditor/**/*.hpp"
+      - "Apps/NocturneHost/**/*.h"
+      - "Apps/NocturneHost/**/*.hpp"
+      - "Docs/API/**"
+      - "Docs/Systems/**"
+      - "Docs/Development/**"
+      - "Knowledge/**"
+      - "Schemas/knowledge-manifest.schema.json"
+      - "Website/scripts/prepare-api.ps1"
+      - "Website/scripts/validate-api.ps1"
+      - "Website/scripts/prepare.mjs"
+      - "Website/src/content.config.ts"
+      - "Website/astro.config.mjs"
+      - "Website/package.json"
+      - "Website/package-lock.json"
+      - ".github/workflows/api-docs-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  api-docs:
+    name: Doxygen HTML + XML
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Website/package-lock.json
+
+      - name: Install Doxygen
+        shell: pwsh
+        run: |
+          $command = Get-Command doxygen -ErrorAction SilentlyContinue
+
+          if (-not $command) {
+            choco install doxygen.install --yes --no-progress
+            if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+            }
+
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" +
+                        [System.Environment]::GetEnvironmentVariable("Path", "User")
+          }
+
+          $command = Get-Command doxygen -ErrorAction SilentlyContinue
+          if (-not $command) {
+            $candidate = "C:\Program Files\doxygen\bin\doxygen.exe"
+            if (Test-Path -LiteralPath $candidate) {
+              Add-Content -Path $env:GITHUB_PATH -Value (Split-Path -Parent $candidate)
+              $env:Path = "$(Split-Path -Parent $candidate);$env:Path"
+            }
+          }
+
+          doxygen --version
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Install website dependencies
+        working-directory: Website
+        shell: pwsh
+        run: npm ci --no-audit --no-fund
+
+      - name: Generate Doxygen API
+        working-directory: Website
+        shell: pwsh
+        run: npm run api
+
+      - name: Build website with API assets
+        working-directory: Website
+        shell: pwsh
+        run: npm run build
+
+      - name: Validate generated API
+        working-directory: Website
+        shell: pwsh
+        run: npm run validate:api
+
+      - name: Verify API integration
+        shell: pwsh
+        run: |
+          function Assert-File([string]$Path) {
+            if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+              throw "Missing expected API output: $Path"
+            }
+          }
+
+          function Assert-Contains([string]$Path, [string]$Text) {
+            if (-not (Select-String -LiteralPath $Path -SimpleMatch -Pattern $Text -Quiet)) {
+              throw "Expected '$Text' in $Path"
+            }
+          }
+
+          Assert-File "Website/dist/api/index.html"
+          Assert-File "Website/dist/api/nocturne.tag"
+          Assert-File "Website/dist/api-xml/index.xml"
+          Assert-File "Website/dist/api-symbols.json"
+          Assert-File "Website/dist/api-build.json"
+
+          Assert-File "Website/dist/api-symbol/noc.Engine.html"
+          Assert-File "Website/dist/api-symbol/noc.ResourceManager.html"
+          Assert-File "Website/dist/api-symbol/noc.RenderSystem.html"
+          Assert-File "Website/dist/api-symbol/noc.World.html"
+          Assert-File "Website/dist/api-symbol/nocturne.editor.EditorShellV3.html"
+
+          Assert-File "Website/dist/docs/development/c-api-reference/index.html"
+
+          Assert-Contains "Website/dist/docs/systems/runtime/index.html" "C++ API reference"
+          Assert-Contains "Website/dist/docs/systems/runtime/index.html" "/api-symbol/noc.Engine.html"
+          Assert-Contains "Website/dist/docs/systems/resources/index.html" "/api-symbol/noc.ResourceManager.html"
+          Assert-Contains "Website/dist/docs/systems/rendering/index.html" "/api-symbol/noc.RenderSystem.html"
+          Assert-Contains "Website/dist/docs/systems/world-ecs/index.html" "/api-symbol/noc.World.html"
+          Assert-Contains "Website/dist/docs/systems/editor/index.html" "/api-symbol/nocturne.editor.EditorShellV3.html"
+
+          Assert-Contains "Website/dist/knowledge/manifest.json" "noc.development.cpp-api"
+          Assert-Contains "Website/dist/knowledge/manifest.json" "apiSymbols"
+
+          git diff --exit-code -- Knowledge llms.txt llms-full.txt
+          if ($LASTEXITCODE -ne 0) {
+            throw "Generated canonical knowledge is stale after API metadata changes."
+          }
+
+      - name: Upload generated API artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nocturne-cpp-api
+          path: |
+            Website/dist/api/
+            Website/dist/api-xml/
+            Website/dist/api-symbol/
+            Website/dist/api-symbols.json
+            Website/dist/api-build.json
+          if-no-files-found: error
+          retention-days: 7
