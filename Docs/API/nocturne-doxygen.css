@@ -1,0 +1,109 @@
+/* Nocturne Doxygen theme overrides.
+   Design choice (not directly from the book). */
+
+html,
+body {
+  background: #0b0f14;
+  color: #e4e9ef;
+}
+
+body,
+table,
+div,
+p,
+dl {
+  font-family: "Segoe UI", Inter, Arial, sans-serif;
+}
+
+#top,
+#titlearea,
+#nav-tree,
+.ui-resizable-e,
+.header,
+.contents {
+  background-color: #0f151d;
+}
+
+#titlearea {
+  border-bottom: 1px solid #263241;
+}
+
+#projectname,
+.title,
+h1,
+h2,
+h3,
+h4 {
+  color: #edf3fa;
+}
+
+#projectbrief,
+#projectnumber,
+.navpath li.navelem a,
+.navpath li.footer,
+.footer {
+  color: #7f91a7;
+}
+
+a,
+a:visited,
+.contents a:visited {
+  color: #6cb6ff;
+}
+
+a:hover {
+  color: #9fd0ff;
+}
+
+.tablist li.current a,
+.sm-dox a:hover,
+.sm-dox a:focus,
+.sm-dox a:active {
+  background: #1677d2;
+  color: #fff;
+  text-shadow: none;
+}
+
+.memitem,
+.memproto,
+.memdoc,
+.directory,
+.fieldtable,
+table.memberdecls,
+table.doxtable {
+  border-color: #263241;
+}
+
+.memproto,
+.memdoc,
+.memitem,
+.fieldtable th,
+table.doxtable th {
+  background: #121a24;
+}
+
+.fragment,
+pre.fragment,
+div.line {
+  background: #0c1219;
+  border-color: #263241;
+  color: #d7e3f0;
+}
+
+code {
+  color: #c6def6;
+}
+
+#nav-tree .selected {
+  background: #123456;
+  color: #fff;
+  text-shadow: none;
+}
+
+#nav-tree a {
+  color: #b8c5d3;
+}
+
+.arrow {
+  color: #6cb6ff;
+}
