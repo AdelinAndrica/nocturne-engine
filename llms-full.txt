@@ -1187,7 +1187,7 @@ subsystem: "Development"
 phase_introduced: 16
 description: "Canonical release packaging, artifact validation, manifest promotion and Downloads publication contract."
 source_path: "Docs/Development/Release Process.md"
-source_files: [".github/workflows/release-package.yml",".github/scripts/package-release.ps1","Schemas/release.schema.json","Website/src/data/releases.json","Website/src/data/release-schema.mjs","Website/src/pages/download.astro"]
+source_files: [".github/workflows/release-package.yml",".github/scripts/package-release.ps1","Schemas/release.schema.json","Website/scripts/promote-release.mjs","Website/src/data/releases.json","Website/src/data/release-schema.mjs","Website/src/pages/download.astro"]
 source_docs: ["Docs/Production Engineering Standard.md","Docs/Web/Nocturne Website — Design & Technical Specification.md"]
 book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §1.7 Tools and the Asset Pipeline"]
 aliases: ["Release Process","Downloads Pipeline","Release Packaging"]
@@ -1212,7 +1212,8 @@ A target becomes downloadable only after the pipeline has:
 3. measured exact byte size;
 4. generated a SHA-256 checksum;
 5. published the archive;
-6. promoted a validated release record into the website manifest.
+6. promoted validated release records into a reviewed website-manifest pull request;
+7. merged that reviewed manifest change before the Downloads page claims support.
 
 This keeps the Downloads page aligned with actual artifacts rather than theoretical build configurations.
 
@@ -1285,7 +1286,7 @@ An architecture is build/package-capable only if its matrix job completes all bu
 
 Web 5 currently proves this for `x86_64` and `x86`.
 
-Public Downloads still require a real tagged publication plus reviewed manifest promotion.
+Public Downloads still require a real tagged publication plus review and merge of the generated manifest pull request.
 
 ## Ship build
 
@@ -1447,11 +1448,30 @@ When the release packaging workflow is triggered by a `v<version>` tag and all a
 - SHA-256 files;
 - per-architecture release-record JSON files.
 
-The website manifest is deliberately a separate reviewed source.
+The website manifest remains a separate reviewed source.
 
 A GitHub Release existing by itself does not cause the website to claim support automatically.
 
-Promotion tool:
+After the release assets are published, the tag-only job:
+
+`Prepare Downloads manifest PR`
+
+performs the normal website publication preparation:
+
+1. downloads the validated architecture release records from the same workflow run;
+2. checks out `master`;
+3. runs `Website/scripts/promote-release.mjs`;
+4. validates the resulting manifest;
+5. builds the Downloads page;
+6. uploads the candidate `releases.json` as workflow evidence;
+7. creates or updates a `release-manifest/<tag>` branch;
+8. opens a pull request against `master`.
+
+The job has no auto-merge step.
+
+The Downloads page changes only after that PR is reviewed and merged.
+
+The promotion tool remains directly callable for recovery, local validation or deliberate maintenance:
 
 ```powershell
 cd Website
@@ -1462,7 +1482,9 @@ npm run build
 
 `Website/scripts/promote-release.mjs` verifies that all supplied records agree on version, channel, date, release notes and source commit. It rejects duplicate architecture tuples and refuses to overwrite an existing published version.
 
-**Design choice (not directly from the book):** manifest promotion remains an explicit source-controlled action so a malformed/partial publication cannot silently change the public support matrix.
+If manifest preparation or PR creation fails after the GitHub Release exists, the website manifest remains unchanged. This preserves artifact honesty: a partial publication cannot silently alter the public support matrix.
+
+**Design choice (not directly from the book):** normal manifest promotion is automated up to a source-controlled review boundary, while merge remains an explicit human action.
 
 ## Website publication
 
@@ -1537,7 +1559,11 @@ Release publication stops when:
 - packaging fails;
 - the archive cannot be hashed;
 - release metadata is malformed;
-- the website manifest violates its schema.
+- the website manifest violates its schema;
+- release-record promotion fails;
+- the reviewed manifest pull request cannot be prepared.
+
+A failure after GitHub Release publication does not retroactively delete the release assets; it prevents the website from claiming them until the manifest-review path succeeds.
 
 A release target that fails these gates is not represented as downloadable.
 
@@ -1552,7 +1578,6 @@ The exact GitHub Actions workflow, semantic-version policy, ZIP layout, checksum
 - [Production Engineering Standard](/docs/development/production-engineering-standard/)
 - [Website Specification](/docs/development/website-specification/)
 - [Downloads](/download)
-
 ---
 
 ## Documentation Model

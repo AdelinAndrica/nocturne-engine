@@ -132,6 +132,7 @@
         ".github/workflows/release-package.yml",
         ".github/scripts/package-release.ps1",
         "Schemas/release.schema.json",
+        "Website/scripts/promote-release.mjs",
         "Website/src/data/releases.json",
         "Website/src/data/release-schema.mjs",
         "Website/src/pages/download.astro"
