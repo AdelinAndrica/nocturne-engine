@@ -6,9 +6,10 @@ status: "active"
 subsystem: "Documentation"
 phase_introduced: 16
 description: "Canonical contract for generated Nocturne C++ API documentation, symbol links and Doxygen XML tooling output."
-source_files: ["Docs/API/Doxyfile","Docs/API/MainPage.dox","Website/scripts/prepare-api.ps1","Website/scripts/validate-api.ps1"]
+source_files: ["Docs/API/Doxyfile","Docs/API/MainPage.dox
+Docs/API/BeginnerGuide.dox","Docs/API/BeginnerGuide.dox","Website/scripts/prepare-api.ps1","Website/scripts/validate-api.ps1"]
 source_docs: ["Docs/Development/Documentation Model.md","Docs/Web/Nocturne Website — Design & Technical Specification.md"]
-book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §1.7 Tools and the Asset Pipeline"]
+book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §1.7 Tools and the Asset Pipeline","Jason Gregory — Game Engine Architecture (3rd ed.), §7.2.2 Runtime Resource Management","Jason Gregory — Game Engine Architecture (3rd ed.), §8.2 Game Loop","Jason Gregory — Game Engine Architecture (3rd ed.), §11.2 Rendering Pipeline","Jason Gregory — Game Engine Architecture (3rd ed.), §15.4 Game World Editor","Jason Gregory — Game Engine Architecture (3rd ed.), §16.2 Runtime Object Model Architectures"]
 aliases: ["C++ API Reference","API Reference","Doxygen API"]
 deprecated_aliases: []
 api_symbols: ["noc::Engine","noc::ResourceManager","noc::RenderSystem","noc::World","nocturne::editor::EditorShellV3"]
@@ -20,7 +21,7 @@ api_symbols: ["noc::Engine","noc::ResourceManager","noc::RenderSystem","noc::Wor
 
 The generated C++ API reference answers a different question from the conceptual documentation:
 
-> **What symbols exist in the current C++ header surface, and what members/types do they expose?**
+> **What does this type/function do, when should I use it, what owns it, and what rules do I need to obey?**
 
 Canonical Architecture, Systems and Development documents remain responsible for:
 
@@ -32,7 +33,9 @@ Canonical Architecture, Systems and Development documents remain responsible for
 - design constraints;
 - current architectural contracts.
 
-The API reference is a structural/source companion to those documents, not a replacement for them.
+The API reference is a beginner-oriented symbol/use companion to those documents, not a replacement for them.
+
+Web 7.1 deliberately changes the default from **"show every symbol and let the reader infer usage"** to **"teach the supported public surface first"**.
 
 ## Human API route
 
@@ -45,6 +48,27 @@ The Doxygen landing page is:
 `/api/index.html`
 
 The generated API uses the current Nocturne dark visual vocabulary while remaining a separate generated reference surface.
+
+The landing page sends new readers to:
+
+`Beginner Guide`
+
+before the alphabetical class list.
+
+The recommended learning order is:
+
+```text
+Engine / MainLoop
+    ↓
+EntityHandle / World / components
+    ↓
+VirtualFileSystem / ResourceManager
+    ↓
+RenderQueue / RenderSystem
+    ↓
+EditorShellV3 / EditorViewportController
+```
+
 
 ## Machine/tooling route
 
@@ -117,27 +141,85 @@ The generator intentionally excludes:
 
 `EditorShellV3` is the current canonical editor shell.
 
-## Undocumented existing code
+## Beginner-oriented extraction policy
 
-The current repository did not previously contain a Doxygen documentation layer.
+The repository did not originally have complete Doxygen prose.
 
-Web 7 therefore uses:
+Web 7 used `EXTRACT_ALL = YES` as a bootstrap mechanism so the existing type graph could be inspected.
 
-`EXTRACT_ALL = YES`
+Web 7.1 keeps structural extraction available, but changes what the default human reference emphasizes:
 
-so the existing class/struct/function surface can be navigated immediately.
+```text
+EXTRACT_PRIVATE       = NO
+EXTRACT_PRIV_VIRTUAL  = NO
+EXTRACT_LOCAL_CLASSES = NO
+```
 
-This does not imply that every member already has high-quality authored API prose.
+Private implementation details are therefore hidden from the primary beginner reference.
 
-Future subsystem work can add focused Doxygen comments where symbol-level contracts need more explanation.
+This is intentional: a beginner should first understand the contract they are expected to call, not implementation helpers they are not meant to use.
 
-## Public and internal members
+Source browsing remains available when deeper implementation inspection is needed.
 
-Web 7 includes private/internal class members in the generated reference.
+## Required beginner documentation contract
 
-This is deliberate because Nocturne's immediate audience is engine development and maintenance, not a frozen third-party SDK surface.
+For the primary architectural surface, a class/struct description must explain the role of the type.
 
-**Design choice (not directly from the book):** when Nocturne later defines a supported external SDK, that SDK should get its own narrower public-reference policy rather than treating the current engine-internal reference as a compatibility promise.
+For important public functions, documentation must explain enough of the following when applicable:
+
+- what the function does;
+- when normal application/editor code should call it;
+- when it should **not** be called directly;
+- parameter meaning;
+- return/failure semantics;
+- ownership and borrowed lifetime;
+- frame lifetime;
+- structural-mutation invalidation;
+- blocking/asynchronous behavior;
+- threading assumptions;
+- normal call sequence;
+- common beginner trap.
+
+The goal is not comment volume. The goal is to remove required guesswork.
+
+### Enforced types
+
+Web 7.1 enforces beginner descriptions on the current core surface:
+
+```text
+noc::Engine
+noc::MainLoop
+noc::VirtualFileSystem
+noc::ResourceManager
+noc::ResourceHandle
+noc::EntityHandle
+noc::EntityRegistry
+noc::World
+noc::RenderQueue
+noc::RenderSystem
+noc::Dx12Renderer
+noc::TransformComponent
+noc::RenderableComponent
+noc::CameraComponent
+noc::NameComponent
+nocturne::editor::EditorShellV3
+nocturne::editor::EditorViewportController
+nocturne::editor::EditorTheme
+```
+
+For the core classes with callable public APIs, every generated public function must have a non-empty Doxygen description.
+
+`Website/scripts/validate-api.ps1` reads the generated XML and fails CI when this contract regresses.
+
+## Public versus internal members
+
+The beginner reference intentionally hides private class members.
+
+This does **not** mean private code is unimportant or inaccessible: the repository and source browser remain the authority for implementation detail.
+
+It means the generated learning surface no longer presents private helpers at the same visual level as APIs you are expected to use.
+
+**Design choice (not directly from the book):** when Nocturne later defines a supported external SDK, that SDK should get its own narrower compatibility policy. Web 7.1 is an internal-engine learning/reference surface, not an ABI/API stability promise.
 
 ## Conceptual page integration
 
@@ -157,7 +239,7 @@ This preserves one authored relationship instead of maintaining separate human a
 
 ## Validation
 
-Web 7 validates that generated output contains the current key symbols for:
+Web 7.1 validates that generated output contains and explains the current key symbols for:
 
 - Runtime;
 - Resources;
@@ -168,7 +250,10 @@ Web 7 validates that generated output contains the current key symbols for:
 Validation also rejects accidental inclusion of:
 
 - the legacy `EditorControls` shell surface;
-- vendored `d3dx12` helper code.
+- vendored `d3dx12` helper code;
+- stable alias redirects whose Doxygen HTML target does not exist.
+
+The last rule matters after private/internal symbols are hidden: `index.xml` may still enumerate nested compounds that are not emitted as standalone HTML. Alias generation therefore only publishes an alias when the concrete Doxygen HTML target exists.
 
 ## Source precedence
 
@@ -185,7 +270,9 @@ The generated API cannot override a canonical architectural contract merely beca
 
 Gregory §1.7 supports reliable tooling and development pipelines as part of the engine ecosystem.
 
-The choice of Doxygen, HTML/XML publication, symbol aliases, extraction policy and conceptual-to-symbol metadata are **Design choice (not directly from the book)**.
+The explanations attached to the core APIs also follow the same book grounding as their canonical systems: Gregory §7.2.2 for resource management, §8.2 for the game loop, §11.2 for rendering-pipeline separation, §15.4 for the world editor, and §16.2/§16.5 for runtime object/component/reference concepts.
+
+The exact Doxygen presentation, Beginner Guide, wording template, XML coverage gate, hidden-private policy and symbol-alias behavior are **Design choice (not directly from the book)**.
 
 ## Related documentation
 
