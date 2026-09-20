@@ -22,6 +22,72 @@ function Assert-Contains {
     }
 }
 
+function Get-DescriptionText {
+    param($Node)
+
+    if ($null -eq $Node) {
+        return ""
+    }
+
+    $brief = ""
+    $detail = ""
+
+    if ($null -ne $Node.briefdescription) {
+        $brief = [string]$Node.briefdescription.InnerText
+    }
+    if ($null -ne $Node.detaileddescription) {
+        $detail = [string]$Node.detaileddescription.InnerText
+    }
+
+    return ($brief + " " + $detail).Trim()
+}
+
+function Assert-BeginnerDocumentedCompound {
+    param(
+        [string]$QualifiedName,
+        [switch]$RequireAllPublicFunctions
+    )
+
+    $entry = $symbolIndex.compounds |
+        Where-Object { [string]$_.name -eq $QualifiedName } |
+        Select-Object -First 1
+
+    if (-not $entry) {
+        throw "Missing API symbol '$QualifiedName' in symbol index."
+    }
+
+    $xmlPath = Join-Path $websiteRoot ("public\api-xml\" + [string]$entry.refid + ".xml")
+    if (-not (Test-Path -LiteralPath $xmlPath -PathType Leaf)) {
+        throw "Missing compound XML for '$QualifiedName': $xmlPath"
+    }
+
+    [xml]$compoundXml = Get-Content -LiteralPath $xmlPath -Raw
+    $compound = $compoundXml.doxygen.compounddef
+
+    $description = Get-DescriptionText $compound
+    if ([string]::IsNullOrWhiteSpace($description)) {
+        throw "Beginner API contract: '$QualifiedName' has no generated class/struct description."
+    }
+
+    if ($RequireAllPublicFunctions) {
+        $functions = @(
+            $compound.sectiondef.memberdef |
+            Where-Object {
+                [string]$_.kind -eq "function" -and
+                [string]$_.prot -eq "public"
+            }
+        )
+
+        foreach ($fn in $functions) {
+            $name = [string]$fn.name
+            $fnDescription = Get-DescriptionText $fn
+            if ([string]::IsNullOrWhiteSpace($fnDescription)) {
+                throw "Beginner API contract: '$QualifiedName::$name' has no generated public-function description."
+            }
+        }
+    }
+}
+
 Assert-File "public\api\index.html"
 Assert-File "public\api\nocturne.tag"
 Assert-File "public\api-xml\index.xml"
@@ -63,6 +129,38 @@ foreach ($required in @(
 Assert-Contains "public\api-xml\index.xml" "noc::ResourceManager"
 Assert-Contains "public\api-xml\index.xml" "noc::RenderSystem"
 
+# Web 7.1 beginner-oriented contract: these public surfaces must never regress
+# back to signature-only documentation.
+foreach ($compound in @(
+    "noc::Engine",
+    "noc::MainLoop",
+    "noc::VirtualFileSystem",
+    "noc::ResourceManager",
+    "noc::ResourceHandle",
+    "noc::EntityHandle",
+    "noc::EntityRegistry",
+    "noc::World",
+    "noc::RenderQueue",
+    "noc::RenderSystem",
+    "noc::Dx12Renderer",
+    "nocturne::editor::EditorShellV3",
+    "nocturne::editor::EditorViewportController",
+    "nocturne::editor::EditorTheme"
+)) {
+    Assert-BeginnerDocumentedCompound -QualifiedName $compound -RequireAllPublicFunctions
+}
+
+foreach ($component in @(
+    "noc::TransformComponent",
+    "noc::RenderableComponent",
+    "noc::CameraComponent",
+    "noc::NameComponent"
+)) {
+    Assert-BeginnerDocumentedCompound -QualifiedName $component
+}
+
+Assert-Contains "public\api\index.html" "Beginner Guide"
+
 if (Select-String -LiteralPath (Join-Path $websiteRoot "public\api-xml\index.xml") -SimpleMatch -Pattern "EditorControls" -Quiet) {
     throw "Legacy EditorControls unexpectedly entered the current API index."
 }
@@ -71,4 +169,4 @@ if (Select-String -LiteralPath (Join-Path $websiteRoot "public\api-xml\index.xml
     throw "Vendored d3dx12 helper unexpectedly entered the current API index."
 }
 
-Write-Host "Generated Nocturne C++ API validation passed."
+Write-Host "Generated Nocturne C++ API validation passed, including beginner documentation coverage."

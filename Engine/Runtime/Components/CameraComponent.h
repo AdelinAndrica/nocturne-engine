@@ -12,31 +12,60 @@ namespace noc
     inline constexpr const char* kCameraComponentCanonicalName =
         "Nocturne.Camera";
 
-    // Camera lens state plus derived matrix cache.
-    //
-    // Book grounding:
-    // - Luna, Introduction to 3D Game Programming with DirectX 12, Camera
-    //   chapter: camera position/basis and frustum properties are the essential
-    //   camera data, including FOV, aspect, near and far distances.
-    // - Lengyel, Foundations Vol. 2, Chapter 6: perspective projection depends
-    //   on vertical FOV, viewport aspect ratio, near distance and far distance.
-    //
-    // Design choice (not directly from the book): view/proj/viewProj are cached
-    // derived values. TransformComponent remains the authoritative spatial state.
+    /**
+     * @brief Camera lens state plus cached derived view/projection matrices.
+     *
+     * CameraComponent owns lens/projection parameters. Spatial position/orientation are
+     * not duplicated here; TransformComponent is authoritative for camera transform.
+     *
+     * @par Authored values
+     * @c fovYRadians, @c aspect, @c nearZ, @c farZ and @c enabled are camera state.
+     *
+     * @par Derived values
+     * @c view, @c proj and @c viewProj are rebuilt from lens + Transform state.
+     *
+     * @par Valid perspective
+     * World currently accepts perspective settings only when:
+     * - 0 < fovYRadians < pi
+     * - aspect > 0
+     * - nearZ > 0
+     * - farZ > nearZ
+     *
+     * @par Book grounding
+     * Camera/frustum/projection concepts are grounded in Frank Luna,
+     * Introduction to 3D Game Programming with DirectX 12, and Eric Lengyel,
+     * Foundations of Game Engine Development, Volume 2.
+     *
+     * @ingroup world_ecs
+     */
     struct CameraComponent
     {
-        float fovYRadians = 1.04719755f; // 60 degrees
+        /** Vertical field of view in radians. Default: 60 degrees. */
+        float fovYRadians = 1.04719755f;
+
+        /** Width / height aspect ratio. */
         float aspect = 16.0f / 9.0f;
+
+        /** Positive near clipping distance. */
         float nearZ = 0.1f;
+
+        /** Far clipping distance, greater than nearZ. */
         float farZ = 500.0f;
 
+        /** Camera-system enable state. */
         bool enabled = true;
 
+        /** Derived world-to-view matrix. */
         Mat4 view = Mat4::Identity();
+
+        /** Derived perspective projection matrix. */
         Mat4 proj = Mat4::Identity();
+
+        /** Derived combined projection * view matrix. */
         Mat4 viewProj = Mat4::Identity();
     };
 
+    /** @brief Returns canonical metadata for CameraComponent. */
     [[nodiscard]] constexpr ComponentTypeMetadata CameraComponentMetadata() noexcept
     {
         return MakeComponentTypeMetadata<CameraComponent>(

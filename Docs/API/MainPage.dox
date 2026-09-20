@@ -1,11 +1,29 @@
 /**
 @mainpage Nocturne Engine C++ API
 
+# Start here
+
+If you are learning Nocturne, open @ref api_beginner_guide before browsing the
+alphabetical class list.
+
+This API reference is intentionally written to explain **what a type does, when you
+should use it, when you should not use it, ownership/lifetime, threading assumptions
+and common call flow**.
+
+# Primary subsystem groups
+
+- @ref runtime
+- @ref world_ecs
+- @ref resources
+- @ref rendering
+- @ref editor
+
 # Purpose
 
-This site is the generated symbol reference for the current Nocturne Engine C++ header surface.
+This site is the generated C++ reference for the current Nocturne Engine header surface.
 
-Use the canonical Nocturne documentation for architecture, ownership, lifecycle, subsystem boundaries and design rationale.
+Use the canonical Nocturne documentation for the larger architecture, subsystem
+boundaries and design rationale:
 
 - Human documentation: `/docs/`
 - Machine knowledge manifest: `/knowledge/manifest.json`
@@ -21,17 +39,47 @@ For current behavior, use:
 3. completion/implementation reports as delivered-work evidence;
 4. historical Phase documents for chronology and earlier design context.
 
-The generated API is a structural reference. It does not override canonical architecture documentation.
+Doxygen is an explanatory symbol layer. It does not override canonical architecture
+documentation.
 
-# Current extraction policy
+# Extraction policy
 
-Web 7 documents the current Engine, NocturneEditor and NocturneHost header surfaces.
+The beginner-facing reference includes public/protected API surface from current
+Engine, NocturneEditor and NocturneHost headers.
 
-The following are deliberately excluded:
+Private class members are deliberately hidden from the primary reference so internal
+implementation details do not overwhelm the API you are expected to use.
+
+The following are also deliberately excluded:
 
 - `ThirdParty/`;
+- test directories;
 - `Engine/Render/DX12/d3dx12.h` because it is vendored DirectX helper code;
-- legacy `EditorShell.h` and `EditorControls.h`, because `EditorShellV3` is the current canonical editor shell.
+- legacy `EditorShell.h` and `EditorControls.h`, because `EditorShellV3` is the
+  current canonical editor shell.
 
-@note Design choice (not directly from the book): Doxygen is the generated C++ reference layer for Nocturne. The supplied engine books ground subsystem concepts and architecture, not this documentation tool choice.
+@note Design choice (not directly from the book): Doxygen is the generated C++
+reference layer and Web 7.1 makes the default view beginner-oriented. The supplied
+engine books ground subsystem concepts and architecture, not this documentation-tool
+choice.
 */
+
+/** @defgroup runtime Runtime
+ *  @brief Engine lifecycle, frame loop and boot configuration.
+ */
+
+/** @defgroup world_ecs World & ECS
+ *  @brief Runtime entity identity, components, hierarchy, camera and render extraction.
+ */
+
+/** @defgroup resources Resources
+ *  @brief Virtual file access, asynchronous resource loading and typed runtime resources.
+ */
+
+/** @defgroup rendering Rendering
+ *  @brief Renderer-facing frame data, high-level render facade and DX12 backend.
+ */
+
+/** @defgroup editor Editor
+ *  @brief Native editor shell, theme and editor-only viewport interaction.
+ */
