@@ -43,9 +43,16 @@ namespace noc
         /** @brief Destroys the registry after defensively calling Shutdown(). */
         ~EntityRegistry();
 
+        /** @brief Copy construction is disabled because registry slot storage has one owner. */
         EntityRegistry(const EntityRegistry&) = delete;
+
+        /** @brief Copy assignment is disabled because registry slot storage has one owner. */
         EntityRegistry& operator=(const EntityRegistry&) = delete;
+
+        /** @brief Move construction is disabled; registry identity/storage stays at a stable owner. */
         EntityRegistry(EntityRegistry&&) = delete;
+
+        /** @brief Move assignment is disabled; registry identity/storage stays at a stable owner. */
         EntityRegistry& operator=(EntityRegistry&&) = delete;
 
         /**

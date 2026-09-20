@@ -88,9 +88,16 @@ namespace noc
         /** @brief Destroys the World after defensively calling Shutdown(). */
         ~World();
 
+        /** @brief Copy construction is disabled because World uniquely owns ECS systems/state. */
         World(const World&) = delete;
+
+        /** @brief Copy assignment is disabled because World uniquely owns ECS systems/state. */
         World& operator=(const World&) = delete;
+
+        /** @brief Move construction is disabled to keep World-owned systems at a stable owner. */
         World(World&&) = delete;
+
+        /** @brief Move assignment is disabled to keep World-owned systems at a stable owner. */
         World& operator=(World&&) = delete;
 
         /**

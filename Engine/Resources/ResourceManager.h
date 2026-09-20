@@ -81,7 +81,15 @@ namespace noc
          */
         ~ResourceManager();
 
+        /**
+         * @brief Copy construction is disabled because the manager uniquely owns
+         * internal resource records, worker-completion state and Engine/VFS links.
+         */
         ResourceManager(const ResourceManager&) = delete;
+
+        /**
+         * @brief Copy assignment is disabled for the same unique-ownership reason.
+         */
         ResourceManager& operator=(const ResourceManager&) = delete;
 
         /**
