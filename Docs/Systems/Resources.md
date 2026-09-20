@@ -11,6 +11,7 @@ source_docs: ["Docs/nocturne_engine_architecture.md","Docs/Phase 4 — Resource 
 book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §7.2 The Resource Manager","Jason Gregory — Game Engine Architecture (3rd ed.), §7.2.2 Runtime Resource Management"]
 aliases: ["Resources","Resource Manager","VFS","Virtual File System"]
 deprecated_aliases: []
+api_symbols: ["noc::VirtualFileSystem","noc::ResourceManager","noc::ResourceHandle"]
 ---
 
 # Resources
