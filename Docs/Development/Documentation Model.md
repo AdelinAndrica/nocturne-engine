@@ -11,6 +11,7 @@ source_docs: ["Docs/nocturne_engine_architecture.md","Docs/Production Engineerin
 book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §1.7 Tools and the Asset Pipeline"]
 aliases: ["Documentation Model","Canonical Documentation","Docs Model"]
 deprecated_aliases: []
+api_symbols: ["noc::VirtualFileSystem","noc::ResourceManager","noc::ResourceHandle"]
 ---
 
 # Documentation Model
@@ -92,6 +93,7 @@ Required canonical identity fields:
 | `book_grounding` | book sections that ground concepts/terminology |
 | `aliases` | current alternate names useful to humans/search/AI |
 | `deprecated_aliases` | legacy names that must not be treated as the current canonical surface |
+| `api_symbols` | qualified C++ compound names that connect a conceptual canonical page to generated Doxygen symbols |
 
 System pages additionally declare:
 
@@ -296,6 +298,79 @@ CI regenerates knowledge and fails when tracked generated outputs differ from th
 Therefore a canonical `Docs/` change cannot silently leave repository-level AI exports stale.
 
 **Design choice (not directly from the book):** the knowledge manifest format, terminology format, `llms.txt`, canonical-only aggregate, raw/AI endpoints and stale-generation policy are Nocturne tooling decisions.
+
+## C++ API reference layer
+
+Web 7 adds a generated symbol/reference layer without changing the authored documentation authority.
+
+```text
+canonical Docs/*.md
+        |
+        +--> api_symbols metadata
+        |
+        v
+Website/scripts/prepare.mjs
+        |
+        +--> conceptual Starlight page
+        |      |
+        |      +--> generated "C++ API reference" links
+        |
+        +--> Knowledge/manifest.json
+               |
+               +--> apiSymbols[]
+
+current C++ headers
+        |
+        v
+Doxygen
+        |
+        +--> /api/            HTML reference
+        +--> /api-xml/        XML structure
+        +--> /api-symbols.json
+        +--> /api-symbol/<qualified.name>.html
+```
+
+The relationship is authored once through `api_symbols`.
+
+Example:
+
+```yaml
+api_symbols: ["noc::Engine","noc::MainLoop","noc::World"]
+```
+
+The synchronizer converts those names into stable alias routes such as:
+
+```text
+/api-symbol/noc.Engine.html
+/api-symbol/noc.MainLoop.html
+/api-symbol/noc.World.html
+```
+
+The Doxygen generation pipeline resolves each alias to the actual XML `refid` and generated HTML file.
+
+This means conceptual docs do not depend directly on Doxygen's internal filenames.
+
+### API source precedence
+
+The generated C++ API is structural implementation reference.
+
+It does not replace canonical documentation for:
+
+- subsystem ownership;
+- lifecycle;
+- dependency direction;
+- architectural rationale;
+- mechanism/policy boundaries.
+
+When conceptual prose and a current symbol surface appear to disagree, inspect the current implementation and update the canonical contract deliberately. Do not silently treat generated API presence as an architectural decision.
+
+### Extraction policy
+
+The current generated API includes Nocturne Engine, Editor and Host headers, including private/internal members useful to engine maintainers.
+
+Vendored/third-party and explicitly legacy surfaces are excluded.
+
+The exact Doxygen configuration, symbol-alias scheme and HTML/XML publication routes are **Design choice (not directly from the book)**.
 
 ## Search policy
 
