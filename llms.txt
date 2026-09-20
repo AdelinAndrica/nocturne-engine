@@ -14,6 +14,7 @@ Historical Phase documents must not override current canonical behavior.
 ## Canonical documentation
 
 - [Nocturne Engine — Architecture Overview](/docs/architecture/overview/) — Canonical layered/subsystem architecture, dependency direction, ownership and engine/application policy boundary. [noc.architecture.overview] — Source: Docs/nocturne_engine_architecture.md
+- [C++ API Reference](/docs/development/c-api-reference/) — Canonical contract for generated Nocturne C++ API documentation, symbol links and Doxygen XML tooling output. [noc.development.cpp-api] — Source: Docs/Development/C++ API Reference.md
 - [Nocturne Engine — Production Engineering Standard](/docs/development/production-engineering-standard/) — Canonical engineering quality, CI, validation and production-readiness standard for Nocturne Engine. [noc.development.production-standard] — Source: Docs/Production Engineering Standard.md
 - [Release Process](/docs/development/release-process/) — Canonical release packaging, artifact validation, manifest promotion and Downloads publication contract. [noc.development.release-process] — Source: Docs/Development/Release Process.md
 - [Documentation Model](/docs/development/documentation-model/) — Canonical source-of-truth, metadata, precedence and generated-documentation rules for Nocturne technical documentation. [noc.documentation.model] — Source: Docs/Development/Documentation Model.md
