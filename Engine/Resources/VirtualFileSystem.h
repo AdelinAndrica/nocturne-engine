@@ -48,6 +48,11 @@ namespace noc
     class VirtualFileSystem
     {
     public:
+        /**
+         * @brief Constructs an empty VFS with no mounted storage providers.
+         *
+         * Mounts are added explicitly through MountLooseDirectory()/MountArchive().
+         */
         VirtualFileSystem() = default;
 
         /** @brief Destroys the VFS and its owned mount objects. */

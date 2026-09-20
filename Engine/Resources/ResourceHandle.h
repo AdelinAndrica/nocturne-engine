@@ -36,11 +36,13 @@ namespace noc
          */
         constexpr bool IsValid() const { return index != 0xFFFFFFFFu; }
 
+        /** @brief Compares resource identity (index and generation). */
         friend constexpr bool operator==(ResourceHandle a, ResourceHandle b)
         {
             return a.index == b.index && a.generation == b.generation;
         }
 
+        /** @brief Returns true when resource identity differs. */
         friend constexpr bool operator!=(ResourceHandle a, ResourceHandle b)
         {
             return !(a == b);

@@ -70,7 +70,15 @@ namespace noc
     class ResourceManager
     {
     public:
+        /** @brief Constructs an uninitialized resource manager. Call Init() before use. */
         ResourceManager() = default;
+
+        /**
+         * @brief Destroys the manager after defensively calling Shutdown().
+         *
+         * Normal Engine shutdown should still call Shutdown() explicitly to preserve
+         * deterministic subsystem ordering.
+         */
         ~ResourceManager();
 
         ResourceManager(const ResourceManager&) = delete;

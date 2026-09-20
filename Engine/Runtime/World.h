@@ -82,7 +82,10 @@ namespace noc
     class World
     {
     public:
+        /** @brief Constructs an uninitialized World. Call Init() before entity/component use. */
         World() = default;
+
+        /** @brief Destroys the World after defensively calling Shutdown(). */
         ~World();
 
         World(const World&) = delete;

@@ -37,7 +37,10 @@ namespace noc
     class EntityRegistry
     {
     public:
+        /** @brief Constructs an uninitialized registry with no slot storage. */
         EntityRegistry() = default;
+
+        /** @brief Destroys the registry after defensively calling Shutdown(). */
         ~EntityRegistry();
 
         EntityRegistry(const EntityRegistry&) = delete;

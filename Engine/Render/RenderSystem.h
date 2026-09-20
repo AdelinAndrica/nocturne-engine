@@ -45,6 +45,7 @@ namespace noc
     class RenderSystem
     {
     public:
+        /** @brief Constructs an uninitialized render facade with no backend Impl. */
         RenderSystem() = default;
 
         /**
