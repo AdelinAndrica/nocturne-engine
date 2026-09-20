@@ -1,5 +1,6 @@
 #include "../../NocturneEditor/EditorCommands.h"
 
+#include "Assets/RuntimeFormats/MeshBlob.h"
 #include "Core/Log.h"
 #include "Core/Memory/Allocator.h"
 #include "Runtime/Components/LightComponent.h"
@@ -12,6 +13,11 @@
 #include "Runtime/World.h"
 
 #include <cmath>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <string>
+#include <vector>
 
 namespace
 {
@@ -307,6 +313,196 @@ bool RunPhase16LightTests()
     NOC_LOG_INFO(
         "Phase16Light",
         "Light foundation tests %s",
+        ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+
+bool RunPhase16PrimitiveAssetTests()
+{
+    NOC_LOG_INFO(
+        "Phase16Primitive",
+        "%s",
+        "Built-in primitive asset tests begin");
+
+    namespace fs = std::filesystem;
+
+#ifndef NOC_CONTENT_ROOT
+#define NOC_CONTENT_ROOT "Data"
+#endif
+
+    struct PrimitiveExpectation
+    {
+        const char* relativePath;
+        uint32_t vertexCount;
+        uint32_t indexCount;
+        noc::Vec3 expectedMin;
+        noc::Vec3 expectedMax;
+    };
+
+    const PrimitiveExpectation expectations[] = {
+        {
+            "Meshes/Primitives/plane.nmsh",
+            4u,
+            6u,
+            { -1.0f, 0.0f, -1.0f },
+            { 1.0f, 0.0f, 1.0f }
+        },
+        {
+            "Meshes/Primitives/cube.nmsh",
+            24u,
+            36u,
+            { -1.0f, -1.0f, -1.0f },
+            { 1.0f, 1.0f, 1.0f }
+        },
+        {
+            "Meshes/Primitives/sphere.nmsh",
+            561u,
+            2880u,
+            { -1.0f, -1.0f, -1.0f },
+            { 1.0f, 1.0f, 1.0f }
+        },
+        {
+            "Meshes/Primitives/cylinder.nmsh",
+            134u,
+            384u,
+            { -1.0f, -1.0f, -1.0f },
+            { 1.0f, 1.0f, 1.0f }
+        }
+    };
+
+    bool ok = true;
+    constexpr float kBoundsEpsilon = 1.0e-4f;
+
+    for (const PrimitiveExpectation& expected : expectations)
+    {
+        const fs::path path =
+            fs::path(NOC_CONTENT_ROOT)
+            / fs::path(expected.relativePath);
+
+        std::ifstream stream(path, std::ios::binary);
+        if (!stream)
+        {
+            NOC_LOG_ERROR(
+                "Phase16Primitive",
+                "Failed to open built-in primitive '%s'",
+                expected.relativePath);
+            ok = false;
+            continue;
+        }
+
+        std::vector<uint8_t> bytes{
+            std::istreambuf_iterator<char>(stream),
+            std::istreambuf_iterator<char>()
+        };
+
+        noc::IntermediateMesh mesh;
+        std::string error;
+        if (!noc::ReadMeshBlob(
+                bytes.data(),
+                bytes.size(),
+                &mesh,
+                &error))
+        {
+            NOC_LOG_ERROR(
+                "Phase16Primitive",
+                "Failed to decode built-in primitive '%s': %s",
+                expected.relativePath,
+                error.c_str());
+            ok = false;
+            continue;
+        }
+
+        const uint32_t vertexCount =
+            static_cast<uint32_t>(
+                mesh.positions.size() / 3u);
+        const uint32_t indexCount =
+            static_cast<uint32_t>(
+                mesh.indices.size());
+
+        ok &= CheckLight(
+            vertexCount == expected.vertexCount,
+            "Primitive vertex-count regression");
+        ok &= CheckLight(
+            indexCount == expected.indexCount,
+            "Primitive index-count regression");
+        ok &= CheckLight(
+            mesh.normals.size()
+                == static_cast<size_t>(vertexCount) * 3u,
+            "Primitive normals missing");
+        ok &= CheckLight(
+            mesh.tangents.size()
+                == static_cast<size_t>(vertexCount) * 4u,
+            "Primitive tangents missing");
+        ok &= CheckLight(
+            mesh.uvs.size()
+                == static_cast<size_t>(vertexCount) * 2u,
+            "Primitive UVs missing");
+        ok &= CheckLight(
+            mesh.submeshes.size() == 1u,
+            "Primitive must contain one submesh");
+
+        if (vertexCount == 0u)
+            continue;
+
+        noc::Vec3 minimum{
+            mesh.positions[0],
+            mesh.positions[1],
+            mesh.positions[2]
+        };
+        noc::Vec3 maximum = minimum;
+
+        bool finite = true;
+        for (uint32_t vertex = 0;
+             vertex < vertexCount;
+             ++vertex)
+        {
+            const noc::Vec3 p{
+                mesh.positions[vertex * 3u + 0u],
+                mesh.positions[vertex * 3u + 1u],
+                mesh.positions[vertex * 3u + 2u]
+            };
+            finite = finite
+                && std::isfinite(p.x)
+                && std::isfinite(p.y)
+                && std::isfinite(p.z);
+            minimum.x = (std::min)(minimum.x, p.x);
+            minimum.y = (std::min)(minimum.y, p.y);
+            minimum.z = (std::min)(minimum.z, p.z);
+            maximum.x = (std::max)(maximum.x, p.x);
+            maximum.y = (std::max)(maximum.y, p.y);
+            maximum.z = (std::max)(maximum.z, p.z);
+        }
+
+        ok &= CheckLight(
+            finite,
+            "Primitive contains non-finite positions");
+        ok &= CheckLight(
+            std::fabs(minimum.x - expected.expectedMin.x)
+                    <= kBoundsEpsilon
+                && std::fabs(minimum.y - expected.expectedMin.y)
+                    <= kBoundsEpsilon
+                && std::fabs(minimum.z - expected.expectedMin.z)
+                    <= kBoundsEpsilon
+                && std::fabs(maximum.x - expected.expectedMax.x)
+                    <= kBoundsEpsilon
+                && std::fabs(maximum.y - expected.expectedMax.y)
+                    <= kBoundsEpsilon
+                && std::fabs(maximum.z - expected.expectedMax.z)
+                    <= kBoundsEpsilon,
+            "Primitive bounds regression");
+
+        bool indicesValid = true;
+        for (const uint32_t index : mesh.indices)
+            indicesValid = indicesValid && index < vertexCount;
+        ok &= CheckLight(
+            indicesValid,
+            "Primitive contains out-of-range indices");
+    }
+
+    NOC_LOG_INFO(
+        "Phase16Primitive",
+        "Built-in primitive asset tests %s",
         ok ? "PASS" : "FAIL");
     return ok;
 }
