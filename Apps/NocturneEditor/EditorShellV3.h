@@ -16,8 +16,12 @@
 #include "EditorInspectorModel.h"
 #include "Runtime/Entity.h"
 
-namespace noc { class Engine; }
-namespace nocturne::editor { class EditorSession; }
+namespace noc { class Engine; struct AABB; }
+namespace nocturne::editor
+{
+    class EditorSession;
+    enum class EditorEntityCreateKind : uint8_t;
+}
 
 namespace nocturne::editor
 {
@@ -104,6 +108,15 @@ namespace nocturne::editor
             IdMenuHelp,
 
             IdActorCreate = 9101,
+            IdActorCreateStaticMesh,
+            IdActorCreateCamera,
+            IdActorCreateDirectionalLight,
+            IdActorCreatePointLight,
+            IdActorCreateSpotLight,
+            IdActorCreatePlane,
+            IdActorCreateCube,
+            IdActorCreateSphere,
+            IdActorCreateCylinder,
             IdActorDuplicate,
             IdActorDelete,
             IdActorRename,
@@ -177,6 +190,13 @@ namespace nocturne::editor
         [[nodiscard]] bool RequestEditorExit_();
 
         [[nodiscard]] bool ExecuteCreateEntity_(
+            noc::EntityHandle parent =
+                noc::EntityHandle::Invalid());
+        [[nodiscard]] bool ExecuteCreatePreset_(
+            EditorEntityCreateKind kind,
+            const char* name,
+            const char* meshVirtualPath,
+            const noc::AABB& localBounds,
             noc::EntityHandle parent =
                 noc::EntityHandle::Invalid());
         [[nodiscard]] bool ExecuteDeleteSelection_();
