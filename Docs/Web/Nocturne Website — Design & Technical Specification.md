@@ -14,7 +14,7 @@
 >
 > **Primary architectural source:** Jason Gregory, *Game Engine Architecture (3rd Edition)*
 >
-> **Web implementation status:** Web 7 C++ API Reference implemented on `web-docs-foundation`; repository-owned Doxygen now generates human HTML, tooling XML, stable qualified-name symbol aliases and conceptual-doc → C++ symbol links. Web 6 canonical AI knowledge and Web 5 artifact-driven Downloads remain intact.
+> **Web implementation status:** Web 8 CI, Deployment and Quality Gates implemented on `web-docs-foundation`; complete static-output validation now covers links, privacy/secrets, performance budgets, keyboard/accessibility and responsive browser behavior, with a guarded root-hosted GitHub Pages deployment workflow and reviewed release→Downloads manifest automation. No public deployment or fake release has been performed.
 
 ---
 
@@ -1243,14 +1243,24 @@ Validated extraction currently covers **97 Nocturne headers** and indexes **147 
 
 Scope:
 
-- web build in CI;
-- link validation;
-- schema validation;
-- stale generated-doc detection;
-- accessibility baseline;
-- performance baseline;
-- static deployment target;
-- release-page artifact integration.
+- [x] independent hosted web-quality workflow;
+- [x] full static-site build including Doxygen API;
+- [x] broken internal-link validation;
+- [x] static-output privacy / credential / local-path audit;
+- [x] deterministic route performance budgets;
+- [x] stale generated-doc detection;
+- [x] keyboard/focus accessibility baseline;
+- [x] mobile/tablet/desktop responsive browser baseline;
+- [x] production `site` support plus generated sitemap/robots;
+- [x] guarded root-hosted deployment target;
+- [x] GitHub Pages custom-workflow implementation;
+- [x] release-page artifact integration through a reviewed manifest PR;
+- [x] no automatic release-manifest merge;
+- [x] no fake public release.
+
+**Status:** COMPLETE for repository implementation. See `Docs/Web/Nocturne Website — Web 8 Implementation Report.md`.
+
+Public deployment remains intentionally **inactive** until a real root-hosted production URL/custom domain is configured. The current website uses absolute root routes and Web 8 refuses project-subpath deployment instead of silently publishing broken navigation.
 
 ---
 
@@ -1273,10 +1283,10 @@ Before the Website track can be treated as a durable product surface:
 - [x] Release metadata validates against a schema.
 - [x] AI entry points identify canonical versus historical sources.
 - [x] Generated C++ API HTML/XML exists and canonical conceptual pages link to validated symbols.
-- [ ] No private credentials/paths appear in static output.
-- [ ] Keyboard navigation and focus states are functional.
-- [ ] Responsive docs remain readable at narrow widths.
-- [ ] Broken internal docs links fail validation.
+- [x] No private credentials/paths appear in static output.
+- [x] Keyboard navigation and focus states are functional.
+- [x] Responsive docs remain readable at narrow widths.
+- [x] Broken internal docs links fail validation.
 - [x] Build output is static and deployable without a permanent application server.
 
 ---
@@ -1324,19 +1334,19 @@ All twelve items above are **Design choice (not directly from the book)** except
 
 ## 23. Next implementation handoff
 
-Start Web 8 with:
+The Website track is complete through Web 8.
 
-> Implement **Web 8 — CI, Deployment and Quality Gates** on branch `web-docs-foundation` on top of the validated Web 7 API reference, Web 6 AI knowledge layer and Web 5 release/download contract. Consolidate the website's production gates: broken internal-link validation, static-output privacy/secret/path auditing, automated accessibility baseline, responsive-browser checks, performance budget, production `site`/sitemap configuration, static deployment target and final release-page artifact integration. Preserve the current Nocturne visual/product contract, canonical-vs-history precedence and artifact honesty. Do not publish a fake engine release, do not make Website an engine/runtime dependency, and do not merge draft PR #2 automatically.
+Return to the engine roadmap with:
+
+> Continue with **Phase 16 — Editor Scene Editing** on the engine implementation branch. First read all existing Phase files, with special attention to the Phase 15 completion/validation reports and every existing Phase 16 architecture, handoff and implementation-checklist document. Preserve the production-engineering standard, current `EditorShellV3`, the Phase 15 World/ECS contracts and the validated Website/Docs canonical source-precedence model. Do not treat Website tooling as an engine/runtime dependency.
 
 Bring:
 
-- this specification;
-- `Docs/Web/Nocturne Website — Web 7 Implementation Report.md`;
-- `Docs/Development/Documentation Model.md`;
-- `Docs/Development/C++ API Reference.md`;
-- `Docs/Development/Release Process.md`;
-- current Website / API Docs / Windows / Release workflows;
-- current `Website/dist` route contract;
-- current `Knowledge/`, `Schemas/` and Doxygen outputs;
-- `Docs/Production Engineering Standard.md`.
+- `Docs/Production Engineering Standard.md`;
+- Phase 15 completion and CI validation reports;
+- all Phase 16 handoff / architecture / implementation-checklist documents;
+- canonical `Docs/Systems/World & ECS.md`;
+- canonical `Docs/Systems/Editor.md`;
+- current Phase 16 source state;
+- the provided engine architecture books.
 

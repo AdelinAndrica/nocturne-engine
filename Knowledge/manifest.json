@@ -396,6 +396,46 @@
       ]
     },
     {
+      "id": "noc.web.quality",
+      "title": "Website Quality & Deployment",
+      "docType": "standard",
+      "canonical": true,
+      "status": "active",
+      "subsystem": "Website",
+      "phaseIntroduced": 16,
+      "sourcePath": "Docs/Development/Website Quality & Deployment.md",
+      "webPath": "/docs/development/website-quality-deployment/",
+      "rawPath": "/raw/noc.web.quality.md",
+      "aiPath": "/ai/noc.web.quality.md",
+      "description": "Canonical build-quality, privacy, browser validation, deployment and release-to-Downloads publication contract for the Nocturne website.",
+      "sourceFiles": [
+        "Website/scripts/validate-static.mjs",
+        "Website/scripts/browser-quality.mjs",
+        "Website/scripts/postbuild.mjs",
+        "Website/scripts/validate-deployment-target.mjs",
+        ".github/workflows/web-quality.yml",
+        ".github/workflows/web-deploy.yml",
+        ".github/workflows/release-package.yml"
+      ],
+      "sourceDocs": [
+        "Docs/Web/Nocturne Website — Design & Technical Specification.md",
+        "Docs/Development/Documentation Model.md",
+        "Docs/Development/Release Process.md",
+        "Docs/Development/C++ API Reference.md"
+      ],
+      "bookGrounding": [
+        "Jason Gregory — Game Engine Architecture (3rd ed.), §1.7 Tools and the Asset Pipeline"
+      ],
+      "aliases": [
+        "Website Quality",
+        "Web Quality Gates",
+        "Website Deployment",
+        "Web Deployment"
+      ],
+      "deprecatedAliases": [],
+      "apiSymbols": []
+    },
+    {
       "id": "noc.web.spec",
       "title": "Nocturne Website — Design & Technical Specification",
       "docType": "web-spec",

@@ -106,6 +106,18 @@
       "deprecatedAliases": []
     },
     {
+      "term": "Website Quality & Deployment",
+      "documentId": "noc.web.quality",
+      "definition": "Canonical build-quality, privacy, browser validation, deployment and release-to-Downloads publication contract for the Nocturne website.",
+      "aliases": [
+        "Website Quality",
+        "Web Quality Gates",
+        "Website Deployment",
+        "Web Deployment"
+      ],
+      "deprecatedAliases": []
+    },
+    {
       "term": "Nocturne Website — Design & Technical Specification",
       "documentId": "noc.web.spec",
       "definition": "Canonical product and technical specification for the Nocturne Engine website and documentation surface.",

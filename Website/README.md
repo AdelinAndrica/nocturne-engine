@@ -173,3 +173,76 @@ Generated API files under `Website/public/api*` are ignored by Git and recreated
 Canonical conceptual pages author `api_symbols` in repository-root `Docs/`; the website generator turns those names into stable `/api-symbol/` links and exposes the same relationships through `Knowledge/manifest.json`.
 
 The Doxygen layer is structural/source reference. It does not replace canonical Architecture/System/Development documentation.
+
+
+## Web quality gates
+
+The repository-owned quality workflow builds the complete website, including Doxygen, then validates links, privacy, static performance and rendered-browser behavior.
+
+Local static checks:
+
+```powershell
+cd Website
+npm run api
+$env:NOCTURNE_SITE_URL="https://your-root-host.example"
+npm run build
+npm run validate:api
+npm run validate:static -- --require-api --require-sitemap
+```
+
+Browser baseline:
+
+```powershell
+npm install --no-save --package-lock=false playwright@1.63.0
+npx playwright install chromium
+npm run serve:dist
+```
+
+In a second shell:
+
+```powershell
+cd Website
+$env:NOCTURNE_PREVIEW_URL="http://127.0.0.1:4322"
+npm run validate:browser
+```
+
+The browser package is installed temporarily and does not modify the committed website dependency contract.
+
+## Production deployment
+
+Production deployment is intentionally guarded.
+
+The current website uses root-absolute routes, so the deployment target must be a root-hosted HTTPS origin.
+
+Validate a candidate URL:
+
+```powershell
+cd Website
+npm run validate:deploy-target -- "https://your-real-production-domain.example"
+```
+
+The GitHub Pages workflow is:
+
+`.github/workflows/web-deploy.yml`
+
+Before activating it:
+
+1. configure a real root-hosted custom domain for GitHub Pages;
+2. set repository variable `NOCTURNE_SITE_URL` to that HTTPS origin;
+3. use the protected `github-pages` environment.
+
+Do not use the default project subpath without first refactoring the site's absolute-route contract.
+
+## Release to Downloads publication
+
+A real version tag now continues past GitHub Release publication into a reviewed website-manifest flow.
+
+The tag-only `Prepare Downloads manifest PR` job:
+
+- downloads validated architecture release records;
+- promotes them into a candidate `releases.json`;
+- validates and builds Downloads;
+- uploads the candidate manifest;
+- opens/updates a PR against `master`.
+
+It never auto-merges the Downloads manifest.

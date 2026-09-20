@@ -52,6 +52,7 @@ export default defineConfig({
             { slug: 'docs/development/c-api-reference', label: 'C++ API Reference' },
             { slug: 'docs/development/production-engineering-standard' },
             { slug: 'docs/development/release-process' },
+            { slug: 'docs/development/website-quality-deployment', label: 'Website Quality & Deployment' },
             { slug: 'docs/development/website-specification' }
           ]
         },

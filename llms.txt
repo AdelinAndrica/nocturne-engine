@@ -22,6 +22,7 @@ Historical Phase documents must not override current canonical behavior.
 - [Rendering](/docs/systems/rendering/) — Canonical renderer ownership, frame handoff, DirectX 12 backend and editor render-target integration contract. [noc.render] — Source: Docs/Systems/Rendering.md
 - [Resources](/docs/systems/resources/) — Canonical virtual file system, resource loading, typed resource and runtime asset-lifetime contract. [noc.resources] — Source: Docs/Systems/Resources.md
 - [Runtime](/docs/systems/runtime/) — Canonical runtime ownership, lifecycle, frame execution, configuration and subsystem orchestration contract. [noc.runtime] — Source: Docs/Systems/Runtime.md
+- [Website Quality & Deployment](/docs/development/website-quality-deployment/) — Canonical build-quality, privacy, browser validation, deployment and release-to-Downloads publication contract for the Nocturne website. [noc.web.quality] — Source: Docs/Development/Website Quality & Deployment.md
 - [Nocturne Website — Design & Technical Specification](/docs/development/website-specification/) — Canonical product and technical specification for the Nocturne Engine website and documentation surface. [noc.web.spec] — Source: Docs/Web/Nocturne Website — Design & Technical Specification.md
 - [World & ECS](/docs/systems/world-ecs/) — Canonical runtime entity identity, component ownership, transform hierarchy, camera and render-extraction contract. [noc.world] — Source: Docs/Systems/World & ECS.md
 
