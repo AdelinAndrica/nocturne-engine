@@ -27,7 +27,8 @@ const nocturneDocMetadata = z.object({
   source_docs: z.array(z.string().min(1)).optional(),
   book_grounding: z.array(z.string().min(1)).optional(),
   aliases: z.array(z.string().min(1)).optional(),
-  deprecated_aliases: z.array(z.string().min(1)).optional()
+  deprecated_aliases: z.array(z.string().min(1)).optional(),
+  api_symbols: z.array(z.string().min(1)).optional()
 });
 
 export const collections = {
