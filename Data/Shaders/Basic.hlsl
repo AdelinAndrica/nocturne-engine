@@ -43,11 +43,20 @@ struct InstanceData
 // t0: per-instance transforms
 StructuredBuffer<InstanceData> gInstances : register(t0);
 
+// b1: index of the first StructuredBuffer instance consumed by this draw.
+// A root constant is used because StartInstanceLocation does not offset a
+// manually indexed StructuredBuffer.
+cbuffer PerDraw : register(b1)
+{
+    uint gInstanceBase;
+};
+
 VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
 {
     VSOut o;
 
-    InstanceData instanceData = gInstances[instanceId];
+    InstanceData instanceData =
+        gInstances[gInstanceBase + instanceId];
     float4 worldPosition =
         mul(instanceData.world, float4(input.pos, 1.0));
 
