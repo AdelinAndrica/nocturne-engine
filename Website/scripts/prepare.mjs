@@ -130,6 +130,13 @@ function parseSourceDocument(markdown, relativeSource) {
   };
 }
 
+function sanitizeHistoricalPublicContent(markdown) {
+  return markdown
+    .replace(/\b[A-Za-z]:[\\/]Projects[\\/]Nocturne\b/gi, '<repo>')
+    .replace(/\b[A-Za-z]:[\\/]Users[\\/][A-Za-z0-9._ -]+/g, '<user-home>')
+    .replace(/\/(?:home|Users)\/[A-Za-z0-9._-]+/g, '<user-home>');
+}
+
 function extractTitle(markdown, fallback) {
   const match = markdown.match(/^#\s+(.+)$/m);
   return match ? match[1].trim() : fallback;
@@ -676,7 +683,10 @@ async function syncDocs() {
     }
 
     const target = path.join(contentRoot, relativeTarget);
-    const body = removeFirstH1(sourceDoc.body).trimStart();
+    const publicSourceBody = historical
+      ? sanitizeHistoricalPublicContent(sourceDoc.body)
+      : sourceDoc.body;
+    const body = removeFirstH1(publicSourceBody).trimStart();
     const sourceNote = historical
       ? '> **Historical record.** For current behavior, prefer canonical Architecture and System documentation.\n\n'
       : '';

@@ -1,7 +1,10 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
+const site = process.env.NOCTURNE_SITE_URL?.trim();
+
 export default defineConfig({
+  ...(site ? { site } : {}),
   output: 'static',
   integrations: [
     starlight({

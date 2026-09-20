@@ -182,3 +182,89 @@ jobs:
           
           & gh @ghArgs
           exit $LASTEXITCODE
+
+  website-manifest:
+    name: Prepare Downloads manifest PR
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - package
+      - publish
+    runs-on: windows-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout website source branch
+        uses: actions/checkout@v7
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Configure Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Website/package-lock.json
+
+      - name: Download published release records
+        uses: actions/download-artifact@v5
+        with:
+          pattern: nocturne-release-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Promote release records into a reviewed manifest candidate
+        working-directory: Website
+        shell: pwsh
+        run: |
+          npm ci --no-audit --no-fund
+          npm run promote:release -- ../release-assets/release-record-x86_64.json ../release-assets/release-record-x86.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run validate:releases
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload promoted manifest evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: nocturne-website-manifest-${{ github.ref_name }}
+          path: Website/src/data/releases.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Open or update Downloads manifest pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $branch = "release-manifest/$env:GITHUB_REF_NAME"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c $branch
+          git add Website/src/data/releases.json
+
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Release manifest already contains $env:GITHUB_REF_NAME; no PR change required."
+            exit 0
+          }
+
+          git commit -m "web(release): publish $env:GITHUB_REF_NAME in Downloads"
+          git push --force-with-lease origin "HEAD:$branch"
+
+          $existing = gh pr list --repo $env:GITHUB_REPOSITORY --base master --head $branch --state open --json number --jq '.[0].number'
+          if ($existing) {
+            Write-Host "Downloads manifest PR #$existing already exists and branch was updated."
+            exit 0
+          }
+
+          gh pr create `
+            --repo $env:GITHUB_REPOSITORY `
+            --base master `
+            --head $branch `
+            --title "web(release): publish $env:GITHUB_REF_NAME in Downloads" `
+            --body "Promotes the validated release records produced and published by Nocturne Release Packaging. Review before merge; this workflow never auto-merges the Downloads manifest."

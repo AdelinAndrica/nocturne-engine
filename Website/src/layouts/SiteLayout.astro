@@ -8,6 +8,7 @@ interface Props {
 
 const { title, description } = Astro.props;
 const pathname = Astro.url.pathname;
+const canonicalUrl = Astro.site ? new URL(pathname, Astro.site) : undefined;
 const isActive = (href: string) =>
   href === '/' ? pathname === '/' : pathname.startsWith(href);
 ---
@@ -20,6 +21,7 @@ const isActive = (href: string) =>
     <meta name="description" content={description} />
     <meta name="theme-color" content="#0A0F16" />
     <meta name="color-scheme" content="dark" />
+    {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
     <title>{title}</title>
   </head>
   <body>

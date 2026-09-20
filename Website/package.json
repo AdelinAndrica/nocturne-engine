@@ -19,7 +19,12 @@
     "validate:knowledge": "node scripts/validate-knowledge.mjs",
     "api": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-api.ps1",
     "validate:api": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/validate-api.ps1",
-    "build:api": "npm run api && npm run build && npm run validate:api"
+    "build:api": "npm run api && npm run build && npm run validate:api",
+    "postbuild": "node scripts/postbuild.mjs",
+    "validate:static": "node scripts/validate-static.mjs",
+    "serve:dist": "node scripts/serve-static.mjs",
+    "validate:browser": "node scripts/browser-quality.mjs",
+    "validate:deploy-target": "node scripts/validate-deployment-target.mjs"
   },
   "dependencies": {
     "@astrojs/starlight": "0.42.2",

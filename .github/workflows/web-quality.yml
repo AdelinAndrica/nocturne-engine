@@ -1,0 +1,142 @@
+name: Nocturne Web Quality
+
+on:
+  push:
+    paths:
+      - "Website/**"
+      - "Design/**"
+      - "Docs/**"
+      - "Engine/Assets/AssetImportPipeline.cpp"
+      - "Knowledge/**"
+      - "Schemas/**"
+      - "llms.txt"
+      - "llms-full.txt"
+      - ".github/workflows/web-quality.yml"
+  pull_request:
+    paths:
+      - "Website/**"
+      - "Design/**"
+      - "Docs/**"
+      - "Engine/Assets/AssetImportPipeline.cpp"
+      - "Knowledge/**"
+      - "Schemas/**"
+      - "llms.txt"
+      - "llms-full.txt"
+      - ".github/workflows/web-quality.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Static + Browser Quality
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      NOCTURNE_SITE_URL: https://nocturne.test.invalid/
+      NOCTURNE_PREVIEW_URL: http://127.0.0.1:4322
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Configure Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Website/package-lock.json
+
+      - name: Install Doxygen
+        shell: pwsh
+        run: |
+          $command = Get-Command doxygen -ErrorAction SilentlyContinue
+          if (-not $command) {
+            choco install doxygen.install --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" +
+                        [System.Environment]::GetEnvironmentVariable("Path", "User")
+          }
+          doxygen --version
+
+      - name: Install website dependencies
+        working-directory: Website
+        shell: pwsh
+        run: |
+          npm ci --no-audit --no-fund
+          npm install --no-save --package-lock=false playwright@1.63.0
+          npx playwright install chromium
+
+      - name: Generate C++ API
+        working-directory: Website
+        shell: pwsh
+        run: npm run api
+
+      - name: Build complete static site
+        working-directory: Website
+        shell: pwsh
+        run: npm run build
+
+      - name: Validate generated C++ API
+        working-directory: Website
+        shell: pwsh
+        run: npm run validate:api
+
+      - name: Validate links, privacy and performance budgets
+        working-directory: Website
+        shell: pwsh
+        run: npm run validate:static -- --require-api --require-sitemap
+
+      - name: Verify generated knowledge remains committed
+        shell: pwsh
+        run: |
+          git diff --exit-code -- Knowledge llms.txt llms-full.txt
+          if ($LASTEXITCODE -ne 0) {
+            throw "Generated canonical knowledge is stale."
+          }
+
+      - name: Run browser accessibility and responsive baseline
+        working-directory: Website
+        shell: pwsh
+        run: |
+          $server = Start-Process -FilePath "node" -ArgumentList "scripts/serve-static.mjs" -PassThru -WorkingDirectory (Get-Location)
+          try {
+            $ready = $false
+            for ($attempt = 0; $attempt -lt 30; ++$attempt) {
+              try {
+                $response = Invoke-WebRequest -Uri "$env:NOCTURNE_PREVIEW_URL/" -UseBasicParsing -TimeoutSec 2
+                if ($response.StatusCode -eq 200) {
+                  $ready = $true
+                  break
+                }
+              }
+              catch {
+                Start-Sleep -Milliseconds 500
+              }
+            }
+            if (-not $ready) { throw "Static preview server did not become ready." }
+            npm run validate:browser
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          finally {
+            if ($server -and -not $server.HasExited) {
+              Stop-Process -Id $server.Id -Force
+            }
+          }
+
+      - name: Upload quality evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: nocturne-web-quality
+          path: |
+            Website/dist/quality-report.json
+            Website/dist/browser-quality-report.json
+            Website/dist/sitemap.xml
+            Website/dist/robots.txt
+            Website/dist/api-build.json
+          if-no-files-found: error
+          retention-days: 14

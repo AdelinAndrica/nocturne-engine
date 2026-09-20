@@ -1,0 +1,136 @@
+name: Deploy Nocturne Website
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "Website/**"
+      - "Design/**"
+      - "Docs/**"
+      - "Knowledge/**"
+      - "Schemas/**"
+      - "llms.txt"
+      - "llms-full.txt"
+      - ".github/workflows/web-deploy.yml"
+  workflow_dispatch:
+    inputs:
+      site_url:
+        description: "Root-hosted public HTTPS URL configured for GitHub Pages/custom domain"
+        required: true
+        type: string
+
+concurrency:
+  group: nocturne-pages-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    name: Production static artifact
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.NOCTURNE_SITE_URL != '' }}
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      NOCTURNE_SITE_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.site_url || vars.NOCTURNE_SITE_URL }}
+      NOCTURNE_PREVIEW_URL: http://127.0.0.1:4322
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Configure Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Website/package-lock.json
+
+      - name: Validate deployment target
+        working-directory: Website
+        shell: pwsh
+        run: npm run validate:deploy-target -- "$env:NOCTURNE_SITE_URL"
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Install Doxygen
+        shell: pwsh
+        run: |
+          $command = Get-Command doxygen -ErrorAction SilentlyContinue
+          if (-not $command) {
+            choco install doxygen.install --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" +
+                        [System.Environment]::GetEnvironmentVariable("Path", "User")
+          }
+          doxygen --version
+
+      - name: Install website and browser tooling
+        working-directory: Website
+        shell: pwsh
+        run: |
+          npm ci --no-audit --no-fund
+          npm install --no-save --package-lock=false playwright@1.63.0
+          npx playwright install chromium
+
+      - name: Generate C++ API and production site
+        working-directory: Website
+        shell: pwsh
+        run: |
+          npm run api
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run validate:api
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run validate:static -- --require-api --require-sitemap
+
+      - name: Run production browser baseline
+        working-directory: Website
+        shell: pwsh
+        run: |
+          $server = Start-Process -FilePath "node" -ArgumentList "scripts/serve-static.mjs" -PassThru -WorkingDirectory (Get-Location)
+          try {
+            for ($attempt = 0; $attempt -lt 30; ++$attempt) {
+              try {
+                $response = Invoke-WebRequest -Uri "$env:NOCTURNE_PREVIEW_URL/" -UseBasicParsing -TimeoutSec 2
+                if ($response.StatusCode -eq 200) { break }
+              }
+              catch { Start-Sleep -Milliseconds 500 }
+            }
+            npm run validate:browser
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          finally {
+            if ($server -and -not $server.HasExited) {
+              Stop-Process -Id $server.Id -Force
+            }
+          }
+
+      - name: Verify generated knowledge remains committed
+        shell: pwsh
+        run: git diff --exit-code -- Knowledge llms.txt llms-full.txt
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: Website/dist
+
+  deploy:
+    name: Deploy GitHub Pages
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.NOCTURNE_SITE_URL != '' }}
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
