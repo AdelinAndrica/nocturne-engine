@@ -212,22 +212,52 @@ namespace nocturne::editor
         engine_ = &engine;
         session_ = &session;
         auto& world = engine.GetWorld();
-        const noc::ResourceHandle logicalMesh = engine.Resources().RequestBinary("Meshes/triangle.nmsh");
 
-        auto createBootstrapObject = [&](
+        // Book grounding:
+        // - Luna's geometry examples use the same primitive families to validate
+        //   transforms and rendering.
+        // - Luna/Lengyel distinguish directional, point, and spot lights.
+        //
+        // Design choice (not directly from the book): Phase 16 opens with a
+        // transient showcase scene built from reusable runtime primitives. It is
+        // bootstrap content only, not a serialized scene contract (Phase 17).
+        const auto planeMesh =
+            engine.Resources().RequestMesh(
+                "Meshes/Primitives/plane.nmsh");
+        const auto cubeMesh =
+            engine.Resources().RequestMesh(
+                "Meshes/Primitives/cube.nmsh");
+        const auto sphereMesh =
+            engine.Resources().RequestMesh(
+                "Meshes/Primitives/sphere.nmsh");
+        const auto cylinderMesh =
+            engine.Resources().RequestMesh(
+                "Meshes/Primitives/cylinder.nmsh");
+
+        if (!planeMesh.IsValid()
+            || !cubeMesh.IsValid()
+            || !sphereMesh.IsValid()
+            || !cylinderMesh.IsValid())
+        {
+            NOC_LOG_ERROR(
+                "Editor",
+                "%s",
+                "Failed to request one or more built-in primitive meshes");
+            return false;
+        }
+
+        auto createStaticMesh = [&](
             const char* name,
+            noc::ResourceHandle mesh,
+            const noc::AABB& localBounds,
             const noc::Vec3& translation,
             const noc::Quat& rotation,
             const noc::Vec3& scale) -> noc::EntityHandle
         {
-            const noc::EntityHandle entity = world.CreateObject();
+            const noc::EntityHandle entity =
+                world.CreateObject();
             if (!entity.IsValid())
                 return noc::EntityHandle::Invalid();
-
-            const noc::AABB localBounds{
-                noc::Vec3(-1.0f, -1.0f, -1.0f),
-                noc::Vec3(1.0f, 1.0f, 1.0f)
-            };
 
             if (!world.AddName(entity, name)
                 || !world.SetLocalTRS(
@@ -237,7 +267,7 @@ namespace nocturne::editor
                     scale)
                 || !world.SetRenderable(
                     entity,
-                    logicalMesh,
+                    mesh,
                     localBounds))
             {
                 (void)world.DestroyEntity(entity);
@@ -247,31 +277,113 @@ namespace nocturne::editor
             return entity;
         };
 
-        // Design choice (not directly from the book): retain the deterministic
-        // Phase 14 demo scene as startup content only. No editor subsystem stores
-        // these handles as authoring identity; hierarchy and picking discover
-        // authored entities directly from World.
-        noc::EntityHandle bootstrap[4]{
-            createBootstrapObject(
-                "Cube_A",
-                { 0.0f, -0.15f, 6.0f },
-                noc::Quat::Identity(),
-                { 1.0f, 1.0f, 1.0f }),
-            createBootstrapObject(
-                "Cube_B",
-                { -2.5f, -0.10f, 9.0f },
-                AxisAngle({ 0,1,0 }, 0.38f),
-                { 0.8f, 1.05f, 0.8f }),
-            createBootstrapObject(
-                "Cube_C",
-                { 2.4f, -0.35f, 11.0f },
-                AxisAngle({ 0,1,0 }, -0.52f),
-                { 1.1f, 0.8f, 1.1f }),
-            createBootstrapObject(
-                "Ground",
+        auto createLight = [&](
+            const char* name,
+            noc::LightType type,
+            const noc::Vec3& translation,
+            const noc::Quat& rotation,
+            const noc::Vec3& color,
+            float intensity,
+            float range,
+            float innerConeRadians,
+            float outerConeRadians) -> noc::EntityHandle
+        {
+            const noc::EntityHandle entity =
+                world.CreateObject();
+            if (!entity.IsValid())
+                return noc::EntityHandle::Invalid();
+
+            if (!world.AddName(entity, name)
+                || !world.SetLocalTRS(
+                    entity,
+                    translation,
+                    rotation,
+                    noc::Vec3::One())
+                || !world.AddLight(entity, type)
+                || !world.SetLightColor(entity, color)
+                || !world.SetLightIntensity(entity, intensity)
+                || !world.SetLightRange(entity, range)
+                || (type == noc::LightType::Spot
+                    && !world.SetLightSpotAngles(
+                        entity,
+                        innerConeRadians,
+                        outerConeRadians)))
+            {
+                (void)world.DestroyEntity(entity);
+                return noc::EntityHandle::Invalid();
+            }
+
+            return entity;
+        };
+
+        const noc::AABB planeBounds{
+            noc::Vec3{ -1.0f, 0.0f, -1.0f },
+            noc::Vec3{ 1.0f, 0.0f, 1.0f }
+        };
+        const noc::AABB unitBounds{
+            noc::Vec3{ -1.0f, -1.0f, -1.0f },
+            noc::Vec3{ 1.0f, 1.0f, 1.0f }
+        };
+
+        noc::EntityHandle bootstrap[] = {
+            createStaticMesh(
+                "Ground_Plane",
+                planeMesh.Untyped(),
+                planeBounds,
                 { 0.0f, -1.25f, 9.0f },
                 noc::Quat::Identity(),
-                { 6.5f, 0.10f, 7.5f })
+                { 6.5f, 1.0f, 7.5f }),
+            createStaticMesh(
+                "Showcase_Cube",
+                cubeMesh.Untyped(),
+                unitBounds,
+                { -2.6f, -0.25f, 8.0f },
+                AxisAngle({ 0,1,0 }, 0.38f),
+                { 0.9f, 0.9f, 0.9f }),
+            createStaticMesh(
+                "Showcase_Sphere",
+                sphereMesh.Untyped(),
+                unitBounds,
+                { 0.0f, -0.25f, 8.5f },
+                noc::Quat::Identity(),
+                { 1.0f, 1.0f, 1.0f }),
+            createStaticMesh(
+                "Showcase_Cylinder",
+                cylinderMesh.Untyped(),
+                unitBounds,
+                { 2.7f, -0.25f, 9.0f },
+                AxisAngle({ 0,1,0 }, -0.28f),
+                { 0.85f, 1.0f, 0.85f }),
+            createLight(
+                "Directional Light",
+                noc::LightType::Directional,
+                { 0.0f, 4.0f, 2.0f },
+                YawPitch(-0.55f, 0.65f),
+                { 0.72f, 0.80f, 1.00f },
+                0.55f,
+                30.0f,
+                0.0f,
+                0.0f),
+            createLight(
+                "Point Light",
+                noc::LightType::Point,
+                { -3.0f, 2.2f, 6.5f },
+                noc::Quat::Identity(),
+                { 1.00f, 0.58f, 0.32f },
+                2.2f,
+                8.5f,
+                0.0f,
+                0.0f),
+            createLight(
+                "Spot Light",
+                noc::LightType::Spot,
+                { 3.5f, 3.4f, 5.0f },
+                YawPitch(2.55f, 0.62f),
+                { 0.42f, 0.62f, 1.00f },
+                3.0f,
+                12.0f,
+                0.30f,
+                0.55f)
         };
 
         bool bootstrapOk = true;
@@ -289,7 +401,7 @@ namespace nocturne::editor
             NOC_LOG_ERROR(
                 "Editor",
                 "%s",
-                "Failed to create Phase 14 bootstrap scene objects");
+                "Failed to create Phase 16 default showcase scene");
             return false;
         }
 
@@ -322,7 +434,10 @@ namespace nocturne::editor
         }
 
         scenePrepared_ = true;
-        NOC_LOG_INFO("Editor", "Phase 14 3D validation scene prepared (3 cubes + selectable ground + editor camera)");
+        NOC_LOG_INFO(
+            "Editor",
+            "%s",
+            "Phase 16 default showcase scene prepared (4 primitives + 3 lights + editor camera)");
         return true;
     }
 
