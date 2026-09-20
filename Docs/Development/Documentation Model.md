@@ -11,7 +11,7 @@ source_docs: ["Docs/nocturne_engine_architecture.md","Docs/Production Engineerin
 book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §1.7 Tools and the Asset Pipeline"]
 aliases: ["Documentation Model","Canonical Documentation","Docs Model"]
 deprecated_aliases: []
-api_symbols: ["noc::VirtualFileSystem","noc::ResourceManager","noc::ResourceHandle"]
+api_symbols: []
 ---
 
 # Documentation Model
@@ -134,6 +134,7 @@ source_docs: ["Docs/Phase 4 — Resource Manager.md"]
 book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §7.2"]
 aliases: ["Resources","Resource Manager","VFS"]
 deprecated_aliases: []
+api_symbols: ["noc::VirtualFileSystem","noc::ResourceManager","noc::ResourceHandle"]
 ---
 ```
 
