@@ -120,6 +120,14 @@ foreach ($compound in $xml.doxygenindex.compound) {
         continue
     }
 
+    $generatedHtml = Join-Path $htmlSource "$refid.html"
+    if (-not (Test-Path -LiteralPath $generatedHtml -PathType Leaf)) {
+        # Doxygen's XML index can still enumerate nested/private compounds even when
+        # the beginner-facing HTML policy hides them. Do not publish a stable alias
+        # unless a concrete HTML target exists.
+        continue
+    }
+
     $alias = Get-SymbolAlias $name
     $target = "/api/$refid.html"
     $aliasFile = Join-Path $publicSymbol "$alias.html"
