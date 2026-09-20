@@ -11,6 +11,7 @@ source_docs: ["Docs/nocturne_engine_architecture.md","Docs/Phase 15 — Entity C
 book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §16.2.1.6 Pure Component Models","Jason Gregory — Game Engine Architecture (3rd ed.), §16.2.2 Property-Centric Architectures","Jason Gregory — Game Engine Architecture (3rd ed.), §16.5 Object References and World Queries","Bob Nystrom — Game Programming Patterns, Component and Data Locality"]
 aliases: ["World","ECS","Entity Component System","World & ECS"]
 deprecated_aliases: []
+api_symbols: ["noc::World","noc::EntityHandle","noc::EntityRegistry"]
 ---
 
 # World & ECS
