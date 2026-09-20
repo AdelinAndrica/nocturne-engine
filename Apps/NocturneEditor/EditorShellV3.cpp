@@ -3621,6 +3621,10 @@ namespace nocturne::editor
             return;
 
         noc::ResourceHandle newHandle{};
+        noc::AABB newBounds{
+            noc::Vec3::Zero(),
+            noc::Vec3::Zero()
+        };
 
         if (command > 1)
         {
@@ -3651,9 +3655,7 @@ namespace nocturne::editor
 
             if (!engine_->Resources().WaitUntilReady(
                     typedHandle.Untyped(),
-                    kEditorMeshValidationTimeoutMs)
-                || !engine_->Resources().GetMesh(
-                    typedHandle))
+                    kEditorMeshValidationTimeoutMs))
             {
                 const char* error =
                     engine_->Resources().GetError(
@@ -3671,8 +3673,76 @@ namespace nocturne::editor
                 return;
             }
 
-            newHandle =
-                typedHandle.Untyped();
+            const noc::MeshResource* meshResource =
+                engine_->Resources().GetMesh(typedHandle);
+            if (!meshResource)
+            {
+                AppendConsole_(
+                    L"Mesh assignment failed; decoded mesh is unavailable.");
+                return;
+            }
+
+            const noc::IntermediateMesh& cpuMesh =
+                meshResource->CpuMesh();
+            const size_t vertexCount =
+                cpuMesh.positions.size() / 3u;
+            if (vertexCount == 0
+                || cpuMesh.positions.size()
+                    != vertexCount * 3u)
+            {
+                AppendConsole_(
+                    L"Mesh assignment failed; decoded mesh has no valid positions.");
+                return;
+            }
+
+            noc::Vec3 minimum{
+                cpuMesh.positions[0],
+                cpuMesh.positions[1],
+                cpuMesh.positions[2]
+            };
+            noc::Vec3 maximum = minimum;
+
+            for (size_t vertex = 1;
+                 vertex < vertexCount;
+                 ++vertex)
+            {
+                const noc::Vec3 position{
+                    cpuMesh.positions[vertex * 3u + 0u],
+                    cpuMesh.positions[vertex * 3u + 1u],
+                    cpuMesh.positions[vertex * 3u + 2u]
+                };
+
+                if (!std::isfinite(position.x)
+                    || !std::isfinite(position.y)
+                    || !std::isfinite(position.z))
+                {
+                    AppendConsole_(
+                        L"Mesh assignment failed; decoded mesh contains non-finite positions.");
+                    return;
+                }
+
+                minimum.x = (std::min)(minimum.x, position.x);
+                minimum.y = (std::min)(minimum.y, position.y);
+                minimum.z = (std::min)(minimum.z, position.z);
+                maximum.x = (std::max)(maximum.x, position.x);
+                maximum.y = (std::max)(maximum.y, position.y);
+                maximum.z = (std::max)(maximum.z, position.z);
+            }
+
+            if (!std::isfinite(minimum.x)
+                || !std::isfinite(minimum.y)
+                || !std::isfinite(minimum.z))
+            {
+                AppendConsole_(
+                    L"Mesh assignment failed; decoded mesh contains non-finite positions.");
+                return;
+            }
+
+            newHandle = typedHandle.Untyped();
+            newBounds = noc::AABB{
+                minimum,
+                maximum
+            };
         }
 
         const noc::EntityHandle entity =
@@ -3683,11 +3753,23 @@ namespace nocturne::editor
 
         try
         {
-            auto propertyCommand =
+            auto meshCommand =
                 std::make_unique<
                     SetReflectedPropertyCommand>();
+            auto boundsCommand =
+                std::make_unique<
+                    SetReflectedPropertyCommand>();
+            auto compound =
+                std::make_unique<
+                    CompoundEditorCommand>();
 
-            if (!propertyCommand->Init(
+            const noc::TypeId renderableType{
+                static_cast<uint64_t>(
+                    noc::kRenderableComponentTypeId.value)
+            };
+
+            if (binding.componentTypeId != renderableType
+                || !meshCommand->Init(
                     context,
                     entity,
                     binding.componentTypeId,
@@ -3695,12 +3777,27 @@ namespace nocturne::editor
                     noc::ReflectedConstValueView{
                         noc::BuiltinTypeIds::ResourceHandle,
                         &newHandle })
+                || !boundsCommand->Init(
+                    context,
+                    entity,
+                    renderableType,
+                    noc::MakePropertyId(
+                        "Nocturne.Renderable.localBounds"),
+                    noc::ReflectedConstValueView{
+                        noc::BuiltinTypeIds::AABB,
+                        &newBounds })
+                || !compound->Init(
+                    "Assign Mesh + Bounds")
+                || !compound->Append(
+                    std::move(meshCommand))
+                || !compound->Append(
+                    std::move(boundsCommand))
                 || !session_->History().Execute(
                     context,
-                    std::move(propertyCommand)))
+                    std::move(compound)))
             {
                 AppendConsole_(
-                    L"Mesh assignment rejected by reflected semantic setter.");
+                    L"Mesh assignment rejected; mesh and bounds were not changed.");
                 return;
             }
         }
