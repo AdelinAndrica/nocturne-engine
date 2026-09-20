@@ -19,6 +19,18 @@ namespace noc
 		Mat4 world;
 	};
 
+	struct RenderLight
+	{
+		Vec3 position = Vec3::Zero();
+		float range = 0.0f;
+		Vec3 direction = Vec3{ 0.0f, 0.0f, 1.0f };
+		float intensity = 0.0f;
+		Vec3 color = Vec3::One();
+		float innerConeCos = 1.0f;
+		float outerConeCos = 1.0f;
+		uint32_t type = 0;
+	}
+
 	// Design choice (not directly from the book): a tiny editor/debug bridge is
 	// carried with the frame submission so the renderer can depth-test selection
 	// visualization without coupling MeshPass directly to editor Win32 code.
@@ -38,6 +50,9 @@ namespace noc
 		const RenderInstance* instances = nullptr;
 		uint32_t instanceCount = 0;
 		uint32_t totalRenderables = 0;
+		const RenderLight* lights = nullptr;
+		uint32_t lightCount = 0;
+		uint32_t totalLights = 0;
 		RenderDebugSelection debugSelection{};
 	};
 }
