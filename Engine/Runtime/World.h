@@ -7,6 +7,7 @@
 #include "Runtime/Bounds.h"
 #include "Runtime/ComponentType.h"
 #include "Runtime/Components/CameraComponent.h"
+#include "Runtime/Components/LightComponent.h"
 #include "Runtime/Components/NameComponent.h"
 #include "Runtime/Components/RenderableComponent.h"
 #include "Runtime/Components/TransformComponent.h"
@@ -139,6 +140,24 @@ namespace noc
 
         [[nodiscard]] bool SetCameraFromObject(SceneObjectHandle entity);
         [[nodiscard]] EntityHandle ActiveCamera() const;
+
+        // --- Light component ---
+        [[nodiscard]] bool AddLight(
+            EntityHandle entity,
+            LightType type = LightType::Point);
+        [[nodiscard]] bool RemoveLight(EntityHandle entity);
+        [[nodiscard]] bool HasLight(EntityHandle entity) const;
+        [[nodiscard]] const LightComponent* GetLight(EntityHandle entity) const;
+
+        [[nodiscard]] bool SetLightType(EntityHandle entity, LightType type);
+        [[nodiscard]] bool SetLightColor(EntityHandle entity, const Vec3& color);
+        [[nodiscard]] bool SetLightIntensity(EntityHandle entity, float intensity);
+        [[nodiscard]] bool SetLightRange(EntityHandle entity, float range);
+        [[nodiscard]] bool SetLightSpotAngles(
+            EntityHandle entity,
+            float innerConeRadians,
+            float outerConeRadians);
+        [[nodiscard]] bool SetLightEnabled(EntityHandle entity, bool enabled);
 
         // --- Name component ---
         [[nodiscard]] bool AddName(EntityHandle entity, const char* name = "");
