@@ -47,9 +47,19 @@ foreach ($alias in $aliases) {
     Assert-File "public\api-symbol\$alias.html"
 }
 
-Assert-Contains "public\api-symbols.json" '"name": "noc::Engine"'
-Assert-Contains "public\api-symbols.json" '"name": "noc::World"'
-Assert-Contains "public\api-symbols.json" '"name": "nocturne::editor::EditorShellV3"'
+$symbolIndex = Get-Content -LiteralPath (Join-Path $websiteRoot "public\api-symbols.json") -Raw | ConvertFrom-Json
+$symbolNames = @($symbolIndex.compounds | ForEach-Object { [string]$_.name })
+
+foreach ($required in @(
+    "noc::Engine",
+    "noc::World",
+    "nocturne::editor::EditorShellV3"
+)) {
+    if ($required -notin $symbolNames) {
+        throw "Expected API symbol '$required' in public\api-symbols.json"
+    }
+}
+
 Assert-Contains "public\api-xml\index.xml" "noc::ResourceManager"
 Assert-Contains "public\api-xml\index.xml" "noc::RenderSystem"
 
