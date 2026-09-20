@@ -1555,7 +1555,24 @@ namespace nocturne::editor
         fileMenu_ = CreatePopupMenu(); AppendMenuW(fileMenu_, MF_STRING, IdToolbarNew, L"New Scene"); AppendMenuW(fileMenu_, MF_STRING, IdToolbarOpen, L"Open Scene..."); AppendMenuW(fileMenu_, MF_STRING, IdToolbarSave, L"Save Scene"); AppendMenuW(fileMenu_, MF_SEPARATOR, 0, nullptr); AppendMenuW(fileMenu_, MF_STRING, IDCANCEL, L"Exit");
         buildMenu_ = CreatePopupMenu(); AppendMenuW(buildMenu_, MF_STRING, IdToolbarBuild, L"Build Content"); AppendMenuW(buildMenu_, MF_STRING, IdToolbarPlay, L"Play");
         actorMenu_ = CreatePopupMenu();
-        AppendMenuW(actorMenu_, MF_STRING, IdActorCreate, L"Create Entity");
+        HMENU createMenu = CreatePopupMenu();
+        HMENU lightMenu = CreatePopupMenu();
+        HMENU primitiveMenu = CreatePopupMenu();
+        AppendMenuW(createMenu, MF_STRING, IdActorCreate, L"Empty Entity");
+        AppendMenuW(createMenu, MF_STRING, IdActorCreateStaticMesh, L"Static Mesh Entity");
+        AppendMenuW(createMenu, MF_STRING, IdActorCreateCamera, L"Camera");
+        AppendMenuW(createMenu, MF_SEPARATOR, 0, nullptr);
+        AppendMenuW(lightMenu, MF_STRING, IdActorCreateDirectionalLight, L"Directional Light");
+        AppendMenuW(lightMenu, MF_STRING, IdActorCreatePointLight, L"Point Light");
+        AppendMenuW(lightMenu, MF_STRING, IdActorCreateSpotLight, L"Spot Light");
+        AppendMenuW(createMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(lightMenu), L"Light");
+        AppendMenuW(createMenu, MF_SEPARATOR, 0, nullptr);
+        AppendMenuW(primitiveMenu, MF_STRING, IdActorCreatePlane, L"Plane");
+        AppendMenuW(primitiveMenu, MF_STRING, IdActorCreateCube, L"Cube");
+        AppendMenuW(primitiveMenu, MF_STRING, IdActorCreateSphere, L"Sphere");
+        AppendMenuW(primitiveMenu, MF_STRING, IdActorCreateCylinder, L"Cylinder");
+        AppendMenuW(createMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(primitiveMenu), L"Primitive");
+        AppendMenuW(actorMenu_, MF_POPUP, reinterpret_cast<UINT_PTR>(createMenu), L"Create");
         AppendMenuW(actorMenu_, MF_SEPARATOR, 0, nullptr);
         AppendMenuW(actorMenu_, MF_STRING, IdActorDuplicate, L"Duplicate Entity\tCtrl+D");
         AppendMenuW(actorMenu_, MF_STRING, IdActorDelete, L"Delete Entity\tDelete");
@@ -1880,57 +1897,76 @@ namespace nocturne::editor
     bool EditorShellV3::ExecuteCreateEntity_(
         noc::EntityHandle parent)
     {
-        if (!session_ || !engine_)
+        return ExecuteCreatePreset_(
+            EditorEntityCreateKind::Empty,
+            "Entity",
+            nullptr,
+            noc::AABB{ noc::Vec3::Zero(), noc::Vec3::Zero() },
+            parent);
+    }
+
+    bool EditorShellV3::ExecuteCreatePreset_(
+        EditorEntityCreateKind kind,
+        const char* name,
+        const char* meshVirtualPath,
+        const noc::AABB& localBounds,
+        noc::EntityHandle parent)
+    {
+        if (!session_ || !engine_ || !name)
             return false;
 
-        noc::World& world =
-            engine_->GetWorld();
-
+        noc::World& world = engine_->GetWorld();
         if (parent.IsValid()
             && (!world.IsAlive(parent)
                 || session_->IsToolOwned(parent)
                 || !world.HasTransform(parent)))
         {
             AppendConsole_(
-                L"Create Child Entity rejected: parent is stale, tool-owned, or has no Transform.");
+                L"Create Entity rejected: parent is stale, tool-owned, or has no Transform.");
             return false;
         }
 
-        auto context =
-            session_->CommandContext();
+        noc::ResourceHandle mesh{};
+        if (meshVirtualPath && meshVirtualPath[0] != '\0')
+        {
+            const auto typed =
+                engine_->Resources().RequestMesh(meshVirtualPath);
+            if (!typed.IsValid())
+            {
+                AppendConsole_(
+                    L"Create primitive failed: built-in mesh resource request was rejected.");
+                return false;
+            }
+            mesh = typed.Untyped();
+        }
 
+        auto context = session_->CommandContext();
         try
         {
-            auto command =
-                std::make_unique<CreateEntityCommand>();
+            auto command = std::make_unique<CreateEntityCommand>();
             auto* commandRaw = command.get();
 
-            // Design choice (not directly from the book): toolbar/Actor create
-            // remains an authored scene-root operation. Hierarchy context
-            // creation can explicitly pass the selected authored entity as the
-            // parent; both flows reuse the same CreateEntityCommand.
-            if (!command->Init(
-                    "Entity",
-                    parent)
+            if (!command->InitPreset(
+                    name,
+                    kind,
+                    parent,
+                    mesh,
+                    localBounds)
                 || !session_->History().Execute(
                     context,
                     std::move(command)))
             {
-                AppendConsole_(
-                    parent.IsValid()
-                        ? L"Create Child Entity failed."
-                        : L"Create Entity failed.");
+                AppendConsole_(L"Create Entity preset failed.");
                 return false;
             }
 
             const noc::EntityHandle created =
                 commandRaw->CurrentEntity();
-
             if (!created.IsValid()
                 || !session_->SetSelection(created))
             {
                 AppendConsole_(
-                    L"Create Entity succeeded but selection update failed.");
+                    L"Create Entity preset succeeded but selection update failed.");
                 return false;
             }
 
@@ -1938,18 +1974,13 @@ namespace nocturne::editor
             PopulateScene_();
             RefreshInspector();
             UpdateStatus_();
-            AppendConsole_(
-                parent.IsValid()
-                    ? L"Child entity created."
-                    : L"Entity created.");
+            AppendConsole_(L"Entity preset created.");
             return true;
         }
         catch (const std::bad_alloc&)
         {
             AppendConsole_(
-                parent.IsValid()
-                    ? L"Create Child Entity failed: allocation failure."
-                    : L"Create Entity failed: allocation failure.");
+                L"Create Entity preset failed: allocation failure.");
             return false;
         }
     }
@@ -5377,6 +5408,60 @@ namespace nocturne::editor
             break;
         case IdActorCreate:
             (void)ExecuteCreateEntity_();
+            break;
+        case IdActorCreateStaticMesh:
+            (void)ExecuteCreatePreset_(
+                EditorEntityCreateKind::StaticMesh,
+                "Static Mesh", nullptr,
+                noc::AABB{ noc::Vec3::Zero(), noc::Vec3::Zero() });
+            break;
+        case IdActorCreateCamera:
+            (void)ExecuteCreatePreset_(
+                EditorEntityCreateKind::Camera,
+                "Camera", nullptr,
+                noc::AABB{ noc::Vec3::Zero(), noc::Vec3::Zero() });
+            break;
+        case IdActorCreateDirectionalLight:
+            (void)ExecuteCreatePreset_(
+                EditorEntityCreateKind::DirectionalLight,
+                "Directional Light", nullptr,
+                noc::AABB{ noc::Vec3::Zero(), noc::Vec3::Zero() });
+            break;
+        case IdActorCreatePointLight:
+            (void)ExecuteCreatePreset_(
+                EditorEntityCreateKind::PointLight,
+                "Point Light", nullptr,
+                noc::AABB{ noc::Vec3::Zero(), noc::Vec3::Zero() });
+            break;
+        case IdActorCreateSpotLight:
+            (void)ExecuteCreatePreset_(
+                EditorEntityCreateKind::SpotLight,
+                "Spot Light", nullptr,
+                noc::AABB{ noc::Vec3::Zero(), noc::Vec3::Zero() });
+            break;
+        case IdActorCreatePlane:
+            (void)ExecuteCreatePreset_(
+                EditorEntityCreateKind::StaticMesh,
+                "Plane", "Meshes/Primitives/plane.nmsh",
+                noc::AABB{ noc::Vec3{ -1.0f, 0.0f, -1.0f }, noc::Vec3{ 1.0f, 0.0f, 1.0f } });
+            break;
+        case IdActorCreateCube:
+            (void)ExecuteCreatePreset_(
+                EditorEntityCreateKind::StaticMesh,
+                "Cube", "Meshes/Primitives/cube.nmsh",
+                noc::AABB{ noc::Vec3{ -1.0f, -1.0f, -1.0f }, noc::Vec3{ 1.0f, 1.0f, 1.0f } });
+            break;
+        case IdActorCreateSphere:
+            (void)ExecuteCreatePreset_(
+                EditorEntityCreateKind::StaticMesh,
+                "Sphere", "Meshes/Primitives/sphere.nmsh",
+                noc::AABB{ noc::Vec3{ -1.0f, -1.0f, -1.0f }, noc::Vec3{ 1.0f, 1.0f, 1.0f } });
+            break;
+        case IdActorCreateCylinder:
+            (void)ExecuteCreatePreset_(
+                EditorEntityCreateKind::StaticMesh,
+                "Cylinder", "Meshes/Primitives/cylinder.nmsh",
+                noc::AABB{ noc::Vec3{ -1.0f, -1.0f, -1.0f }, noc::Vec3{ 1.0f, 1.0f, 1.0f } });
             break;
         case IdActorDuplicate:
             (void)ExecuteDuplicateSelection_();
