@@ -45,6 +45,7 @@ export default defineConfig({
           label: 'Development',
           items: [
             { slug: 'docs/development/documentation-model' },
+            { slug: 'docs/development/c-api-reference', label: 'C++ API Reference' },
             { slug: 'docs/development/production-engineering-standard' },
             { slug: 'docs/development/release-process' },
             { slug: 'docs/development/website-specification' }
