@@ -1,0 +1,37 @@
+/**
+@mainpage Nocturne Engine C++ API
+
+# Purpose
+
+This site is the generated symbol reference for the current Nocturne Engine C++ header surface.
+
+Use the canonical Nocturne documentation for architecture, ownership, lifecycle, subsystem boundaries and design rationale.
+
+- Human documentation: `/docs/`
+- Machine knowledge manifest: `/knowledge/manifest.json`
+- Canonical AI aggregate: `/llms-full.txt`
+- Doxygen XML: `/api-xml/index.xml`
+
+# Source precedence
+
+For current behavior, use:
+
+1. canonical Architecture / Systems / Development documentation;
+2. current C++ source for exact implementation behavior;
+3. completion/implementation reports as delivered-work evidence;
+4. historical Phase documents for chronology and earlier design context.
+
+The generated API is a structural reference. It does not override canonical architecture documentation.
+
+# Current extraction policy
+
+Web 7 documents the current Engine, NocturneEditor and NocturneHost header surfaces.
+
+The following are deliberately excluded:
+
+- `ThirdParty/`;
+- `Engine/Render/DX12/d3dx12.h` because it is vendored DirectX helper code;
+- legacy `EditorShell.h` and `EditorControls.h`, because `EditorShellV3` is the current canonical editor shell.
+
+@note Design choice (not directly from the book): Doxygen is the generated C++ reference layer for Nocturne. The supplied engine books ground subsystem concepts and architecture, not this documentation tool choice.
+*/
