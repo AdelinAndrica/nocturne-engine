@@ -11,10 +11,39 @@ namespace nocturne::editor
         const char* name,
         noc::EntityHandle parent)
     {
+        return InitPreset(
+            name,
+            EditorEntityCreateKind::Empty,
+            parent);
+    }
+
+    bool CreateEntityCommand::InitPreset(
+        const char* name,
+        EditorEntityCreateKind kind,
+        noc::EntityHandle parent,
+        noc::ResourceHandle mesh,
+        const noc::AABB& localBounds)
+    {
         if (initialized_ || !name)
             return false;
 
+        switch (kind)
+        {
+        case EditorEntityCreateKind::Empty:
+        case EditorEntityCreateKind::StaticMesh:
+        case EditorEntityCreateKind::Camera:
+        case EditorEntityCreateKind::DirectionalLight:
+        case EditorEntityCreateKind::PointLight:
+        case EditorEntityCreateKind::SpotLight:
+            break;
+        default:
+            return false;
+        }
+
         name_ = name;
+        kind_ = kind;
+        mesh_ = mesh;
+        localBounds_ = localBounds;
         requestedParent_ = parent;
         initialized_ = true;
         return true;
@@ -27,7 +56,16 @@ namespace nocturne::editor
 
     const char* CreateEntityCommand::Label() const noexcept
     {
-        return "Create Entity";
+        switch (kind_)
+        {
+        case EditorEntityCreateKind::StaticMesh:       return "Create Static Mesh Entity";
+        case EditorEntityCreateKind::Camera:           return "Create Camera";
+        case EditorEntityCreateKind::DirectionalLight: return "Create Directional Light";
+        case EditorEntityCreateKind::PointLight:       return "Create Point Light";
+        case EditorEntityCreateKind::SpotLight:        return "Create Spot Light";
+        case EditorEntityCreateKind::Empty:
+        default:                                       return "Create Empty Entity";
+        }
     }
 
     std::size_t CreateEntityCommand::MemoryCostBytes() const noexcept
@@ -83,6 +121,46 @@ namespace nocturne::editor
 
         if (!context.world.AddName(created, name_.c_str())
             || !context.world.AddTransform(created))
+        {
+            (void)context.world.DestroyEntity(created);
+            return false;
+        }
+
+        bool presetReady = true;
+        switch (kind_)
+        {
+        case EditorEntityCreateKind::Empty:
+            break;
+        case EditorEntityCreateKind::StaticMesh:
+            presetReady = context.world.AddRenderable(
+                created,
+                mesh_,
+                localBounds_);
+            break;
+        case EditorEntityCreateKind::Camera:
+            presetReady = context.world.AddCamera(created);
+            break;
+        case EditorEntityCreateKind::DirectionalLight:
+            presetReady = context.world.AddLight(
+                created,
+                noc::LightType::Directional);
+            break;
+        case EditorEntityCreateKind::PointLight:
+            presetReady = context.world.AddLight(
+                created,
+                noc::LightType::Point);
+            break;
+        case EditorEntityCreateKind::SpotLight:
+            presetReady = context.world.AddLight(
+                created,
+                noc::LightType::Spot);
+            break;
+        default:
+            presetReady = false;
+            break;
+        }
+
+        if (!presetReady)
         {
             (void)context.world.DestroyEntity(created);
             return false;
