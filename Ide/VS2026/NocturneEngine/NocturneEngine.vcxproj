@@ -102,10 +102,12 @@
     <ClInclude Include="..\..\..\Engine\Runtime\ComponentStorage.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\ComponentType.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Components\CameraComponent.h" />
+    <ClInclude Include="..\..\..\Engine\Runtime\Components\LightComponent.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Components\NameComponent.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Components\RenderableComponent.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Components\TransformComponent.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\CameraSystem.h" />
+    <ClInclude Include="..\..\..\Engine\Runtime\LightSystem.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\NameSystem.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\RenderableSystem.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\TransformSystem.h" />
@@ -119,6 +121,7 @@
     <ClInclude Include="..\..\..\Engine\Runtime\Reflection\PropertyAccess.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Reflection\FunctionInvocation.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Reflection\FoundationComponents.h" />
+    <ClInclude Include="..\..\..\Engine\Runtime\Reflection\LightReflection.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Reflection\ComponentReflection.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Reflection\ReflectionIds.h" />
     <ClInclude Include="..\..\..\Engine\Runtime\Reflection\ReflectionMetadata.h" />
@@ -172,9 +175,11 @@
     <ClCompile Include="..\..\..\Engine\Resources\VPath.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\ComponentRegistry.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\Reflection\FoundationComponents.cpp" />
+    <ClCompile Include="..\..\..\Engine\Runtime\Reflection\LightReflection.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\Reflection\ReflectionRegistry.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\EntityRegistry.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\CameraSystem.cpp" />
+    <ClCompile Include="..\..\..\Engine\Runtime\LightSystem.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\NameSystem.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\RenderableSystem.cpp" />
     <ClCompile Include="..\..\..\Engine\Runtime\TransformSystem.cpp" />
