@@ -385,25 +385,33 @@ namespace noc
 
 		if (!rootReady_)
 		{
-			D3D12_DESCRIPTOR_RANGE ranges[3]{};
+			D3D12_DESCRIPTOR_RANGE ranges[2]{};
 			ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
 			ranges[0].NumDescriptors = 1;
 			ranges[0].BaseShaderRegister = 0;
 			ranges[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-			ranges[1].NumDescriptors = 8;
+			ranges[1].NumDescriptors = 1;
 			ranges[1].BaseShaderRegister = 0;
-			ranges[2].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
-			ranges[2].NumDescriptors = 8;
-			ranges[2].BaseShaderRegister = 0;
 
 			D3D12_ROOT_PARAMETER params[3]{};
-			for (int i = 0; i < 3; ++i)
-			{
-				params[i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-				params[i].DescriptorTable.NumDescriptorRanges = 1;
-				params[i].DescriptorTable.pDescriptorRanges = &ranges[i];
-				params[i].ShaderVisibility = i == 2 ? D3D12_SHADER_VISIBILITY_PIXEL : D3D12_SHADER_VISIBILITY_ALL;
-			}
+			params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+			params[0].DescriptorTable.NumDescriptorRanges = 1;
+			params[0].DescriptorTable.pDescriptorRanges = &ranges[0];
+			params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+			params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+			params[1].DescriptorTable.NumDescriptorRanges = 1;
+			params[1].DescriptorTable.pDescriptorRanges = &ranges[1];
+			params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
+			// Design choice (not directly from the book): scene meshes are submitted
+			// as independent draw calls in Phase 16. A single root constant selects
+			// the corresponding transform inside the frame instance StructuredBuffer.
+			params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+			params[2].Constants.ShaderRegister = 1;
+			params[2].Constants.RegisterSpace = 0;
+			params[2].Constants.Num32BitValues = 1;
+			params[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
 			D3D12_ROOT_SIGNATURE_DESC rs{};
 			rs.NumParameters = 3;
@@ -987,12 +995,17 @@ namespace noc
 					DXGI_FORMAT_R32_UINT);
 				cmd->IASetVertexBuffers(0, 1, &vbv);
 				cmd->IASetIndexBuffer(&ibv);
+
+				// SV_InstanceID is local to this draw. StartInstanceLocation only
+				// offsets IA per-instance streams, while our transforms live in a
+				// StructuredBuffer. Select the correct frame instance explicitly.
+				cmd->SetGraphicsRoot32BitConstant(2, i, 0);
 				cmd->DrawIndexedInstanced(
 					mesh->indexCount,
 					1,
 					0,
 					0,
-					i);
+					0);
 			}
 		}
 
