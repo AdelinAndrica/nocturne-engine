@@ -34,7 +34,8 @@ const allowedSourceMetadata = new Set([
   'source_docs',
   'book_grounding',
   'aliases',
-  'deprecated_aliases'
+  'deprecated_aliases',
+  'api_symbols'
 ]);
 
 function toPosix(value) {
@@ -85,7 +86,7 @@ function parseSourceDocument(markdown, relativeSource) {
 
   const rawLines = match[1].split(/\r?\n/);
   const looksLikeFrontmatter = rawLines.some((line) =>
-    /^(?:id|doc_type|canonical|status|description|subsystem|phase_introduced|source_files|source_docs|book_grounding|aliases|deprecated_aliases):/.test(
+    /^(?:id|doc_type|canonical|status|description|subsystem|phase_introduced|source_files|source_docs|book_grounding|aliases|deprecated_aliases|api_symbols):/.test(
       line.trim()
     )
   );
@@ -290,7 +291,8 @@ function renderGeneratedFrontmatter(metadata, historical) {
     'source_docs',
     'book_grounding',
     'aliases',
-    'deprecated_aliases'
+    'deprecated_aliases',
+    'api_symbols'
   ];
 
   const lines = ['---'];
@@ -335,6 +337,25 @@ async function cleanPreviousGeneratedDocs() {
 }
 
 
+function apiSymbolHref(symbol) {
+  return `/api-symbol/${symbol.replaceAll('::', '.')}.html`;
+}
+
+function renderApiReference(metadata) {
+  const symbols = metadataArray(metadata, 'api_symbols');
+  if (symbols.length === 0) return '';
+
+  return [
+    '',
+    '## C++ API reference',
+    '',
+    '> Generated links into the Doxygen symbol reference. Canonical documentation remains the authority for architecture, ownership and subsystem contracts.',
+    '',
+    ...symbols.map((symbol) => `- [`${symbol}`](${apiSymbolHref(symbol)})`),
+    ''
+  ].join('\n');
+}
+
 function webPathForTarget(relativeTarget) {
   const normalized = toPosix(relativeTarget)
     .replace(/\.md$/i, '')
@@ -362,7 +383,8 @@ function renderResolvedMetadataFrontmatter(document) {
     ['source_docs', metadataArray(metadata, 'source_docs')],
     ['book_grounding', metadataArray(metadata, 'book_grounding')],
     ['aliases', metadataArray(metadata, 'aliases')],
-    ['deprecated_aliases', metadataArray(metadata, 'deprecated_aliases')]
+    ['deprecated_aliases', metadataArray(metadata, 'deprecated_aliases')],
+    ['api_symbols', metadataArray(metadata, 'api_symbols')]
   ];
 
   const lines = ['---'];
@@ -429,7 +451,11 @@ async function generateKnowledge(canonicalDocuments) {
       sourceDocs: metadataArray(document.metadata, 'source_docs'),
       bookGrounding: metadataArray(document.metadata, 'book_grounding'),
       aliases: metadataArray(document.metadata, 'aliases'),
-      deprecatedAliases: metadataArray(document.metadata, 'deprecated_aliases')
+      deprecatedAliases: metadataArray(document.metadata, 'deprecated_aliases'),
+      apiSymbols: metadataArray(document.metadata, 'api_symbols').map((name) => ({
+        name,
+        href: apiSymbolHref(name)
+      }))
     }))
   });
 
@@ -660,6 +686,7 @@ async function syncDocs() {
       renderGeneratedFrontmatter(metadata, historical) +
         sourceNote +
         body +
+        renderApiReference(metadata) +
         '\n',
       'utf8'
     );
