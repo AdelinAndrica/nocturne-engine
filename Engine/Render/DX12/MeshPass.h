@@ -21,6 +21,8 @@ namespace noc
 	class MeshPass
 	{
 	public:
+		~MeshPass();
+
 		bool Init(
 			ID3D12Device* device,
 			Dx12DescriptorAllocator& cbvSrvUav,
@@ -43,14 +45,26 @@ namespace noc
 		bool EnsureSkyPso_(ID3D12Device* device, ResourceManager* rm);
 		bool EnsureRootSigAndPso_(ID3D12Device* device, Dx12PsoCache& cache, ResourceManager* rm);
 		bool EnsureGridPso_(ID3D12Device* device, ResourceManager* rm);
-		bool EnsureValidationCubeUploaded_(ID3D12Device* device, ID3D12GraphicsCommandList* cmd,
-			Dx12DeferredReleaseQueue& deferred, const Dx12FrameSync& sync, uint32_t frameIndex);
+		struct GpuMesh;
+		struct Impl;
+
+		GpuMesh* EnsureMeshUploaded_(
+			ID3D12Device* device,
+			ID3D12GraphicsCommandList* cmd,
+			Dx12DeferredReleaseQueue& deferred,
+			const Dx12FrameSync& sync,
+			uint32_t frameIndex,
+			ResourceManager& resources,
+			ResourceHandle handle);
+		bool EnsureInstanceBuffer_(
+			ID3D12Device* device,
+			uint32_t frameIndex,
+			uint32_t requiredCapacity);
 		bool EnsureGridUploaded_(ID3D12Device* device, ID3D12GraphicsCommandList* cmd,
 			Dx12DeferredReleaseQueue& deferred, const Dx12FrameSync& sync, uint32_t frameIndex);
 		bool EnsureSelectionUpload_(ID3D12Device* device);
 
 		void EnsurePerFrameCbv_(ID3D12Device* device);
-		void EnsurePerFrameInstanceSrv_(ID3D12Device* device);
 
 	private:
 		ResourceHandleT<TextResource> skyHlsl_;
@@ -73,12 +87,6 @@ namespace noc
 		dx12::ComPtr<ID3D12RootSignature> gridRootSig_;
 		dx12::ComPtr<ID3D12PipelineState> gridPso_;
 
-		// Phase 14 validation geometry. The general multi-mesh render path remains
-		// future renderer work; this pass still draws one geometry instanced N times.
-		GpuBuffer vb_;
-		GpuBuffer ib_;
-		uint32_t indexCount_ = 0;
-
 		GpuBuffer gridVb_;
 		uint32_t gridVertexCount_ = 0;
 
@@ -96,7 +104,7 @@ namespace noc
 		// Per-frame instance matrices in an upload buffer (mapped once), exposed as SRV t0.
 		dx12::ComPtr<ID3D12Resource> instanceBuf_[dx12::kFrameCount];
 		uint8_t* instanceMapped_[dx12::kFrameCount]{};
-		uint32_t instanceCapacity_ = 0;
+		uint32_t instanceCapacity_[dx12::kFrameCount]{};
 		Dx12DescriptorHandle instanceSrv_[dx12::kFrameCount]{};
 
 		Dx12PsoCache* psoCache_ = nullptr;
@@ -105,9 +113,9 @@ namespace noc
 		bool rootReady_ = false;
 		bool psoReady_ = false;
 		bool gridPsoReady_ = false;
-		bool meshReady_ = false;
 		bool gridReady_ = false;
 		bool cbReady_ = false;
-		bool instReady_ = false;
+
+		Impl* impl_ = nullptr;
 	};
 }
