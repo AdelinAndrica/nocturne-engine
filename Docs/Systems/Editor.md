@@ -11,6 +11,7 @@ source_docs: ["Docs/nocturne_engine_architecture.md","Docs/Phase 13 — Completi
 book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §15.4 The Game World Editor","Jason Gregory — Game Engine Architecture (3rd ed.), §15.4.1 Typical Features of a Game World Editor"]
 aliases: ["Editor","Nocturne Editor","EditorShellV3"]
 deprecated_aliases: ["EditorShell","EditorControls"]
+api_symbols: ["nocturne::editor::EditorShellV3","nocturne::editor::EditorViewportController","nocturne::editor::EditorTheme"]
 ---
 
 # Editor
