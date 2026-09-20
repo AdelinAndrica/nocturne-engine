@@ -378,7 +378,7 @@ namespace nocturne::editor
                 "Spot Light",
                 noc::LightType::Spot,
                 { 3.5f, 3.4f, 5.0f },
-                YawPitch(2.55f, 0.62f),
+                YawPitch(-0.78f, 0.76f),
                 { 0.42f, 0.62f, 1.00f },
                 3.0f,
                 12.0f,
