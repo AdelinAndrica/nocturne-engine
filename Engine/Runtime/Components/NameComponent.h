@@ -11,6 +11,13 @@ namespace noc
     inline constexpr const char* kNameComponentCanonicalName =
         "Nocturne.Name";
 
+    /** @brief Fixed byte capacity for NameComponent, including the null terminator. */
+    inline constexpr uint32_t kNameComponentCapacity = 64;
+
+    /** @brief Maximum UTF-8 payload bytes available before the null terminator. */
+    inline constexpr uint32_t kNameComponentMaxBytes =
+        kNameComponentCapacity - 1u;
+
     /**
      * @brief Fixed-capacity UTF-8 display name used by runtime/editor presentation.
      *
@@ -27,10 +34,6 @@ namespace noc
      *
      * @ingroup world_ecs
      */
-    inline constexpr uint32_t kNameComponentCapacity = 64;
-    inline constexpr uint32_t kNameComponentMaxBytes =
-        kNameComponentCapacity - 1u;
-
     struct NameComponent
     {
         /** Null-terminated UTF-8 display-name storage. */
