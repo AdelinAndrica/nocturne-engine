@@ -1,0 +1,207 @@
+name: Nocturne Website CI
+
+on:
+  push:
+    paths:
+      - "Website/**"
+      - "Design/**"
+      - "Docs/**"
+      - "Knowledge/**"
+      - "Schemas/**"
+      - "llms.txt"
+      - "llms-full.txt"
+      - ".github/workflows/web-ci.yml"
+  pull_request:
+    paths:
+      - "Website/**"
+      - "Design/**"
+      - "Docs/**"
+      - "Knowledge/**"
+      - "Schemas/**"
+      - "llms.txt"
+      - "llms-full.txt"
+      - ".github/workflows/web-ci.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+  queue: single
+
+permissions:
+  contents: read
+
+jobs:
+  static-site:
+    name: Astro + Starlight static build
+    runs-on: [self-hosted, Windows, X64]
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        shell: powershell
+        working-directory: Website
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Configure Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Website/package-lock.json
+
+      - name: Install website dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Validate release manifest
+        run: npm run validate:releases
+
+      - name: Build static website
+        run: npm run build
+
+      - name: Verify website routes and canonical docs
+        shell: powershell
+        run: |
+          function Assert-File([string]$Path) {
+            if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+              throw "Missing expected file: $Path"
+            }
+          }
+          
+          function Assert-Contains([string]$Path, [string]$Text) {
+            if (-not (Select-String -LiteralPath $Path -SimpleMatch -Pattern $Text -Quiet)) {
+              throw "Expected '$Text' in $Path"
+            }
+          }
+          
+          Assert-File "dist/index.html"
+          Assert-File "dist/download/index.html"
+          Assert-File "dist/docs/index.html"
+          Assert-File "dist/404.html"
+          
+          Assert-File "dist/docs/architecture/overview/index.html"
+          Assert-File "dist/docs/systems/runtime/index.html"
+          Assert-File "dist/docs/systems/resources/index.html"
+          Assert-File "dist/docs/systems/rendering/index.html"
+          Assert-File "dist/docs/systems/world-ecs/index.html"
+          Assert-File "dist/docs/systems/editor/index.html"
+          Assert-File "dist/docs/development/documentation-model/index.html"
+          Assert-File "dist/docs/development/production-engineering-standard/index.html"
+          Assert-File "dist/docs/development/website-specification/index.html"
+          Assert-File "dist/docs/history/index.html"
+
+          Assert-File "dist/llms.txt"
+          Assert-File "dist/llms-full.txt"
+          Assert-File "dist/knowledge/manifest.json"
+          Assert-File "dist/knowledge/terminology.json"
+          Assert-File "dist/schemas/knowledge-manifest.schema.json"
+          Assert-File "dist/schemas/terminology.schema.json"
+          Assert-File "dist/raw/noc.runtime.md"
+          Assert-File "dist/ai/noc.runtime.md"
+          
+          Assert-Contains "dist/docs/systems/runtime/index.html" "noc.runtime"
+          Assert-Contains "dist/docs/systems/resources/index.html" "noc.resources"
+          Assert-Contains "dist/docs/systems/rendering/index.html" "noc.render"
+          Assert-Contains "dist/docs/systems/world-ecs/index.html" "noc.world"
+          Assert-Contains "dist/docs/systems/editor/index.html" "noc.editor"
+          Assert-Contains "dist/docs/systems/runtime/index.html" "View Markdown"
+          Assert-Contains "dist/docs/systems/runtime/index.html" "Copy Markdown"
+          Assert-Contains "dist/docs/systems/runtime/index.html" "Copy for AI"
+          Assert-Contains "dist/knowledge/manifest.json" "noc.runtime"
+          Assert-Contains "dist/knowledge/terminology.json" "EditorShellV3"
+          Assert-Contains "dist/knowledge/terminology.json" "EditorControls"
+          Assert-Contains "dist/llms.txt" "Historical Phase documents must not override current canonical behavior."
+          Assert-Contains "dist/llms-full.txt" "Document ID: noc.runtime"
+          
+          Assert-File "dist/icons/box.svg"
+          Assert-File "dist/icons/device-desktop.svg"
+          Assert-File "dist/icons/world.svg"
+          Assert-File "dist/icons/hierarchy-2.svg"
+          Assert-File "dist/icons/layout-grid.svg"
+          Assert-File "dist/icons/terminal-2.svg"
+          Assert-File "dist/icons/file-text.svg"
+          
+          Assert-Contains "dist/index.html" "EditorShellV3"
+          Assert-Contains "dist/index.html" "Interface schematic"
+          Assert-Contains "dist/index.html" ("Phases 1{0}15 implemented" -f [char]0x2013)
+          Assert-Contains "dist/index.html" "noc.runtime"
+          Assert-Contains "dist/index.html" "noc.resources"
+          Assert-Contains "dist/index.html" "noc.render"
+          Assert-Contains "dist/index.html" "noc.world"
+          Assert-Contains "dist/index.html" "noc.editor"
+          Assert-Contains "dist/index.html" "Skip to content"
+          
+          Assert-File "../Schemas/release.schema.json"
+          Assert-Contains "dist/download/index.html" "PUBLIC RELEASE NOT PUBLISHED"
+          Assert-Contains "dist/download/index.html" "0 published artifacts"
+          Assert-Contains "dist/download/index.html" "Configuration is not the same as support"
+          Assert-Contains "dist/download/index.html" "SHA-256"
+      - name: Verify published-release rendering with ephemeral fixture
+        shell: powershell
+        run: |
+          function Assert-Contains([string]$Path, [string]$Text) {
+            if (-not (Select-String -LiteralPath $Path -SimpleMatch -Pattern $Text -Quiet)) {
+              throw "Expected '$Text' in $Path"
+            }
+          }
+          
+          $backup = Join-Path $env:RUNNER_TEMP "nocturne-releases.json"
+          Copy-Item -LiteralPath "src/data/releases.json" -Destination $backup -Force
+          
+          $fixtureJson = @'
+          {
+            "schemaVersion": 1,
+            "latest": "9.9.9-ci",
+            "releases": [
+              {
+                "version": "9.9.9-ci",
+                "channel": "development",
+                "publishedAt": "2026-09-19",
+                "notesUrl": "https://example.invalid/nocturne/release-notes",
+                "sourceCommit": "0000000000000000000000000000000000000000",
+                "builds": [
+                  {
+                    "platform": "windows",
+                    "architecture": "x86_64",
+                    "configuration": "ship",
+                    "status": "supported",
+                    "file": "nocturne-engine-9.9.9-ci-windows-x86_64.zip",
+                    "bytes": 1048576,
+                    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+                    "url": "https://example.invalid/nocturne/nocturne-engine-9.9.9-ci-windows-x86_64.zip"
+                  }
+                ]
+              }
+            ]
+          }
+          '@
+          [System.IO.File]::WriteAllText(
+            (Join-Path (Get-Location) "src/data/releases.json"),
+            $fixtureJson,
+            (New-Object System.Text.UTF8Encoding($false))
+          )
+          
+          npm run validate:releases
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          
+          npm run build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          
+          Assert-Contains "dist/download/index.html" "v9.9.9-ci"
+          Assert-Contains "dist/download/index.html" "x86_64"
+          Assert-Contains "dist/download/index.html" "1.00 MB"
+          Assert-Contains "dist/download/index.html" "nocturne-engine-9.9.9-ci-windows-x86_64.zip"
+          
+          Move-Item -LiteralPath $backup -Destination "src/data/releases.json" -Force
+
+      - name: Verify generated AI knowledge is committed
+        shell: powershell
+        working-directory: .
+        run: |
+          git diff --exit-code -- Knowledge llms.txt llms-full.txt
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Generated AI knowledge outputs are stale. Run 'cd Website; npm run sync' and commit Knowledge/, llms.txt and llms-full.txt."
+            exit $LASTEXITCODE
+          }

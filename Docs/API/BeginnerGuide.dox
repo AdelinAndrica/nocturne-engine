@@ -1,0 +1,162 @@
+/**
+@page api_beginner_guide Beginner Guide
+
+# Read this first
+
+The Nocturne C++ API is intended to answer two beginner questions before it shows
+you member signatures:
+
+1. **What is this type responsible for?**
+2. **Should I call this function myself, and what lifetime/ownership rules apply?**
+
+If a class page contains a method you do not recognize, do not infer usage from the
+name alone. Read the class-level **When to use**, **Do not use for**,
+**Ownership/lifetime**, **Threading** and **Typical flow** sections first.
+
+# Recommended learning order
+
+## 1. Runtime
+
+Start with:
+
+- @ref noc::Engine
+- @ref noc::MainLoop
+- @ref noc::EngineConfig
+
+Understand the frame sequence before reading lower-level systems:
+
+@code
+Engine::BeginFrame()
+    -> optional editor pre-Tick callback
+    -> Engine::Tick()
+    -> Engine::EndFrame()
+@endcode
+
+Important: @ref noc::Engine::TickOnce() is currently a diagnostic/smoke helper,
+not one full game/editor frame.
+
+## 2. World and ECS
+
+Then read:
+
+- @ref noc::EntityHandle
+- @ref noc::EntityRegistry
+- @ref noc::World
+- @ref noc::TransformComponent
+- @ref noc::RenderableComponent
+- @ref noc::CameraComponent
+- @ref noc::NameComponent
+
+Remember:
+
+@code
+EntityHandle::IsValid()
+@endcode
+
+only checks the handle's local sentinel values. Use @ref noc::World::IsAlive()
+when you need to know whether the entity is still alive.
+
+## 3. Resources
+
+Read:
+
+- @ref noc::VirtualFileSystem
+- @ref noc::ResourceHandle
+- @ref noc::ResourceHandleT
+- @ref noc::ResourceManager
+
+The normal asynchronous idea is:
+
+@code
+request -> Loading
+        -> worker I/O/decode
+        -> ResourceManager::Update()
+        -> Ready or Failed
+@endcode
+
+Do not assume a valid resource handle is ready.
+
+## 4. Rendering
+
+Read:
+
+- @ref noc::RenderQueue
+- @ref noc::RenderSystem
+- @ref noc::Dx12Renderer
+
+The important architecture boundary is:
+
+@code
+World / ECS
+    -> BuildRenderQueue(frameArena, viewport)
+    -> RenderQueue
+    -> RenderSystem
+    -> Dx12Renderer
+@endcode
+
+Most application/editor code should stop at RenderSystem. Dx12Renderer is backend
+implementation detail.
+
+## 5. Editor
+
+Read:
+
+- @ref nocturne::editor::EditorShellV3
+- @ref nocturne::editor::EditorViewportController
+- @ref nocturne::editor::EditorTheme
+
+EditorShellV3 owns presentation/chrome.
+EditorViewportController owns editor-only 3D interaction.
+World remains authoritative for entity/component state.
+
+# Ownership vocabulary used in these docs
+
+**Owns**
+: The object is responsible for lifetime/destruction of the referenced state.
+
+**Borrowed**
+: You may use the reference/pointer while the owner and documented lifetime remain
+  valid. You must not delete/free it.
+
+**Same-frame**
+: The data may be invalid after the next Engine::BeginFrame(), especially when it
+  comes from Engine::FrameArena().
+
+**Structural mutation**
+: Adding/removing/destroying entities/components. Dense ECS storage may relocate
+  component objects, so borrowed component pointers should not be retained across it.
+
+# Book grounding
+
+The architecture explanations in these API comments follow the canonical Nocturne
+system documents, which are grounded in:
+
+- Jason Gregory, Game Engine Architecture (3rd ed.), §7.2 and §7.2.2 for runtime
+  resource management;
+- Gregory §8.2 for the master game loop;
+- Gregory §8.6 for job/task decomposition;
+- Gregory §11.2 and §11.2.1 for rendering-pipeline separation;
+- Gregory §15.4 and §15.4.1 for world-editor responsibilities;
+- Gregory §16.2.1.6, §16.2.2 and §16.5 for component/world/reference architecture;
+- Bob Nystrom, Game Programming Patterns, Component and Data Locality;
+- Frank Luna and Eric Lengyel for camera/projection fundamentals used by
+  CameraComponent.
+
+The exact Nocturne C++ API, Doxygen layout, handle formats, threading boundaries,
+copy-for-AI surface and beginner-oriented wording are **Design choice (not directly
+from the book)**.
+
+# Where conceptual documentation fits
+
+Doxygen explains symbol-level use. For architecture/rationale, follow the canonical
+website documentation:
+
+- Runtime: /docs/systems/runtime/
+- Resources: /docs/systems/resources/
+- Rendering: /docs/systems/rendering/
+- World & ECS: /docs/systems/world-ecs/
+- Editor: /docs/systems/editor/
+
+Do not treat the existence of a private/backend type as an instruction that normal
+application code should call it.
+*/

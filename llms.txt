@@ -1,0 +1,45 @@
+# Nocturne Engine
+
+> Custom Windows game engine written in C++20+, targeting a first-person survival horror game.
+
+## Source precedence
+
+1. Current canonical Architecture / Systems / Development documentation.
+2. Current source code for exact implementation behavior.
+3. Completion/implementation reports as delivered-work evidence.
+4. Historical Phase documents for chronology only.
+
+Historical Phase documents must not override current canonical behavior.
+
+## Canonical documentation
+
+- [Nocturne Engine — Architecture Overview](/docs/architecture/overview/) — Canonical layered/subsystem architecture, dependency direction, ownership and engine/application policy boundary. [noc.architecture.overview] — Source: Docs/nocturne_engine_architecture.md
+- [C++ API Reference](/docs/development/c-api-reference/) — Canonical contract for generated Nocturne C++ API documentation, symbol links and Doxygen XML tooling output. [noc.development.cpp-api] — Source: Docs/Development/C++ API Reference.md
+- [Nocturne Engine — Production Engineering Standard](/docs/development/production-engineering-standard/) — Canonical engineering quality, CI, validation and production-readiness standard for Nocturne Engine. [noc.development.production-standard] — Source: Docs/Production Engineering Standard.md
+- [Release Process](/docs/development/release-process/) — Canonical release packaging, artifact validation, manifest promotion and Downloads publication contract. [noc.development.release-process] — Source: Docs/Development/Release Process.md
+- [Documentation Model](/docs/development/documentation-model/) — Canonical source-of-truth, metadata, precedence and generated-documentation rules for Nocturne technical documentation. [noc.documentation.model] — Source: Docs/Development/Documentation Model.md
+- [Editor](/docs/systems/editor/) — Canonical Nocturne Editor shell, runtime boundary, viewport, selection and authoring-tool contract. [noc.editor] — Source: Docs/Systems/Editor.md
+- [Rendering](/docs/systems/rendering/) — Canonical renderer ownership, frame handoff, DirectX 12 backend and editor render-target integration contract. [noc.render] — Source: Docs/Systems/Rendering.md
+- [Resources](/docs/systems/resources/) — Canonical virtual file system, resource loading, typed resource and runtime asset-lifetime contract. [noc.resources] — Source: Docs/Systems/Resources.md
+- [Runtime](/docs/systems/runtime/) — Canonical runtime ownership, lifecycle, frame execution, configuration and subsystem orchestration contract. [noc.runtime] — Source: Docs/Systems/Runtime.md
+- [Website Quality & Deployment](/docs/development/website-quality-deployment/) — Canonical build-quality, privacy, browser validation, deployment and release-to-Downloads publication contract for the Nocturne website. [noc.web.quality] — Source: Docs/Development/Website Quality & Deployment.md
+- [Nocturne Website — Design & Technical Specification](/docs/development/website-specification/) — Canonical product and technical specification for the Nocturne Engine website and documentation surface. [noc.web.spec] — Source: Docs/Web/Nocturne Website — Design & Technical Specification.md
+- [World & ECS](/docs/systems/world-ecs/) — Canonical runtime entity identity, component ownership, transform hierarchy, camera and render-extraction contract. [noc.world] — Source: Docs/Systems/World & ECS.md
+
+## Machine-readable entry points
+
+- Knowledge/manifest.json — stable canonical document index and source relationships.
+- Knowledge/terminology.json — canonical terms, aliases and deprecated aliases.
+- Schemas/knowledge-manifest.schema.json — manifest contract.
+- Schemas/terminology.schema.json — terminology contract.
+- llms-full.txt — generated canonical-only documentation export.
+
+## Agent rules
+
+- Prefer canonical documents over Phase/history documents for current behavior.
+- Inspect referenced source files when exact implementation detail matters.
+- Do not introduce upward engine dependencies.
+- Engine provides mechanisms; applications provide policies.
+- Engine namespace: noc::.
+- Game/application namespace: game::.
+- Do not treat roadmap scope as proof that a feature is implemented.

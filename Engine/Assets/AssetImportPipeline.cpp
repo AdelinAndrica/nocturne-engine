@@ -160,7 +160,7 @@ namespace noc {
 
     bool AssetImportPipeline::ImportAll() {
         // Design choice: scan physical filesystem under content root "Data".
-        // Since combined.md mounts a loose directory like "D:/Projects/Nocturne/Data" :contentReference[oaicite:16]{index=16}
+        // Historical examples may mount a loose directory like "<repo>/Data".
         // we assume host runs with cwd at repo root and Data exists.
         const std::filesystem::path root("Data");
         if (!std::filesystem::exists(root)) {

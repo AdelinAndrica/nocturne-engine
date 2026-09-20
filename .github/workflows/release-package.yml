@@ -1,0 +1,270 @@
+name: Nocturne Release Packaging
+
+on:
+  pull_request:
+    paths:
+      - "Engine/**"
+      - "Apps/NocturneHost/**"
+      - "Apps/NocturneEditor/**"
+      - "Data/**"
+      - "Ide/VS2026/NocturneEngine/**"
+      - "Ide/VS2026/NocturneHost/**"
+      - "Ide/VS2026/NocturneEditor/**"
+      - "Schemas/release.schema.json"
+      - "Website/src/data/release-schema.mjs"
+      - ".github/scripts/package-release.ps1"
+      - ".github/workflows/release-package.yml"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Semantic release version without the v prefix"
+        required: true
+        default: "0.1.0-dev.0"
+        type: string
+      channel:
+        description: "Release channel"
+        required: true
+        default: development
+        type: choice
+        options:
+          - development
+          - preview
+          - stable
+  push:
+    tags:
+      - "v*.*.*"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+  queue: single
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Ship ${{ matrix.architecture }}
+    runs-on: [self-hosted, Windows, X64]
+    timeout-minutes: 25
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - msbuild_platform: x64
+            architecture: x86_64
+          - msbuild_platform: Win32
+            architecture: x86
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Resolve candidate version
+        id: version
+        shell: powershell
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $version = "${{ inputs.version }}"
+            $channel = "${{ inputs.channel }}"
+          }
+          elseif ("${{ github.event_name }}" -eq "push") {
+            $version = "${{ github.ref_name }}".TrimStart("v")
+            $channel = if ($version.Contains("-")) { "preview" } else { "stable" }
+          }
+          else {
+            $version = "0.0.0-pr${{ github.event.pull_request.number }}"
+            $channel = "development"
+          }
+
+          if ($version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$') {
+            throw "Invalid release version: $version"
+          }
+
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "channel=$channel" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Build Ship outputs
+        shell: powershell
+        run: |
+          $root = "$env:GITHUB_WORKSPACE\"
+          $out = "$env:GITHUB_WORKSPACE\Build\Release\${{ matrix.architecture }}\bin\"
+
+          $projects = @(
+            "Ide\VS2026\NocturneEngine\NocturneEngine.vcxproj",
+            "Ide\VS2026\NocturneHost\NocturneHost.vcxproj",
+            "Ide\VS2026\NocturneEditor\NocturneEditor.vcxproj"
+          )
+
+          foreach ($project in $projects) {
+            msbuild $project `
+              /m `
+              /p:Configuration=Ship `
+              /p:Platform=${{ matrix.msbuild_platform }} `
+              "/p:SolutionDir=$root" `
+              "/p:OutDir=$out"
+
+            if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+            }
+          }
+
+      - name: Package release candidate
+        id: package
+        shell: powershell
+        run: |
+          & ".github\scripts\package-release.ps1" `
+            -Version "${{ steps.version.outputs.version }}" `
+            -Channel "${{ steps.version.outputs.channel }}" `
+            -Architecture "${{ matrix.architecture }}" `
+            -Platform "${{ matrix.msbuild_platform }}" `
+            -BinDir "$env:GITHUB_WORKSPACE\Build\Release\${{ matrix.architecture }}\bin" `
+            -DataDir "$env:GITHUB_WORKSPACE\Data" `
+            -OutputDir "$env:GITHUB_WORKSPACE\Build\Release\${{ matrix.architecture }}\package" `
+            -SourceCommit "${{ github.sha }}" `
+            -Repository "${{ github.repository }}"
+
+      - name: Upload packaged candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: nocturne-release-${{ steps.version.outputs.version }}-windows-${{ matrix.architecture }}
+          path: |
+            ${{ steps.package.outputs.artifact_path }}
+            ${{ steps.package.outputs.checksum_path }}
+            ${{ steps.package.outputs.record_path }}
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish GitHub release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: package
+    runs-on: [self-hosted, Windows, X64]
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download packaged architectures
+        uses: actions/download-artifact@v5
+        with:
+          pattern: nocturne-release-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: powershell
+        run: |
+          $assets = @(
+            Get-ChildItem -Path "release-assets" -File | Where-Object {
+              $_.Name -like "*.zip" -or
+              $_.Name -like "*.sha256" -or
+              $_.Name -like "release-record-*.json"
+            } | ForEach-Object { $_.FullName }
+          )
+          
+          if ($assets.Count -eq 0) {
+            Write-Error "No packaged assets found."
+            exit 1
+          }
+          
+          $ghArgs = @(
+            "release", "create", $env:GITHUB_REF_NAME,
+            "--repo", $env:GITHUB_REPOSITORY,
+            "--title", "Nocturne Engine $env:GITHUB_REF_NAME",
+            "--generate-notes"
+          ) + $assets
+          
+          & gh @ghArgs
+          exit $LASTEXITCODE
+
+  website-manifest:
+    name: Prepare Downloads manifest PR
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - package
+      - publish
+    runs-on: windows-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout website source branch
+        uses: actions/checkout@v7
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Configure Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Website/package-lock.json
+
+      - name: Download published release records
+        uses: actions/download-artifact@v5
+        with:
+          pattern: nocturne-release-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Promote release records into a reviewed manifest candidate
+        working-directory: Website
+        shell: pwsh
+        run: |
+          npm ci --no-audit --no-fund
+          npm run promote:release -- ../release-assets/release-record-x86_64.json ../release-assets/release-record-x86.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run validate:releases
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload promoted manifest evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: nocturne-website-manifest-${{ github.ref_name }}
+          path: Website/src/data/releases.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Open or update Downloads manifest pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $branch = "release-manifest/$env:GITHUB_REF_NAME"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c $branch
+          git add Website/src/data/releases.json
+
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Release manifest already contains $env:GITHUB_REF_NAME; no PR change required."
+            exit 0
+          }
+
+          git commit -m "web(release): publish $env:GITHUB_REF_NAME in Downloads"
+          git push --force-with-lease origin "HEAD:$branch"
+
+          $existing = gh pr list --repo $env:GITHUB_REPOSITORY --base master --head $branch --state open --json number --jq '.[0].number'
+          if ($existing) {
+            Write-Host "Downloads manifest PR #$existing already exists and branch was updated."
+            exit 0
+          }
+
+          gh pr create `
+            --repo $env:GITHUB_REPOSITORY `
+            --base master `
+            --head $branch `
+            --title "web(release): publish $env:GITHUB_REF_NAME in Downloads" `
+            --body "Promotes the validated release records produced and published by Nocturne Release Packaging. Review before merge; this workflow never auto-merges the Downloads manifest."

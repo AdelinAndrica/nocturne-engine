@@ -1,0 +1,251 @@
+---
+const data = Astro.locals.starlightRoute.entry.data as typeof Astro.locals.starlightRoute.entry.data & {
+  id?: string;
+  doc_type?: string;
+  canonical?: boolean;
+  status?: string;
+  subsystem?: string;
+};
+
+const historical = data.doc_type === 'historical-phase' || data.canonical === false;
+const authorityLabel = historical ? 'HISTORY' : data.canonical ? 'CANONICAL' : 'REFERENCE';
+const typeLabel = data.subsystem
+  ? data.subsystem.toUpperCase()
+  : data.doc_type
+    ? data.doc_type.replaceAll('-', ' ').toUpperCase()
+    : 'DOCUMENTATION';
+const statusLabel = data.status?.toUpperCase();
+const canExport = data.canonical === true && Boolean(data.id);
+const rawPath = data.id ? `/raw/${data.id}.md` : '';
+const aiPath = data.id ? `/ai/${data.id}.md` : '';
+---
+
+<div class="noc-page-title">
+  <div class="noc-page-title__meta" data-pagefind-ignore>
+    <span class:list={['noc-chip', historical ? 'noc-chip--history' : 'noc-chip--authority']}>
+      {authorityLabel}
+    </span>
+    <span class="noc-chip noc-chip--type">{typeLabel}</span>
+    {statusLabel && (
+      <span class:list={['noc-chip', `noc-chip--status-${data.status}`]}>
+        {statusLabel}
+      </span>
+    )}
+  </div>
+
+  <h1 id="_top">{data.title}</h1>
+
+  {data.id && (
+    <div class="noc-page-title__id" data-pagefind-ignore>
+      {data.id}
+    </div>
+  )}
+
+  {canExport && (
+    <div class="noc-doc-actions" data-pagefind-ignore>
+      <a class="noc-doc-action" href={rawPath}>View Markdown</a>
+      <button
+        class="noc-doc-action"
+        type="button"
+        data-copy-source={rawPath}
+        data-copy-label="Copy Markdown"
+      >
+        Copy Markdown
+      </button>
+      <button
+        class="noc-doc-action noc-doc-action--ai"
+        type="button"
+        data-copy-source={aiPath}
+        data-copy-label="Copy for AI"
+      >
+        Copy for AI
+      </button>
+      <span class="noc-doc-actions__status" aria-live="polite"></span>
+    </div>
+  )}
+</div>
+
+<script>
+  const bindNocturneCopyActions = () => {
+    document.querySelectorAll('[data-copy-source]').forEach((element) => {
+      if (!(element instanceof HTMLButtonElement)) return;
+      if (element.dataset.copyBound === 'true') return;
+
+      element.dataset.copyBound = 'true';
+      const idleLabel = element.dataset.copyLabel ?? element.textContent ?? 'Copy';
+
+      element.addEventListener('click', async () => {
+        const source = element.dataset.copySource;
+        const status = element
+          .closest('.noc-doc-actions')
+          ?.querySelector('.noc-doc-actions__status');
+
+        if (!source) return;
+
+        try {
+          element.disabled = true;
+          element.textContent = 'Copying…';
+
+          const response = await fetch(source, {
+            headers: { Accept: 'text/markdown,text/plain;q=0.9,*/*;q=0.1' }
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          const text = await response.text();
+          await navigator.clipboard.writeText(text);
+
+          element.textContent = 'Copied';
+          if (status instanceof HTMLElement) {
+            status.textContent = `${idleLabel} copied to clipboard.`;
+          }
+
+          window.setTimeout(() => {
+            element.textContent = idleLabel;
+            if (status instanceof HTMLElement) status.textContent = '';
+          }, 1800);
+        } catch (error) {
+          console.error('Nocturne documentation copy failed.', error);
+          element.textContent = 'Copy failed';
+          if (status instanceof HTMLElement) {
+            status.textContent = 'Copy failed. Open the Markdown source and copy it manually.';
+          }
+
+          window.setTimeout(() => {
+            element.textContent = idleLabel;
+          }, 2200);
+        } finally {
+          element.disabled = false;
+        }
+      });
+    });
+  };
+
+  bindNocturneCopyActions();
+  document.addEventListener('astro:page-load', bindNocturneCopyActions);
+</script>
+
+<style>
+  .noc-page-title {
+    margin-bottom: 1.5rem;
+  }
+
+  .noc-page-title__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .noc-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.45rem;
+    padding: 0 0.45rem;
+    border: 1px solid var(--noc-border);
+    border-radius: 4px;
+    background: var(--noc-input-bg);
+    color: var(--noc-text-muted);
+    font-family: var(--noc-font-mono);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+
+  .noc-chip--authority {
+    border-color: color-mix(in srgb, var(--noc-accent) 52%, var(--noc-border));
+    background: color-mix(in srgb, var(--noc-accent) 12%, var(--noc-input-bg));
+    color: #a9d4ff;
+  }
+
+  .noc-chip--history {
+    border-color: color-mix(in srgb, var(--noc-text-muted) 36%, var(--noc-border));
+    color: var(--noc-text-muted);
+  }
+
+  .noc-chip--status-implemented,
+  .noc-chip--status-foundation {
+    border-color: color-mix(in srgb, var(--noc-success) 42%, var(--noc-border));
+    color: #a8e7b9;
+  }
+
+  .noc-chip--status-active {
+    border-color: color-mix(in srgb, var(--noc-accent) 45%, var(--noc-border));
+    color: #a9d4ff;
+  }
+
+  .noc-chip--status-planned {
+    border-color: color-mix(in srgb, var(--noc-warning) 42%, var(--noc-border));
+    color: #efd19b;
+  }
+
+  .noc-chip--status-historical {
+    color: var(--noc-text-muted);
+  }
+
+  h1 {
+    margin: 0;
+    color: var(--noc-text-primary);
+    font-family: var(--noc-font-display);
+    letter-spacing: -0.035em;
+  }
+
+  .noc-page-title__id {
+    margin-top: 0.55rem;
+    color: var(--noc-text-muted);
+    font-family: var(--noc-font-mono);
+    font-size: 0.72rem;
+  }
+
+  .noc-doc-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.8rem;
+  }
+
+  .noc-doc-action {
+    min-height: 1.9rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.58rem;
+    border: 1px solid var(--noc-border);
+    border-radius: var(--noc-radius-sm);
+    background: var(--noc-input-bg);
+    color: var(--noc-text-muted);
+    font-family: var(--noc-font-mono);
+    font-size: 0.61rem;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .noc-doc-action:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--noc-border) 55%, var(--noc-text-muted));
+    background: var(--noc-button-hover);
+    color: var(--noc-text-primary);
+  }
+
+  .noc-doc-action--ai {
+    border-color: color-mix(in srgb, var(--noc-accent) 50%, var(--noc-border));
+    color: #a9d4ff;
+  }
+
+  .noc-doc-action:disabled {
+    cursor: progress;
+    opacity: 0.72;
+  }
+
+  .noc-doc-actions__status {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+</style>

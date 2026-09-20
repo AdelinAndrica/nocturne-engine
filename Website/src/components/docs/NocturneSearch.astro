@@ -1,0 +1,40 @@
+---
+import DefaultSearch from '@astrojs/starlight/components/Search.astro';
+---
+
+<div class="noc-search">
+  <DefaultSearch {...Astro.props} />
+</div>
+
+<style>
+  .noc-search {
+    min-width: min(28rem, 42vw);
+  }
+
+  .noc-search :global(button) {
+    border: 1px solid var(--noc-border);
+    border-radius: var(--noc-radius-md);
+    background: var(--noc-input-bg);
+    color: var(--noc-text-muted);
+    box-shadow: none;
+  }
+
+  .noc-search :global(button:hover) {
+    border-color: color-mix(in srgb, var(--noc-border) 55%, var(--noc-text-muted));
+    background: var(--noc-button-hover);
+    color: var(--noc-text-primary);
+  }
+
+  .noc-search :global(kbd) {
+    border-color: var(--noc-border);
+    background: var(--noc-panel-bg-alt);
+    color: var(--noc-text-muted);
+    font-family: var(--noc-font-mono);
+  }
+
+  @media (max-width: 50rem) {
+    .noc-search {
+      min-width: auto;
+    }
+  }
+</style>

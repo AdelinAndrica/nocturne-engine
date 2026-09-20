@@ -2,22 +2,50 @@
 
 namespace noc
 {
-    // Engine-owned boot configuration.
-    // Phase 3: only VFS/mount policy lives here.
-    //
-    // Important rule:
-    // - These values are consumed during Engine::Init() to mount the VFS.
-    // - Changing them after Init() is not supported (config is frozen).
+    /**
+     * @brief Boot-time configuration consumed by Engine::Init().
+     *
+     * EngineConfig currently owns content-mount policy only. It tells the runtime
+     * where loose content, optional overrides and an optional archive live.
+     *
+     * @par When to use
+     * Configure these values before Engine::Init(), normally through
+     * Engine::ConfigMutable() or the Set*Root()/SetArchivePath() helpers.
+     *
+     * @par Lifetime
+     * These fields are raw const-char pointers. Engine does not copy the pointed
+     * strings into owned storage here, so caller-provided storage must remain valid
+     * until Init() has consumed the configuration.
+     *
+     * @par Frozen after Init
+     * Runtime configuration changes after initialization are unsupported.
+     *
+     * @see Engine
+     * @ingroup runtime
+     */
     struct EngineConfig
     {
-        // Physical directory roots. May be absolute or relative to process working directory.
-        // Default is "Data" to support the common dev layout: <working_dir>/Data/...
+        /**
+         * @brief Primary loose content directory.
+         *
+         * May be absolute or relative to the process working directory.
+         * Default: @c "Data".
+         */
         const char* contentRoot = "Data";
 
-        // Optional additional mount for overrides (mount order matters; see Engine::Init()).
+        /**
+         * @brief Optional later loose mount used for overrides.
+         *
+         * VFS searches later mounts first, so files here may override matching paths
+         * from earlier mounts.
+         */
         const char* overrideRoot = nullptr;
 
-        // Optional archive mount, e.g. "Packed/game.zip"
+        /**
+         * @brief Optional archive mounted during Engine::Init().
+         *
+         * Example: @c "Packed/game.zip".
+         */
         const char* archivePath = nullptr;
     };
 }

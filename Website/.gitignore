@@ -1,0 +1,18 @@
+node_modules/
+dist/
+.astro/
+.generated-docs.json
+public/nocturne-logo.png
+public/icons/
+public/api/
+public/api-xml/
+public/api-symbol/
+public/api-symbols.json
+public/api-build.json
+
+# Generated from repository-root Docs/ by scripts/prepare.mjs.
+src/content/docs/docs/architecture/overview.md
+src/content/docs/docs/development/production-engineering-standard.md
+src/content/docs/docs/development/website-specification.md
+src/content/docs/docs/history/
+src/styles/generated/

@@ -1,0 +1,85 @@
+/**
+@mainpage Nocturne Engine C++ API
+
+# Start here
+
+If you are learning Nocturne, open @ref api_beginner_guide before browsing the
+alphabetical class list.
+
+This API reference is intentionally written to explain **what a type does, when you
+should use it, when you should not use it, ownership/lifetime, threading assumptions
+and common call flow**.
+
+# Primary subsystem groups
+
+- @ref runtime
+- @ref world_ecs
+- @ref resources
+- @ref rendering
+- @ref editor
+
+# Purpose
+
+This site is the generated C++ reference for the current Nocturne Engine header surface.
+
+Use the canonical Nocturne documentation for the larger architecture, subsystem
+boundaries and design rationale:
+
+- Human documentation: `/docs/`
+- Machine knowledge manifest: `/knowledge/manifest.json`
+- Canonical AI aggregate: `/llms-full.txt`
+- Doxygen XML: `/api-xml/index.xml`
+
+# Source precedence
+
+For current behavior, use:
+
+1. canonical Architecture / Systems / Development documentation;
+2. current C++ source for exact implementation behavior;
+3. completion/implementation reports as delivered-work evidence;
+4. historical Phase documents for chronology and earlier design context.
+
+Doxygen is an explanatory symbol layer. It does not override canonical architecture
+documentation.
+
+# Extraction policy
+
+The beginner-facing reference includes public/protected API surface from current
+Engine, NocturneEditor and NocturneHost headers.
+
+Private class members are deliberately hidden from the primary reference so internal
+implementation details do not overwhelm the API you are expected to use.
+
+The following are also deliberately excluded:
+
+- `ThirdParty/`;
+- test directories;
+- `Engine/Render/DX12/d3dx12.h` because it is vendored DirectX helper code;
+- legacy `EditorShell.h` and `EditorControls.h`, because `EditorShellV3` is the
+  current canonical editor shell.
+
+@note Design choice (not directly from the book): Doxygen is the generated C++
+reference layer and Web 7.1 makes the default view beginner-oriented. The supplied
+engine books ground subsystem concepts and architecture, not this documentation-tool
+choice.
+*/
+
+/** @defgroup runtime Runtime
+ *  @brief Engine lifecycle, frame loop and boot configuration.
+ */
+
+/** @defgroup world_ecs World & ECS
+ *  @brief Runtime entity identity, components, hierarchy, camera and render extraction.
+ */
+
+/** @defgroup resources Resources
+ *  @brief Virtual file access, asynchronous resource loading and typed runtime resources.
+ */
+
+/** @defgroup rendering Rendering
+ *  @brief Renderer-facing frame data, high-level render facade and DX12 backend.
+ */
+
+/** @defgroup editor Editor
+ *  @brief Native editor shell, theme and editor-only viewport interaction.
+ */

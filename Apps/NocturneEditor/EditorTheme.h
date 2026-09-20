@@ -5,8 +5,14 @@
 
 namespace nocturne::editor
 {
-    // Design choice (not directly from the book): centralized visual tokens keep the
-    // Phase 13 tooling UI coherent and replaceable without leaking into runtime UI.
+    /**
+     * @brief Centralized editor color tokens.
+     *
+     * These values define native editor presentation only; they are not gameplay UI
+     * colors and are not an engine-runtime dependency.
+     *
+     * @ingroup editor
+     */
     struct ThemeColors
     {
         COLORREF windowBg;
@@ -27,6 +33,15 @@ namespace nocturne::editor
         COLORREF danger;
     };
 
+    /**
+     * @brief Shared baseline layout metrics for native editor controls.
+     *
+     * @note EditorShellV3 may compute/override concrete layout values for the active
+     * shell. Treat this structure as centralized defaults/tokens, not as a promise
+     * that every pixel dimension in the shell is read from here.
+     *
+     * @ingroup editor
+     */
     struct ThemeMetrics
     {
         int menuHeight = 28;
@@ -45,10 +60,25 @@ namespace nocturne::editor
         int compactRowHeight = 31;
     };
 
+    /**
+     * @brief Read-only access point for Nocturne Editor visual tokens.
+     *
+     * @par When to use
+     * Native editor widgets/chrome should query EditorTheme rather than duplicating
+     * palette constants.
+     *
+     * @par Do not use for
+     * Do not introduce EditorTheme into Engine runtime/game UI code.
+     *
+     * @ingroup editor
+     */
     class EditorTheme
     {
     public:
+        /** @brief Returns process-lifetime editor color tokens. */
         static const ThemeColors& Colors();
+
+        /** @brief Returns process-lifetime editor metric defaults. */
         static const ThemeMetrics& Metrics();
     };
 }

@@ -1,0 +1,522 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "id": "nocturne-engine",
+    "name": "Nocturne Engine",
+    "platform": "Windows",
+    "language": "C++20+",
+    "target": "first-person survival horror",
+    "canonicalDocsRoot": "Docs/"
+  },
+  "sourcePrecedence": [
+    "Current canonical Architecture / Systems / Development contracts.",
+    "Current source code for exact implementation behavior.",
+    "Completion and implementation reports as evidence of delivered work.",
+    "Historical Phase documents for chronology and earlier design context."
+  ],
+  "documents": [
+    {
+      "id": "noc.architecture.overview",
+      "title": "Nocturne Engine — Architecture Overview",
+      "docType": "architecture",
+      "canonical": true,
+      "status": "active",
+      "subsystem": "Architecture",
+      "sourcePath": "Docs/nocturne_engine_architecture.md",
+      "webPath": "/docs/architecture/overview/",
+      "rawPath": "/raw/noc.architecture.overview.md",
+      "aiPath": "/ai/noc.architecture.overview.md",
+      "description": "Canonical layered/subsystem architecture, dependency direction, ownership and engine/application policy boundary.",
+      "sourceFiles": [],
+      "sourceDocs": [],
+      "bookGrounding": [],
+      "aliases": [
+        "Nocturne Engine",
+        "Architecture Overview",
+        "Engine Architecture"
+      ],
+      "deprecatedAliases": [],
+      "apiSymbols": []
+    },
+    {
+      "id": "noc.development.cpp-api",
+      "title": "C++ API Reference",
+      "docType": "reference",
+      "canonical": true,
+      "status": "active",
+      "subsystem": "Documentation",
+      "phaseIntroduced": 16,
+      "sourcePath": "Docs/Development/C++ API Reference.md",
+      "webPath": "/docs/development/c-api-reference/",
+      "rawPath": "/raw/noc.development.cpp-api.md",
+      "aiPath": "/ai/noc.development.cpp-api.md",
+      "description": "Canonical contract for generated Nocturne C++ API documentation, symbol links and Doxygen XML tooling output.",
+      "sourceFiles": [
+        "Docs/API/Doxyfile",
+        "Docs/API/MainPage.dox",
+        "Docs/API/BeginnerGuide.dox",
+        "Website/scripts/prepare-api.ps1",
+        "Website/scripts/validate-api.ps1"
+      ],
+      "sourceDocs": [
+        "Docs/Development/Documentation Model.md",
+        "Docs/Web/Nocturne Website — Design & Technical Specification.md"
+      ],
+      "bookGrounding": [
+        "Jason Gregory — Game Engine Architecture (3rd ed.), §1.7 Tools and the Asset Pipeline",
+        "Jason Gregory — Game Engine Architecture (3rd ed.), §7.2.2 Runtime Resource Management",
+        "Jason Gregory — Game Engine Architecture (3rd ed.), §8.2 Game Loop",
+        "Jason Gregory — Game Engine Architecture (3rd ed.), §11.2 Rendering Pipeline",
+        "Jason Gregory — Game Engine Architecture (3rd ed.), §15.4 Game World Editor",
+        "Jason Gregory — Game Engine Architecture (3rd ed.), §16.2 Runtime Object Model Architectures"
+      ],
+      "aliases": [
+        "C++ API Reference",
+        "API Reference",
+        "Doxygen API"
+      ],
+      "deprecatedAliases": [],
+      "apiSymbols": [
+        {
+          "name": "noc::Engine",
+          "href": "/api-symbol/noc.Engine.html"
+        },
+        {
+          "name": "noc::ResourceManager",
+          "href": "/api-symbol/noc.ResourceManager.html"
+        },
+        {
+          "name": "noc::RenderSystem",
+          "href": "/api-symbol/noc.RenderSystem.html"
+        },
+        {
+          "name": "noc::World",
+          "href": "/api-symbol/noc.World.html"
+        },
+        {
+          "name": "nocturne::editor::EditorShellV3",
+          "href": "/api-symbol/nocturne.editor.EditorShellV3.html"
+        }
+      ]
+    },
+    {
+      "id": "noc.development.production-standard",
+      "title": "Nocturne Engine — Production Engineering Standard",
+      "docType": "standard",
+      "canonical": true,
+      "status": "active",
+      "subsystem": "Development",
+      "sourcePath": "Docs/Production Engineering Standard.md",
+      "webPath": "/docs/development/production-engineering-standard/",
+      "rawPath": "/raw/noc.development.production-standard.md",
+      "aiPath": "/ai/noc.development.production-standard.md",
+      "description": "Canonical engineering quality, CI, validation and production-readiness standard for Nocturne Engine.",
+      "sourceFiles": [],
+      "sourceDocs": [],
+      "bookGrounding": [],
+      "aliases": [
+        "Production Engineering Standard",
+        "Production Standard"
+      ],
+      "deprecatedAliases": [],
+      "apiSymbols": []
+    },
+    {
+      "id": "noc.development.release-process",
+      "title": "Release Process",
+      "docType": "standard",
+      "canonical": true,
+      "status": "active",
+      "subsystem": "Development",
+      "phaseIntroduced": 16,
+      "sourcePath": "Docs/Development/Release Process.md",
+      "webPath": "/docs/development/release-process/",
+      "rawPath": "/raw/noc.development.release-process.md",
+      "aiPath": "/ai/noc.development.release-process.md",
+      "description": "Canonical release packaging, artifact validation, manifest promotion and Downloads publication contract.",
+      "sourceFiles": [
+        ".github/workflows/release-package.yml",
+        ".github/scripts/package-release.ps1",
+        "Schemas/release.schema.json",
+        "Website/scripts/promote-release.mjs",
+        "Website/src/data/releases.json",
+        "Website/src/data/release-schema.mjs",
+        "Website/src/pages/download.astro"
+      ],
+      "sourceDocs": [
+        "Docs/Production Engineering Standard.md",
+        "Docs/Web/Nocturne Website — Design & Technical Specification.md"
+      ],
+      "bookGrounding": [
+        "Jason Gregory — Game Engine Architecture (3rd ed.), §1.7 Tools and the Asset Pipeline"
+      ],
+      "aliases": [
+        "Release Process",
+        "Downloads Pipeline",
+        "Release Packaging"
+      ],
+      "deprecatedAliases": [],
+      "apiSymbols": []
+    },
+    {
+      "id": "noc.documentation.model",
+      "title": "Documentation Model",
+      "docType": "standard",
+      "canonical": true,
+      "status": "active",
+      "subsystem": "Documentation",
+      "phaseIntroduced": 16,
+      "sourcePath": "Docs/Development/Documentation Model.md",
+      "webPath": "/docs/development/documentation-model/",
+      "rawPath": "/raw/noc.documentation.model.md",
+      "aiPath": "/ai/noc.documentation.model.md",
+      "description": "Canonical source-of-truth, metadata, precedence and generated-documentation rules for Nocturne technical documentation.",
+      "sourceFiles": [
+        "Website/scripts/prepare.mjs",
+        "Website/src/content.config.ts",
+        "Website/astro.config.mjs"
+      ],
+      "sourceDocs": [
+        "Docs/nocturne_engine_architecture.md",
+        "Docs/Production Engineering Standard.md",
+        "Docs/Web/Nocturne Website — Design & Technical Specification.md"
+      ],
+      "bookGrounding": [
+        "Jason Gregory — Game Engine Architecture (3rd ed.), §1.7 Tools and the Asset Pipeline"
+      ],
+      "aliases": [
+        "Documentation Model",
+        "Canonical Documentation",
+        "Docs Model"
+      ],
+      "deprecatedAliases": [],
+      "apiSymbols": []
+    },
+    {
+      "id": "noc.editor",
+      "title": "Editor",
+      "docType": "system",
+      "canonical": true,
+      "status": "implemented",
+      "subsystem": "Editor",
+      "phaseIntroduced": 13,
+      "sourcePath": "Docs/Systems/Editor.md",
+      "webPath": "/docs/systems/editor/",
+      "rawPath": "/raw/noc.editor.md",
+      "aiPath": "/ai/noc.editor.md",
+      "description": "Canonical Nocturne Editor shell, runtime boundary, viewport, selection and authoring-tool contract.",
+      "sourceFiles": [
+        "Apps/NocturneEditor/EditorShellV3.h",
+        "Apps/NocturneEditor/EditorShellV3.cpp",
+        "Apps/NocturneEditor/EditorTheme.h",
+        "Apps/NocturneEditor/EditorTheme.cpp",
+        "Apps/NocturneEditor/EditorViewportController.h",
+        "Apps/NocturneEditor/EditorViewportController.cpp"
+      ],
+      "sourceDocs": [
+        "Docs/nocturne_engine_architecture.md",
+        "Docs/Phase 13 — Completion Report.md",
+        "Docs/Phase 14 — Completion Report.md",
+        "Docs/Phase 15 — Completion Report.md"
+      ],
+      "bookGrounding": [
+        "Jason Gregory — Game Engine Architecture (3rd ed.), §15.4 The Game World Editor",
+        "Jason Gregory — Game Engine Architecture (3rd ed.), §15.4.1 Typical Features of a Game World Editor"
+      ],
+      "aliases": [
+        "Editor",
+        "Nocturne Editor",
+        "EditorShellV3"
+      ],
+      "deprecatedAliases": [
+        "EditorShell",
+        "EditorControls"
+      ],
+      "apiSymbols": [
+        {
+          "name": "nocturne::editor::EditorShellV3",
+          "href": "/api-symbol/nocturne.editor.EditorShellV3.html"
+        },
+        {
+          "name": "nocturne::editor::EditorViewportController",
+          "href": "/api-symbol/nocturne.editor.EditorViewportController.html"
+        },
+        {
+          "name": "nocturne::editor::EditorTheme",
+          "href": "/api-symbol/nocturne.editor.EditorTheme.html"
+        }
+      ]
+    },
+    {
+      "id": "noc.render",
+      "title": "Rendering",
+      "docType": "system",
+      "canonical": true,
+      "status": "implemented",
+      "subsystem": "Rendering",
+      "phaseIntroduced": 8,
+      "sourcePath": "Docs/Systems/Rendering.md",
+      "webPath": "/docs/systems/rendering/",
+      "rawPath": "/raw/noc.render.md",
+      "aiPath": "/ai/noc.render.md",
+      "description": "Canonical renderer ownership, frame handoff, DirectX 12 backend and editor render-target integration contract.",
+      "sourceFiles": [
+        "Engine/Render/RenderSystem.h",
+        "Engine/Render/RenderSystem.cpp",
+        "Engine/Render/RenderQueue.h",
+        "Engine/Render/DX12/Dx12Renderer.h",
+        "Engine/Render/DX12/Dx12SwapChain.h"
+      ],
+      "sourceDocs": [
+        "Docs/nocturne_engine_architecture.md",
+        "Docs/Phase 8 — Rendering Bootstrap (DirectX 12).md",
+        "Docs/Phase 9 — Rendering Engine Foundation.md",
+        "Docs/Phase 9.5 — GPU Resource Foundation (DX12 Memory, Descriptors, Asset-Backed GPU Resources).md",
+        "Docs/Phase 14 — Completion Report.md"
+      ],
+      "bookGrounding": [
+        "Jason Gregory — Game Engine Architecture (3rd ed.), §11.2 The Rendering Pipeline",
+        "Jason Gregory — Game Engine Architecture (3rd ed.), §11.2.1 Overview of the Rendering Pipeline"
+      ],
+      "aliases": [
+        "Rendering",
+        "Renderer",
+        "Render System",
+        "DirectX 12 Renderer"
+      ],
+      "deprecatedAliases": [],
+      "apiSymbols": [
+        {
+          "name": "noc::RenderSystem",
+          "href": "/api-symbol/noc.RenderSystem.html"
+        },
+        {
+          "name": "noc::RenderQueue",
+          "href": "/api-symbol/noc.RenderQueue.html"
+        },
+        {
+          "name": "noc::Dx12Renderer",
+          "href": "/api-symbol/noc.Dx12Renderer.html"
+        }
+      ]
+    },
+    {
+      "id": "noc.resources",
+      "title": "Resources",
+      "docType": "system",
+      "canonical": true,
+      "status": "implemented",
+      "subsystem": "Resources",
+      "phaseIntroduced": 4,
+      "sourcePath": "Docs/Systems/Resources.md",
+      "webPath": "/docs/systems/resources/",
+      "rawPath": "/raw/noc.resources.md",
+      "aiPath": "/ai/noc.resources.md",
+      "description": "Canonical virtual file system, resource loading, typed resource and runtime asset-lifetime contract.",
+      "sourceFiles": [
+        "Engine/Resources/VirtualFileSystem.h",
+        "Engine/Resources/ResourceManager.h",
+        "Engine/Resources/ResourceManager.cpp",
+        "Engine/Resources/ResourceHandle.h",
+        "Engine/Resources/Typed/ResourceLoaderRegistry.h"
+      ],
+      "sourceDocs": [
+        "Docs/nocturne_engine_architecture.md",
+        "Docs/Phase 4 — Resource Manager.md",
+        "Docs/Phase 5 — Typed Resources & Loader Registry.md",
+        "Docs/Phase 11 — Asset Import Pipeline.md"
+      ],
+      "bookGrounding": [
+        "Jason Gregory — Game Engine Architecture (3rd ed.), §7.2 The Resource Manager",
+        "Jason Gregory — Game Engine Architecture (3rd ed.), §7.2.2 Runtime Resource Management"
+      ],
+      "aliases": [
+        "Resources",
+        "Resource Manager",
+        "VFS",
+        "Virtual File System"
+      ],
+      "deprecatedAliases": [],
+      "apiSymbols": [
+        {
+          "name": "noc::VirtualFileSystem",
+          "href": "/api-symbol/noc.VirtualFileSystem.html"
+        },
+        {
+          "name": "noc::ResourceManager",
+          "href": "/api-symbol/noc.ResourceManager.html"
+        },
+        {
+          "name": "noc::ResourceHandle",
+          "href": "/api-symbol/noc.ResourceHandle.html"
+        }
+      ]
+    },
+    {
+      "id": "noc.runtime",
+      "title": "Runtime",
+      "docType": "system",
+      "canonical": true,
+      "status": "implemented",
+      "subsystem": "Runtime",
+      "phaseIntroduced": 1,
+      "sourcePath": "Docs/Systems/Runtime.md",
+      "webPath": "/docs/systems/runtime/",
+      "rawPath": "/raw/noc.runtime.md",
+      "aiPath": "/ai/noc.runtime.md",
+      "description": "Canonical runtime ownership, lifecycle, frame execution, configuration and subsystem orchestration contract.",
+      "sourceFiles": [
+        "Engine/Runtime/Engine.h",
+        "Engine/Runtime/Engine.cpp",
+        "Engine/Runtime/MainLoop.h",
+        "Engine/Runtime/MainLoop.cpp",
+        "Engine/Runtime/EngineConfig.h"
+      ],
+      "sourceDocs": [
+        "Docs/nocturne_engine_architecture.md",
+        "Docs/Phase 6 — Job System & Async Infrastructure.md",
+        "Docs/Production Engineering Standard.md"
+      ],
+      "bookGrounding": [
+        "Jason Gregory — Game Engine Architecture (3rd ed.), §8.2 The Game Loop",
+        "Jason Gregory — Game Engine Architecture (3rd ed.), §8.6 Multiprocessor Game Loops"
+      ],
+      "aliases": [
+        "Runtime",
+        "Engine Runtime",
+        "Main Loop"
+      ],
+      "deprecatedAliases": [],
+      "apiSymbols": [
+        {
+          "name": "noc::Engine",
+          "href": "/api-symbol/noc.Engine.html"
+        },
+        {
+          "name": "noc::MainLoop",
+          "href": "/api-symbol/noc.MainLoop.html"
+        },
+        {
+          "name": "noc::World",
+          "href": "/api-symbol/noc.World.html"
+        }
+      ]
+    },
+    {
+      "id": "noc.web.quality",
+      "title": "Website Quality & Deployment",
+      "docType": "standard",
+      "canonical": true,
+      "status": "active",
+      "subsystem": "Website",
+      "phaseIntroduced": 16,
+      "sourcePath": "Docs/Development/Website Quality & Deployment.md",
+      "webPath": "/docs/development/website-quality-deployment/",
+      "rawPath": "/raw/noc.web.quality.md",
+      "aiPath": "/ai/noc.web.quality.md",
+      "description": "Canonical build-quality, privacy, browser validation, deployment and release-to-Downloads publication contract for the Nocturne website.",
+      "sourceFiles": [
+        "Website/scripts/validate-static.mjs",
+        "Website/scripts/browser-quality.mjs",
+        "Website/scripts/postbuild.mjs",
+        "Website/scripts/validate-deployment-target.mjs",
+        ".github/workflows/web-quality.yml",
+        ".github/workflows/web-deploy.yml",
+        ".github/workflows/release-package.yml"
+      ],
+      "sourceDocs": [
+        "Docs/Web/Nocturne Website — Design & Technical Specification.md",
+        "Docs/Development/Documentation Model.md",
+        "Docs/Development/Release Process.md",
+        "Docs/Development/C++ API Reference.md"
+      ],
+      "bookGrounding": [
+        "Jason Gregory — Game Engine Architecture (3rd ed.), §1.7 Tools and the Asset Pipeline"
+      ],
+      "aliases": [
+        "Website Quality",
+        "Web Quality Gates",
+        "Website Deployment",
+        "Web Deployment"
+      ],
+      "deprecatedAliases": [],
+      "apiSymbols": []
+    },
+    {
+      "id": "noc.web.spec",
+      "title": "Nocturne Website — Design & Technical Specification",
+      "docType": "web-spec",
+      "canonical": true,
+      "status": "active",
+      "subsystem": "Website",
+      "sourcePath": "Docs/Web/Nocturne Website — Design & Technical Specification.md",
+      "webPath": "/docs/development/website-specification/",
+      "rawPath": "/raw/noc.web.spec.md",
+      "aiPath": "/ai/noc.web.spec.md",
+      "description": "Canonical product and technical specification for the Nocturne Engine website and documentation surface.",
+      "sourceFiles": [],
+      "sourceDocs": [],
+      "bookGrounding": [],
+      "aliases": [
+        "Website Specification",
+        "Nocturne Website"
+      ],
+      "deprecatedAliases": [],
+      "apiSymbols": []
+    },
+    {
+      "id": "noc.world",
+      "title": "World & ECS",
+      "docType": "system",
+      "canonical": true,
+      "status": "implemented",
+      "subsystem": "World & ECS",
+      "phaseIntroduced": 15,
+      "sourcePath": "Docs/Systems/World & ECS.md",
+      "webPath": "/docs/systems/world-ecs/",
+      "rawPath": "/raw/noc.world.md",
+      "aiPath": "/ai/noc.world.md",
+      "description": "Canonical runtime entity identity, component ownership, transform hierarchy, camera and render-extraction contract.",
+      "sourceFiles": [
+        "Engine/Runtime/World.h",
+        "Engine/Runtime/World.cpp",
+        "Engine/Runtime/Entity.h",
+        "Engine/Runtime/EntityRegistry.h",
+        "Engine/Runtime/ComponentStorage.h",
+        "Engine/Runtime/ComponentRegistry.h"
+      ],
+      "sourceDocs": [
+        "Docs/nocturne_engine_architecture.md",
+        "Docs/Phase 15 — Entity Component System Architecture.md",
+        "Docs/Phase 15 — Completion Report.md"
+      ],
+      "bookGrounding": [
+        "Jason Gregory — Game Engine Architecture (3rd ed.), §16.2.1.6 Pure Component Models",
+        "Jason Gregory — Game Engine Architecture (3rd ed.), §16.2.2 Property-Centric Architectures",
+        "Jason Gregory — Game Engine Architecture (3rd ed.), §16.5 Object References and World Queries",
+        "Bob Nystrom — Game Programming Patterns, Component and Data Locality"
+      ],
+      "aliases": [
+        "World",
+        "ECS",
+        "Entity Component System",
+        "World & ECS"
+      ],
+      "deprecatedAliases": [],
+      "apiSymbols": [
+        {
+          "name": "noc::World",
+          "href": "/api-symbol/noc.World.html"
+        },
+        {
+          "name": "noc::EntityHandle",
+          "href": "/api-symbol/noc.EntityHandle.html"
+        },
+        {
+          "name": "noc::EntityRegistry",
+          "href": "/api-symbol/noc.EntityRegistry.html"
+        }
+      ]
+    }
+  ]
+}

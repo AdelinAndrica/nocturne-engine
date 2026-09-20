@@ -1,0 +1,33 @@
+{
+  "name": "nocturne-engine-website",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "validate:releases": "node scripts/validate-releases.mjs",
+    "prepare:nocturne": "node scripts/prepare.mjs",
+    "predev": "npm run validate:releases && npm run prepare:nocturne && npm run validate:knowledge",
+    "dev": "astro dev",
+    "prebuild": "npm run validate:releases && npm run prepare:nocturne && npm run validate:knowledge",
+    "build": "astro build",
+    "preview": "astro preview",
+    "sync": "npm run validate:releases && npm run prepare:nocturne && npm run validate:knowledge",
+    "promote:release": "node scripts/promote-release.mjs",
+    "validate:knowledge": "node scripts/validate-knowledge.mjs",
+    "api": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-api.ps1",
+    "validate:api": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/validate-api.ps1",
+    "build:api": "npm run api && npm run build && npm run validate:api",
+    "postbuild": "node scripts/postbuild.mjs",
+    "validate:static": "node scripts/validate-static.mjs",
+    "serve:dist": "node scripts/serve-static.mjs",
+    "validate:browser": "node scripts/browser-quality.mjs",
+    "validate:deploy-target": "node scripts/validate-deployment-target.mjs"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "0.42.2",
+    "astro": "7.3.3"
+  }
+}
