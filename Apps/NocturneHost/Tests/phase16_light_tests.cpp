@@ -1,3 +1,5 @@
+#include "../../NocturneEditor/EditorCommands.h"
+
 #include "Core/Log.h"
 #include "Core/Memory/Allocator.h"
 #include "Runtime/Components/LightComponent.h"
@@ -155,6 +157,149 @@ bool RunPhase16LightTests()
         world.DestroyEntity(entity)
             && !world.HasLight(entity),
         "DestroyEntity did not remove LightComponent");
+
+    nocturne::editor::EditorCommandContext commandContext{
+        world,
+        reflection,
+        allocator,
+        noc::EntityHandle::Invalid()
+    };
+
+    auto verifyPreset =
+        [&](nocturne::editor::EditorEntityCreateKind kind,
+            const char* name,
+            bool expectRenderable,
+            bool expectCamera,
+            bool expectLight,
+            noc::LightType expectedLightType) -> bool
+        {
+            nocturne::editor::CreateEntityCommand command;
+            const noc::ResourceHandle mesh{
+                7u,
+                3u
+            };
+            const noc::AABB bounds{
+                noc::Vec3{ -1.0f, -1.0f, -1.0f },
+                noc::Vec3{ 1.0f, 1.0f, 1.0f }
+            };
+
+            if (!command.InitPreset(
+                    name,
+                    kind,
+                    noc::EntityHandle::Invalid(),
+                    mesh,
+                    bounds)
+                || !command.Execute(commandContext))
+            {
+                return false;
+            }
+
+            noc::EntityHandle created = command.CurrentEntity();
+            if (!world.IsAlive(created)
+                || !world.HasName(created)
+                || !world.HasTransform(created)
+                || world.HasRenderable(created) != expectRenderable
+                || world.HasCamera(created) != expectCamera
+                || world.HasLight(created) != expectLight)
+            {
+                return false;
+            }
+
+            if (expectRenderable)
+            {
+                const noc::RenderableComponent* renderable =
+                    world.GetRenderable(created);
+                if (!renderable
+                    || renderable->mesh != mesh
+                    || renderable->localBounds.min.x != -1.0f
+                    || renderable->localBounds.max.x != 1.0f)
+                {
+                    return false;
+                }
+            }
+
+            if (expectLight)
+            {
+                const noc::LightComponent* presetLight =
+                    world.GetLight(created);
+                if (!presetLight
+                    || presetLight->type != expectedLightType)
+                {
+                    return false;
+                }
+            }
+
+            if (!command.Undo(commandContext)
+                || world.IsAlive(created)
+                || !command.Redo(commandContext))
+            {
+                return false;
+            }
+
+            created = command.CurrentEntity();
+            if (!world.IsAlive(created)
+                || world.HasRenderable(created) != expectRenderable
+                || world.HasCamera(created) != expectCamera
+                || world.HasLight(created) != expectLight)
+            {
+                return false;
+            }
+
+            return command.Undo(commandContext);
+        };
+
+    ok &= CheckLight(
+        verifyPreset(
+            nocturne::editor::EditorEntityCreateKind::Empty,
+            "Empty Entity",
+            false, false, false,
+            noc::LightType::Point),
+        "Empty Entity preset/Undo/Redo failed");
+    ok &= CheckLight(
+        verifyPreset(
+            nocturne::editor::EditorEntityCreateKind::StaticMesh,
+            "Static Mesh",
+            true, false, false,
+            noc::LightType::Point),
+        "Static Mesh Entity preset/Undo/Redo failed");
+    ok &= CheckLight(
+        verifyPreset(
+            nocturne::editor::EditorEntityCreateKind::Camera,
+            "Camera",
+            false, true, false,
+            noc::LightType::Point),
+        "Camera preset/Undo/Redo failed");
+    ok &= CheckLight(
+        verifyPreset(
+            nocturne::editor::EditorEntityCreateKind::DirectionalLight,
+            "Directional Light",
+            false, false, true,
+            noc::LightType::Directional),
+        "Directional Light preset/Undo/Redo failed");
+    ok &= CheckLight(
+        verifyPreset(
+            nocturne::editor::EditorEntityCreateKind::PointLight,
+            "Point Light",
+            false, false, true,
+            noc::LightType::Point),
+        "Point Light preset/Undo/Redo failed");
+    ok &= CheckLight(
+        verifyPreset(
+            nocturne::editor::EditorEntityCreateKind::SpotLight,
+            "Spot Light",
+            false, false, true,
+            noc::LightType::Spot),
+        "Spot Light preset/Undo/Redo failed");
+
+    {
+        nocturne::editor::CreateEntityCommand invalidPreset;
+        ok &= CheckLight(
+            !invalidPreset.InitPreset(
+                "Invalid",
+                static_cast<
+                    nocturne::editor::EditorEntityCreateKind>(255)),
+            "Invalid create preset kind was accepted");
+    }
 
     world.Shutdown();
     reflection.Shutdown();
