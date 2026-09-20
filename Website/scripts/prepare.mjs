@@ -351,7 +351,7 @@ function renderApiReference(metadata) {
     '',
     '> Generated links into the Doxygen symbol reference. Canonical documentation remains the authority for architecture, ownership and subsystem contracts.',
     '',
-    ...symbols.map((symbol) => `- [`${symbol}`](${apiSymbolHref(symbol)})`),
+    ...symbols.map((symbol) => '- [`' + symbol + '`](' + apiSymbolHref(symbol) + ')'),
     ''
   ].join('\n');
 }
