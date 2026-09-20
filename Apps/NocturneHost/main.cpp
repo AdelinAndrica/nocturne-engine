@@ -29,6 +29,7 @@ bool RunPhase16ReflectionPerfTests();
 bool RunPhase16EditorSessionTests();
 bool RunPhase16EditorPerfTests();
 bool RunPhase16LightTests();
+bool RunPhase16PrimitiveAssetTests();
 
 // Phase 12 tooling
 #include "Phase12CookPack.h"
@@ -65,6 +66,7 @@ int main(int argc, char** argv)
         ok &= RunPhase16EditorSessionTests();
         ok &= RunPhase16EditorPerfTests();
         ok &= RunPhase16LightTests();
+        ok &= RunPhase16PrimitiveAssetTests();
         return ok ? 0 : 1;
     }
 
