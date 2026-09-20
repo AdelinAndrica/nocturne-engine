@@ -646,6 +646,7 @@ async function syncDocs() {
       title,
       description:
         sourceMetadata.description ??
+        mapping.metadata.description ??
         (historical
           ? `Historical implementation record from Docs/${normalizedSource}. Prefer canonical Architecture/System documentation for current behavior.`
           : `Canonical Nocturne documentation synchronized from Docs/${normalizedSource}.`)
