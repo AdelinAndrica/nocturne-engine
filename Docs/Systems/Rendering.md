@@ -11,6 +11,7 @@ source_docs: ["Docs/nocturne_engine_architecture.md","Docs/Phase 8 — Rendering
 book_grounding: ["Jason Gregory — Game Engine Architecture (3rd ed.), §11.2 The Rendering Pipeline","Jason Gregory — Game Engine Architecture (3rd ed.), §11.2.1 Overview of the Rendering Pipeline"]
 aliases: ["Rendering","Renderer","Render System","DirectX 12 Renderer"]
 deprecated_aliases: []
+api_symbols: ["noc::RenderSystem","noc::RenderQueue","noc::Dx12Renderer"]
 ---
 
 # Rendering
