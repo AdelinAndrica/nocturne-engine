@@ -8,6 +8,7 @@
 #include "Runtime/ComponentRegistry.h"
 #include "Runtime/EntityRegistry.h"
 #include "Runtime/Frustum.h"
+#include "Runtime/LightSystem.h"
 #include "Runtime/NameSystem.h"
 #include "Runtime/Reflection/ReflectionRegistry.h"
 #include "Runtime/RenderableSystem.h"
@@ -90,6 +91,7 @@ namespace noc
         TransformSystem transforms;
         RenderableSystem renderables;
         CameraSystem cameras;
+        LightSystem lights;
         NameSystem names;
 
         float defaultFovY = kDefaultFovY;
@@ -118,6 +120,9 @@ namespace noc
             if (!cameras.Init(entities, transforms, inAllocator, 8))
                 return false;
 
+            if (!lights.Init(entities, inAllocator, 32))
+                return false;
+
             if (!names.Init(entities, inAllocator, 64))
                 return false;
 
@@ -127,6 +132,7 @@ namespace noc
         void Shutdown()
         {
             names.Shutdown();
+            lights.Shutdown();
             cameras.Shutdown();
             renderables.Shutdown();
             transforms.Shutdown();
@@ -305,6 +311,9 @@ namespace noc
         // individual systems validate EntityRegistry before structural mutation.
         if (impl_->cameras.Has(entity))
             (void)impl_->cameras.Remove(entity);
+
+        if (impl_->lights.Has(entity))
+            (void)impl_->lights.Remove(entity);
 
         if (impl_->renderables.Has(entity))
             (void)impl_->renderables.Remove(entity);
@@ -683,6 +692,71 @@ namespace noc
         return impl_
             ? impl_->cameras.ActiveCamera()
             : EntityHandle::Invalid();
+    }
+
+    bool World::AddLight(EntityHandle entity, LightType type)
+    {
+        return impl_
+            && impl_->entities.IsAlive(entity)
+            && impl_->lights.Add(entity, type) != nullptr;
+    }
+
+    bool World::RemoveLight(EntityHandle entity)
+    {
+        return impl_
+            && impl_->entities.IsAlive(entity)
+            && impl_->lights.Remove(entity);
+    }
+
+    bool World::HasLight(EntityHandle entity) const
+    {
+        return impl_
+            && impl_->entities.IsAlive(entity)
+            && impl_->lights.Has(entity);
+    }
+
+    const LightComponent* World::GetLight(EntityHandle entity) const
+    {
+        if (!impl_ || !impl_->entities.IsAlive(entity))
+            return nullptr;
+        return impl_->lights.Get(entity);
+    }
+
+    bool World::SetLightType(EntityHandle entity, LightType type)
+    {
+        return impl_ && impl_->lights.SetType(entity, type);
+    }
+
+    bool World::SetLightColor(EntityHandle entity, const Vec3& color)
+    {
+        return impl_ && impl_->lights.SetColor(entity, color);
+    }
+
+    bool World::SetLightIntensity(EntityHandle entity, float intensity)
+    {
+        return impl_ && impl_->lights.SetIntensity(entity, intensity);
+    }
+
+    bool World::SetLightRange(EntityHandle entity, float range)
+    {
+        return impl_ && impl_->lights.SetRange(entity, range);
+    }
+
+    bool World::SetLightSpotAngles(
+        EntityHandle entity,
+        float innerConeRadians,
+        float outerConeRadians)
+    {
+        return impl_
+            && impl_->lights.SetSpotAngles(
+                entity,
+                innerConeRadians,
+                outerConeRadians);
+    }
+
+    bool World::SetLightEnabled(EntityHandle entity, bool enabled)
+    {
+        return impl_ && impl_->lights.SetEnabled(entity, enabled);
     }
 
     bool World::AddName(EntityHandle entity, const char* name)
