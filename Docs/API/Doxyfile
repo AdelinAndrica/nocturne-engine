@@ -68,7 +68,6 @@ SEARCHENGINE            = YES
 SERVER_BASED_SEARCH     = NO
 HTML_COLORSTYLE         = DARK
 HTML_EXTRA_STYLESHEET   = Docs/API/nocturne-doxygen.css
-HTML_TIMESTAMP          = NO
 
 GENERATE_HTML           = YES
 HTML_OUTPUT             = html
@@ -85,7 +84,6 @@ XML_NS_MEMB_FILE_SCOPE  = YES
 GENERATE_TAGFILE        = Build/Docs/Doxygen/nocturne.tag
 
 HAVE_DOT                = NO
-CLASS_DIAGRAMS          = NO
 CALL_GRAPH              = NO
 CALLER_GRAPH            = NO
 DIRECTORY_GRAPH         = NO
