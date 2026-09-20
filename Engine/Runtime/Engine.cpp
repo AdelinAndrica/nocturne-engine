@@ -12,6 +12,7 @@
 #include "Runtime/MainLoop.h"
 #include "Runtime/Reflection/BuiltinTypes.h"
 #include "Runtime/Reflection/FoundationComponents.h"
+#include "Runtime/Reflection/LightReflection.h"
 
 #include "Render/RenderQueue.h"
 
@@ -192,6 +193,7 @@ namespace noc {
 
         if (!RegisterBuiltinReflectionTypes(reflection_)
             || !RegisterFoundationComponentReflectionTypes(reflection_)
+            || !RegisterLightReflectionTypes(reflection_)
             || !reflection_.Freeze())
         {
             NOC_LOG_ERROR(
