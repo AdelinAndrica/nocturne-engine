@@ -5,6 +5,8 @@
 #include "EditorReflectionSnapshot.h"
 #include "EditorEntitySnapshot.h"
 #include "Runtime/Entity.h"
+#include "Runtime/Bounds.h"
+#include "Resources/ResourceHandle.h"
 #include "Runtime/Reflection/ReflectedValue.h"
 #include "Runtime/Reflection/ReflectionIds.h"
 
@@ -13,6 +15,19 @@
 
 namespace nocturne::editor
 {
+    // Design choice (not directly from the book): these are authoring presets,
+    // not runtime entity subclasses or a second entity type system. They only
+    // describe the initial component composition used by CreateEntityCommand.
+    enum class EditorEntityCreateKind : uint8_t
+    {
+        Empty = 0,
+        StaticMesh,
+        Camera,
+        DirectionalLight,
+        PointLight,
+        SpotLight
+    };
+
     // Design choice (not directly from the book): editor-created authored
     // entities begin with Name + Transform. Runtime World itself keeps generic
     // entity creation component-free.
@@ -22,6 +37,13 @@ namespace nocturne::editor
         [[nodiscard]] bool Init(
             const char* name,
             noc::EntityHandle parent = noc::EntityHandle::Invalid());
+
+        [[nodiscard]] bool InitPreset(
+            const char* name,
+            EditorEntityCreateKind kind,
+            noc::EntityHandle parent = noc::EntityHandle::Invalid(),
+            noc::ResourceHandle mesh = {},
+            const noc::AABB& localBounds = {});
 
         [[nodiscard]] noc::EntityHandle CurrentEntity() const noexcept;
 
@@ -48,6 +70,9 @@ namespace nocturne::editor
         [[nodiscard]] bool Create_(EditorCommandContext& context);
 
         std::string name_;
+        EditorEntityCreateKind kind_ = EditorEntityCreateKind::Empty;
+        noc::ResourceHandle mesh_{};
+        noc::AABB localBounds_{};
         noc::EntityHandle requestedParent_{};
         noc::EntityHandle currentEntity_{};
         bool initialized_ = false;
