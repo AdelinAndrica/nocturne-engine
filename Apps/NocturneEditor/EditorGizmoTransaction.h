@@ -607,7 +607,7 @@ namespace nocturne::editor
                 return EditorGizmoCommitResult::Failed;
             }
 
-            session.SetSceneDirty();
+            session.NotifyAuthoredMutation();
             Reset();
             return EditorGizmoCommitResult::Committed;
         }
