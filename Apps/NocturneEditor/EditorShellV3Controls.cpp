@@ -962,7 +962,7 @@ bool RegisterV3Classes(HINSTANCE instance)
 HWND MakeButton(HWND parent, int id, const wchar_t* text, Icon icon, ButtonKind kind, HFONT font)
 {
     ButtonInit init{ icon, kind };
-    HWND h = CreateWindowExW(0, kButtonClass, text, WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_CLIPSIBLINGS, 0,0,0,0, parent, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), GetModuleHandleW(nullptr), &init);
+    HWND h = CreateWindowExW(0, kButtonClass, text, WS_CHILD | WS_VISIBLE | WS_TABSTOP, 0,0,0,0, parent, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), GetModuleHandleW(nullptr), &init);
     if (h && font) SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(font), FALSE);
     return h;
 }
