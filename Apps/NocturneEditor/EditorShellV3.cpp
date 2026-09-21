@@ -1970,7 +1970,7 @@ namespace nocturne::editor
                 return false;
             }
 
-            session_->SetSceneDirty();
+            session_->NotifyAuthoredMutation();
             PopulateScene_();
             RefreshInspector();
             UpdateStatus_();
@@ -2012,7 +2012,7 @@ namespace nocturne::editor
             }
 
             session_->ClearSelection();
-            session_->SetSceneDirty();
+            session_->NotifyAuthoredMutation();
             PopulateScene_();
             RefreshInspector();
             UpdateStatus_();
@@ -2064,7 +2064,7 @@ namespace nocturne::editor
                 return false;
             }
 
-            session_->SetSceneDirty();
+            session_->NotifyAuthoredMutation();
             PopulateScene_();
             RefreshInspector();
             UpdateStatus_();
@@ -2126,7 +2126,7 @@ namespace nocturne::editor
             return false;
         }
 
-        session_->SetSceneDirty();
+        session_->NotifyAuthoredMutation();
 
         if (selected.IsValid())
             (void)session_->SetSelection(selected);
@@ -3808,7 +3808,7 @@ namespace nocturne::editor
             return;
         }
 
-        session_->SetSceneDirty();
+        session_->NotifyAuthoredMutation();
 
         if (!inspectorModel_.Refresh(
                 context,
@@ -3935,7 +3935,7 @@ namespace nocturne::editor
             return;
         }
 
-        session_->SetSceneDirty();
+        session_->NotifyAuthoredMutation();
 
         if (!inspectorModel_.Refresh(
                 context,
@@ -4111,7 +4111,7 @@ namespace nocturne::editor
             return;
         }
 
-        session_->SetSceneDirty();
+        session_->NotifyAuthoredMutation();
 
         if (!inspectorModel_.Refresh(
                 context,
@@ -4578,7 +4578,7 @@ namespace nocturne::editor
             return false;
         }
 
-        session_->SetSceneDirty();
+        session_->NotifyAuthoredMutation();
 
         if (!inspectorModel_.Refresh(
                 context,
@@ -4767,7 +4767,7 @@ namespace nocturne::editor
             return false;
         }
 
-        session_->SetSceneDirty();
+        session_->NotifyAuthoredMutation();
         PopulateScene_();
         PostMessageW(
             hwnd_,
@@ -4818,7 +4818,7 @@ namespace nocturne::editor
             return false;
         }
 
-        session_->SetSceneDirty();
+        session_->NotifyAuthoredMutation();
         PopulateScene_();
         PostMessageW(
             hwnd_,
@@ -5162,7 +5162,7 @@ namespace nocturne::editor
             return false;
         }
 
-        session_->SetSceneDirty();
+        session_->NotifyAuthoredMutation();
         PopulateScene_();
         (void)session_->SetSelection(entity);
         SyncSceneSelection();
@@ -5398,7 +5398,7 @@ namespace nocturne::editor
                     if (hint.IsValid())
                         (void)session_->SetSelection(hint);
 
-                    session_->SetSceneDirty();
+                    session_->NotifyAuthoredMutation();
                     PopulateScene_();
                     RefreshInspector();
                     AppendConsole_(L"Undo applied.");
@@ -5418,7 +5418,7 @@ namespace nocturne::editor
                     if (hint.IsValid())
                         (void)session_->SetSelection(hint);
 
-                    session_->SetSceneDirty();
+                    session_->NotifyAuthoredMutation();
                     PopulateScene_();
                     RefreshInspector();
                     AppendConsole_(L"Redo applied.");
