@@ -96,7 +96,7 @@ void DrawTextUi(HDC dc, const wchar_t* text, RECT rc, COLORREF color, HFONT font
     if (oldFont) SelectObject(dc, oldFont);
 }
 
-void Line(HDC dc, int x1, int y1, int x2, int y2, COLORREF color, int width = 1)
+void Line(HDC dc, int x1, int y1, int x2, int y2, COLORREF color, int width)
 {
     HPEN pen = CreatePen(PS_SOLID, width, color);
     HGDIOBJ oldPen = SelectObject(dc, pen);
