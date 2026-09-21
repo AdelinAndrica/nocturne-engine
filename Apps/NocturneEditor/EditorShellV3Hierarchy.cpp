@@ -6,7 +6,6 @@
 #include "Core/Log.h"
 #include "Runtime/Engine.h"
 #include "Runtime/World.h"
-#include "Resources/Typed/MeshResource.h"
 
 #include <algorithm>
 #include <memory>
@@ -21,25 +20,6 @@
 namespace nocturne::editor
 {
     using namespace shellv3;
-
-                &EditorShellV3::RenameEditSubclassProc_,
-                0x1610);
-            DestroyWindow(renameEdit_);
-            renameEdit_ = nullptr;
-        }
-        renameEntity_ = noc::EntityHandle::Invalid();
-        renameEnding_ = false;
-
-        if (window_) window_->SetMessageSink(nullptr);
-        if (fileMenu_) DestroyMenu(fileMenu_);
-        if (buildMenu_) DestroyMenu(buildMenu_);
-        if (actorMenu_) DestroyMenu(actorMenu_);
-        fileMenu_ = buildMenu_ = actorMenu_ = nullptr;
-        if (uiFont_) DeleteObject(uiFont_); if (uiBold_) DeleteObject(uiBold_); if (menuFont_) DeleteObject(menuFont_); if (smallFont_) DeleteObject(smallFont_); if (consoleFont_) DeleteObject(consoleFont_); if (brandFont_) DeleteObject(brandFont_);
-        if (windowBrush_) DeleteObject(windowBrush_); if (editBrush_) DeleteObject(editBrush_);
-        uiFont_ = uiBold_ = menuFont_ = smallFont_ = consoleFont_ = brandFont_ = nullptr; windowBrush_ = editBrush_ = nullptr; session_ = nullptr; engine_ = nullptr; window_ = nullptr; hwnd_ = nullptr;
-    }
-
 
     void EditorShellV3::PopulateScene_()
     {
@@ -152,7 +132,6 @@ namespace nocturne::editor
         SyncSceneSelection();
     }
 
-
     void EditorShellV3::SyncSceneSelection()
     {
         if (!sceneTree_ || !session_)
@@ -162,7 +141,6 @@ namespace nocturne::editor
             sceneTree_,
             session_->SelectedEntity());
     }
-
 
     bool EditorShellV3::ExecuteCreateEntity_(
         noc::EntityHandle parent)
@@ -174,7 +152,6 @@ namespace nocturne::editor
             noc::AABB{ noc::Vec3::Zero(), noc::Vec3::Zero() },
             parent);
     }
-
 
     bool EditorShellV3::ExecuteCreatePreset_(
         EditorEntityCreateKind kind,
@@ -256,7 +233,6 @@ namespace nocturne::editor
         }
     }
 
-
     bool EditorShellV3::ExecuteDeleteSelection_()
     {
         if (!session_)
@@ -297,7 +273,6 @@ namespace nocturne::editor
             return false;
         }
     }
-
 
     bool EditorShellV3::ExecuteDuplicateSelection_()
     {
@@ -350,7 +325,6 @@ namespace nocturne::editor
             return false;
         }
     }
-
 
     bool EditorShellV3::ExecuteReparentEntity_(
         noc::EntityHandle child,
@@ -414,7 +388,6 @@ namespace nocturne::editor
                 : L"Entity unparented to scene root; world pose preserved.");
         return true;
     }
-
 
     void EditorShellV3::ShowHierarchyContextMenu_(
         POINT screenPoint)
@@ -688,7 +661,6 @@ namespace nocturne::editor
         }
     }
 
-
     bool EditorShellV3::BeginRenameSelection_()
     {
         if (!engine_ || !session_ || !sceneTree_)
@@ -741,7 +713,6 @@ namespace nocturne::editor
 
             if (!SetWindowSubclass(
                     renameEdit_,
-
                     &EditorShellV3::RenameEditSubclassProc_,
                     0x1610,
                     reinterpret_cast<DWORD_PTR>(this)))
@@ -783,7 +754,6 @@ namespace nocturne::editor
 
         return true;
     }
-
 
     bool EditorShellV3::CommitRename_()
     {
@@ -901,7 +871,6 @@ namespace nocturne::editor
         return true;
     }
 
-
     void EditorShellV3::CancelRename_() noexcept
     {
         if (!renameEdit_)
@@ -916,7 +885,6 @@ namespace nocturne::editor
         if (sceneTree_)
             SetFocus(sceneTree_);
     }
-
 
     LRESULT CALLBACK EditorShellV3::RenameEditSubclassProc_(
         HWND hwnd,
@@ -968,5 +936,4 @@ namespace nocturne::editor
             wParam,
             lParam);
     }
-
 }
