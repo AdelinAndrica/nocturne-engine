@@ -1020,9 +1020,9 @@ void TreeAdd(
     std::wstring text,
     int depth,
     Icon icon,
-    bool expandable = false,
-    bool expanded = true,
-    noc::EntityHandle entity = noc::EntityHandle::Invalid())
+    bool expandable,
+    bool expanded,
+    noc::EntityHandle entity)
 {
     auto* s = h
         ? reinterpret_cast<TreeState*>(
