@@ -600,6 +600,25 @@ bool RunPhase16EditorSessionTests()
         session.Init(world, reflection, allocator, 3, 4096),
         "EditorSession init failed");
 
+    {
+        const uint64_t cleanVersion =
+            session.StateVersion();
+        session.SetSceneDirty();
+        const uint64_t firstDirtyVersion =
+            session.StateVersion();
+        session.NotifyAuthoredMutation();
+        const uint64_t repeatedMutationVersion =
+            session.StateVersion();
+
+        ok &= CheckEditorSession(
+            session.SceneDirty()
+                && firstDirtyVersion > cleanVersion
+                && repeatedMutationVersion > firstDirtyVersion,
+            "Authored mutation did not invalidate observers while scene was already dirty");
+
+        session.SetSceneDirty(false);
+    }
+
     const noc::EntityHandle authored = world.CreateEntity();
     const noc::EntityHandle camera = world.CreateEntity();
 
