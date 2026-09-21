@@ -4,7 +4,6 @@
 #include "EditorTheme.h"
 
 #include <algorithm>
-#include <cwctype>
 #include <new>
 #include <utility>
 
@@ -21,8 +20,7 @@ namespace nocturne::editor::shellv3
         constexpr wchar_t kTreeClass[] = L"NocturneV3Tree";
         constexpr wchar_t kTableClass[] = L"NocturneV3Table";
         constexpr wchar_t kScrollClass[] = L"NocturneV3Scroll";
-        constexpr UINT WM_NOC_V3_ACTIVE =
-            WM_APP + 0x310;
+        constexpr UINT WM_NOC_V3_ACTIVE = WM_APP + 0x310;
     }
 
 struct ButtonInit { Icon icon = Icon::None; ButtonKind kind = ButtonKind::Neutral; };
