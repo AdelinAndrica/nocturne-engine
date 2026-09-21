@@ -192,6 +192,12 @@ namespace nocturne::editor
         }
     }
 
+    void EditorSession::NotifyAuthoredMutation() noexcept
+    {
+        sceneDirty_ = true;
+        Touch_();
+    }
+
     bool EditorSession::SceneDirty() const noexcept
     {
         return sceneDirty_;
