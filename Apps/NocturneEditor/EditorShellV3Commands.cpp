@@ -11,6 +11,37 @@ namespace nocturne::editor
 {
     using namespace shellv3;
 
+    bool EditorShellV3::RequestEditorExit_()
+    {
+        if (!window_)
+            return false;
+
+        if (session_ && session_->SceneDirty())
+        {
+            // Design choice (not directly from the book): Phase 16 has no
+            // persistence yet, so exit confirmation is intentionally
+            // discard-or-cancel. Save remains Phase 17.
+            const int choice =
+                MessageBoxW(
+                    hwnd_,
+                    L"The current in-memory scene has unsaved authoring changes.\n\nDiscard them and exit Nocturne Editor?",
+                    L"Exit Nocturne Editor",
+                    MB_OKCANCEL
+                        | MB_ICONWARNING
+                        | MB_DEFBUTTON2);
+
+            if (choice != IDOK)
+            {
+                AppendConsole_(
+                    L"Exit cancelled; current scene retained.");
+                return false;
+            }
+        }
+
+        window_->RequestQuit();
+        return true;
+    }
+
     bool EditorShellV3::HasTextInputFocus_() const
     {
         const HWND focus = GetFocus();
@@ -34,7 +65,6 @@ namespace nocturne::editor
             L"RichEdit",
             8) == 0;
     }
-
 
     bool EditorShellV3::FilterMessage(const MSG& message)
     {
@@ -111,7 +141,6 @@ namespace nocturne::editor
 
         return true;
     }
-
 
     void EditorShellV3::HandleCommand_(int id)
     {
@@ -349,7 +378,6 @@ namespace nocturne::editor
         PopulateScene_(); UpdateStatus_();
     }
 
-
     void EditorShellV3::ShowPopup_(int menuId, HWND anchor)
     {
         HMENU menu = nullptr;
@@ -361,7 +389,5 @@ namespace nocturne::editor
         RECT rc{}; GetWindowRect(anchor, &rc); const int command = TrackPopupMenuEx(menu, TPM_RETURNCMD | TPM_LEFTALIGN | TPM_TOPALIGN, rc.left,rc.bottom+2,hwnd_,nullptr); if (command) HandleCommand_(command); if (temporary) DestroyMenu(menu);
     }
 
-
     void EditorShellV3::UpdateStatus_() { if (status_) InvalidateRect(status_, nullptr, FALSE); }
-
 }
