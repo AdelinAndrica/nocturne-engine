@@ -68,6 +68,13 @@ namespace nocturne::editor
         [[nodiscard]] TransformOrientation Orientation() const noexcept;
 
         void SetSceneDirty(bool dirty = true) noexcept;
+
+        // Signals that authoritative authored World state changed even when the
+        // dirty flag was already true. Viewport/editor observers use StateVersion
+        // as their invalidation boundary, so command execute/undo/redo paths must
+        // call this after a successful authored mutation.
+        void NotifyAuthoredMutation() noexcept;
+
         [[nodiscard]] bool SceneDirty() const noexcept;
 
         // In-memory editor scene reset. Destroys authored entities only; the
