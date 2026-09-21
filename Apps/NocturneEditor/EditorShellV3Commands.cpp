@@ -1,6 +1,7 @@
 #include "EditorShellV3.h"
 #include "EditorShellV3Controls.h"
 #include "EditorSession.h"
+#include "EditorCommands.h"
 
 #include "Runtime/Engine.h"
 #include "Runtime/World.h"
