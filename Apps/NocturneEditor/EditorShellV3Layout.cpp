@@ -4,6 +4,7 @@
 #include "EditorTheme.h"
 
 #include "Runtime/Engine.h"
+#include "Core/Log.h"
 
 #include <algorithm>
 #include <filesystem>
