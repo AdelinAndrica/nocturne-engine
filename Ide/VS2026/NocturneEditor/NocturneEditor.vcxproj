@@ -16,6 +16,7 @@
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorShellV3Inspector.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorShellV3Hierarchy.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorShellV3Layout.cpp" />
+    <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorShellV3Commands.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorViewportController.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorCommands.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorReflectionSnapshot.cpp" />
