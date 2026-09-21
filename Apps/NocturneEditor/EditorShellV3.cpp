@@ -1210,7 +1210,7 @@ namespace nocturne::editor
         HWND MakeButton(HWND parent, int id, const wchar_t* text, Icon icon, ButtonKind kind, HFONT font)
         {
             ButtonInit init{ icon, kind };
-            HWND h = CreateWindowExW(0, kButtonClass, text, WS_CHILD | WS_VISIBLE | WS_TABSTOP, 0,0,0,0, parent, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), GetModuleHandleW(nullptr), &init);
+            HWND h = CreateWindowExW(0, kButtonClass, text, WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_CLIPSIBLINGS, 0,0,0,0, parent, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), GetModuleHandleW(nullptr), &init);
             if (h && font) SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(font), FALSE);
             return h;
         }
@@ -1592,7 +1592,7 @@ namespace nocturne::editor
 
     void EditorShellV3::CreatePanels_()
     {
-        auto makeBody = [&](int id = 0) { return CreateWindowExW(0, L"STATIC", L"", WS_CHILD | WS_VISIBLE | SS_OWNERDRAW, 0,0,0,0, hwnd_, id ? reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)) : nullptr, GetModuleHandleW(nullptr), nullptr); };
+        auto makeBody = [&](int id = 0) { return CreateWindowExW(0, L"STATIC", L"", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | SS_OWNERDRAW, 0,0,0,0, hwnd_, id ? reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)) : nullptr, GetModuleHandleW(nullptr), nullptr); };
         scene_.header = MakeHeader(hwnd_, L"Scene Hierarchy", Icon::Hierarchy, uiBold_); sceneTree_ = MakeTree(hwnd_, IdSceneTree, uiFont_); scene_.body = sceneTree_;
         viewport_.header = MakeHeader(hwnd_, L"Viewport", Icon::Viewport, uiBold_);
         viewport_.body = makeBody();
@@ -2934,11 +2934,21 @@ namespace nocturne::editor
                 (std::max)(60, bodyWidth - 24),
                 28,
                 TRUE);
+            const bool showAddComponent =
+                inspectorModel_.Entity().IsValid();
             ShowWindow(
                 inspectorAddComponent_,
-                inspectorModel_.Entity().IsValid()
+                showAddComponent
                     ? SW_SHOW
                     : SW_HIDE);
+            if (showAddComponent)
+            {
+                RedrawWindow(
+                    inspectorAddComponent_,
+                    nullptr,
+                    nullptr,
+                    RDW_INVALIDATE | RDW_UPDATENOW);
+            }
         }
 
         size_t bindingIndex = 0;
