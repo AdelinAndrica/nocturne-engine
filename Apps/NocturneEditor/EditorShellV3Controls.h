@@ -174,6 +174,13 @@ namespace nocturne::editor::shellv3
         int page,
         int position);
 
+    void DrawSlimThumb(
+        HDC dc,
+        int totalRows,
+        int pageRows,
+        int firstRow,
+        const RECT& rc);
+
     [[nodiscard]] Icon IconForType(
         const std::wstring& type);
     [[nodiscard]] std::wstring AssetTypeForPath(
