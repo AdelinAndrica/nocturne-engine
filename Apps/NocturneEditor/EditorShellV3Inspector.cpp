@@ -237,6 +237,8 @@ namespace nocturne::editor
                 && valueType->enumMetadata->values
                 && valueType->enumMetadata->valueCount > 0;
         }
+        
+        
     }
 
     void EditorShellV3::RefreshInspector()
@@ -285,7 +287,6 @@ namespace nocturne::editor
                 nullptr,
                 FALSE);
     }
-
 
     void EditorShellV3::DestroyInspectorControls_() noexcept
     {
@@ -343,7 +344,6 @@ namespace nocturne::editor
         inspectorEnumButtons_.clear();
         inspectorControlsRefreshing_ = false;
     }
-
 
     bool EditorShellV3::RebuildInspectorControls_()
     {
@@ -428,7 +428,7 @@ namespace nocturne::editor
                 }
 
                 HWND removeButton = MakeButton(
-                    hwnd_,
+                    inspector_.body,
                     IdInspectorRemoveBase
                         + static_cast<int>(removeIndex),
                     L"Remove",
@@ -491,7 +491,7 @@ namespace nocturne::editor
                             : noc::TypeId::Invalid();
 
                     HWND picker = MakeButton(
-                        hwnd_,
+                        inspector_.body,
                         IdInspectorResourceBase
                             + static_cast<int>(resourceIndex),
                         L"<None>",
@@ -542,7 +542,7 @@ namespace nocturne::editor
                     }
 
                     HWND toggle = MakeButton(
-                        hwnd_,
+                        inspector_.body,
                         IdInspectorBoolBase
                             + static_cast<int>(boolIndex),
                         L"Off",
@@ -594,7 +594,7 @@ namespace nocturne::editor
                     }
 
                     HWND picker = MakeButton(
-                        hwnd_,
+                        inspector_.body,
                         IdInspectorEnumBase
                             + static_cast<int>(enumIndex),
                         L"",
@@ -677,7 +677,7 @@ namespace nocturne::editor
                         WS_CHILD | WS_TABSTOP
                             | WS_BORDER | ES_AUTOHSCROLL,
                         0, 0, 1, 1,
-                        hwnd_,
+                        inspector_.body,
                         reinterpret_cast<HMENU>(
                             static_cast<INT_PTR>(controlId)),
                         GetModuleHandleW(nullptr),
@@ -765,29 +765,16 @@ namespace nocturne::editor
         return true;
     }
 
-
     void EditorShellV3::LayoutInspectorControls_()
     {
         if (!hwnd_ || !inspector_.body)
             return;
 
-        RECT bodyWindow{};
         RECT bodyClient{};
-        GetWindowRect(inspector_.body, &bodyWindow);
         GetClientRect(inspector_.body, &bodyClient);
 
-        POINT bodyPoints[2]{
-            { bodyWindow.left, bodyWindow.top },
-            { bodyWindow.right, bodyWindow.bottom }
-        };
-        MapWindowPoints(
-            HWND_DESKTOP,
-            hwnd_,
-            bodyPoints,
-            2);
-
-        const int bodyLeft = bodyPoints[0].x;
-        const int bodyTop = bodyPoints[0].y;
+        const int bodyLeft = 0;
+        const int bodyTop = 0;
         const int bodyWidth =
             static_cast<int>(
                 bodyClient.right - bodyClient.left);
@@ -1161,7 +1148,6 @@ namespace nocturne::editor
         }
     }
 
-
     int EditorShellV3::InspectorContentHeight_() const noexcept
     {
         if (!inspectorModel_.Entity().IsValid())
@@ -1189,7 +1175,6 @@ namespace nocturne::editor
         return y + 6;
     }
 
-
     void EditorShellV3::ClampInspectorScroll_() noexcept
     {
         if (!inspector_.body)
@@ -1215,9 +1200,7 @@ namespace nocturne::editor
                 maxScroll);
     }
 
-
     EditorShellV3::InspectorEditBinding*
-
     EditorShellV3::FindInspectorEdit_(HWND source) noexcept
     {
         for (InspectorEditBinding& binding : inspectorEdits_)
@@ -1229,9 +1212,7 @@ namespace nocturne::editor
         return nullptr;
     }
 
-
     const EditorShellV3::InspectorEditBinding*
-
     EditorShellV3::FindInspectorEdit_(HWND source) const noexcept
     {
         for (const InspectorEditBinding& binding : inspectorEdits_)
@@ -1243,9 +1224,7 @@ namespace nocturne::editor
         return nullptr;
     }
 
-
     EditorShellV3::InspectorComponentActionBinding*
-
     EditorShellV3::FindInspectorRemoveButton_(HWND source) noexcept
     {
         for (InspectorComponentActionBinding& binding :
@@ -1258,9 +1237,7 @@ namespace nocturne::editor
         return nullptr;
     }
 
-
     EditorShellV3::InspectorResourceBinding*
-
     EditorShellV3::FindInspectorResourceButton_(
         HWND source) noexcept
     {
@@ -1273,7 +1250,6 @@ namespace nocturne::editor
 
         return nullptr;
     }
-
 
     bool EditorShellV3::SyncInspectorResourceValue_(
         const InspectorResourceBinding& binding)
@@ -1325,7 +1301,6 @@ namespace nocturne::editor
             label);
         return true;
     }
-
 
     void EditorShellV3::ShowResourcePicker_(
         InspectorResourceBinding& binding)
@@ -1735,9 +1710,7 @@ namespace nocturne::editor
                 : L"Mesh assignment cleared.");
     }
 
-
     EditorShellV3::InspectorBoolBinding*
-
     EditorShellV3::FindInspectorBoolButton_(
         HWND source) noexcept
     {
@@ -1750,7 +1723,6 @@ namespace nocturne::editor
 
         return nullptr;
     }
-
 
     bool EditorShellV3::SyncInspectorBoolValue_(
         const InspectorBoolBinding& binding)
@@ -1789,7 +1761,6 @@ namespace nocturne::editor
             enabled);
         return true;
     }
-
 
     void EditorShellV3::ToggleInspectorBool_(
         InspectorBoolBinding& binding)
@@ -1856,9 +1827,7 @@ namespace nocturne::editor
         UpdateStatus_();
     }
 
-
     EditorShellV3::InspectorEnumBinding*
-
     EditorShellV3::FindInspectorEnumButton_(
         HWND source) noexcept
     {
@@ -1871,7 +1840,6 @@ namespace nocturne::editor
 
         return nullptr;
     }
-
 
     bool EditorShellV3::SyncInspectorEnumValue_(
         const InspectorEnumBinding& binding)
@@ -1895,7 +1863,6 @@ namespace nocturne::editor
             value.c_str());
         return true;
     }
-
 
     void EditorShellV3::ShowInspectorEnumPopup_(
         InspectorEnumBinding& binding)
@@ -2035,7 +2002,6 @@ namespace nocturne::editor
 
         UpdateStatus_();
     }
-
 
     bool EditorShellV3::SyncInspectorBindingValue_(
         const InspectorEditBinding& binding)
@@ -2229,7 +2195,6 @@ namespace nocturne::editor
         return true;
     }
 
-
     void EditorShellV3::SyncInspectorControlValues_()
     {
         inspectorControlsRefreshing_ = true;
@@ -2260,7 +2225,6 @@ namespace nocturne::editor
 
         inspectorControlsRefreshing_ = false;
     }
-
 
     bool EditorShellV3::CommitInspectorEdit_(HWND source)
     {
@@ -2511,7 +2475,6 @@ namespace nocturne::editor
         return true;
     }
 
-
     void EditorShellV3::CancelInspectorEdit_(HWND source)
     {
         const InspectorEditBinding* binding =
@@ -2528,7 +2491,6 @@ namespace nocturne::editor
             0,
             -1);
     }
-
 
     LRESULT CALLBACK EditorShellV3::InspectorBodySubclassProc_(
         HWND hwnd,
@@ -2551,6 +2513,28 @@ namespace nocturne::editor
 
         switch (message)
         {
+        case WM_COMMAND:
+            if (self->hwnd_)
+            {
+                return SendMessageW(
+                    self->hwnd_,
+                    message,
+                    wParam,
+                    lParam);
+            }
+            break;
+
+        case WM_CTLCOLOREDIT:
+            if (self->hwnd_)
+            {
+                return SendMessageW(
+                    self->hwnd_,
+                    message,
+                    wParam,
+                    lParam);
+            }
+            break;
+
         case WM_MOUSEWHEEL:
         {
             const int notches =
@@ -2584,7 +2568,6 @@ namespace nocturne::editor
             wParam,
             lParam);
     }
-
 
     LRESULT CALLBACK EditorShellV3::InspectorEditSubclassProc_(
         HWND hwnd,
@@ -2640,7 +2623,6 @@ namespace nocturne::editor
             lParam);
     }
 
-
     bool EditorShellV3::ExecuteAddComponent_(
         noc::TypeId componentTypeId)
     {
@@ -2692,7 +2674,6 @@ namespace nocturne::editor
         return true;
     }
 
-
     bool EditorShellV3::ExecuteRemoveComponent_(
         noc::TypeId componentTypeId)
     {
@@ -2743,7 +2724,6 @@ namespace nocturne::editor
         AppendConsole_(L"Component removed.");
         return true;
     }
-
 
     void EditorShellV3::ShowAddComponentPopup_()
     {
@@ -2896,36 +2876,35 @@ namespace nocturne::editor
         if (!source)
             return false;
 
-        if (InspectorEnumBinding* enumBinding =
+        if (InspectorEnumBinding* binding =
                 FindInspectorEnumButton_(source))
         {
-            ShowInspectorEnumPopup_(*enumBinding);
+            ShowInspectorEnumPopup_(*binding);
             result = 0;
             return true;
         }
 
-        if (InspectorBoolBinding* boolBinding =
+        if (InspectorBoolBinding* binding =
                 FindInspectorBoolButton_(source))
         {
-            ToggleInspectorBool_(*boolBinding);
+            ToggleInspectorBool_(*binding);
             result = 0;
             return true;
         }
 
-        if (InspectorResourceBinding* resourceBinding =
+        if (InspectorResourceBinding* binding =
                 FindInspectorResourceButton_(source))
         {
-            ShowResourcePicker_(*resourceBinding);
+            ShowResourcePicker_(*binding);
             result = 0;
             return true;
         }
 
-        if (InspectorComponentActionBinding* removeBinding =
+        if (InspectorComponentActionBinding* binding =
                 FindInspectorRemoveButton_(source))
         {
-            const noc::TypeId componentTypeId =
-                removeBinding->componentTypeId;
-            (void)ExecuteRemoveComponent_(componentTypeId);
+            (void)ExecuteRemoveComponent_(
+                binding->componentTypeId);
             result = 0;
             return true;
         }
@@ -2942,332 +2921,269 @@ namespace nocturne::editor
 
         const auto& c = EditorTheme::Colors();
         const DRAWITEMSTRUCT* dis = &draw;
-    
-                    RECT rc = dis->rcItem;
-                    Fill(dis->hDC, rc, c.panelBg);
-    
-                    const noc::EntityHandle selected =
-                        inspectorModel_.Entity();
-    
-                    if (!selected.IsValid())
-                    {
-                        RECT title{
-                            rc.left + 18,
-                            rc.top + 54,
-                            rc.right - 18,
-                            rc.top + 78
-                        };
-                        DrawTextUi(
-                            dis->hDC,
-                            L"No object selected",
-                            title,
-                            c.textPrimary,
-                            uiBold_,
-                            DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-    
-                        RECT helper{
-                            rc.left + 20,
-                            rc.top + 84,
-                            rc.right - 20,
-                            rc.top + 124
-                        };
-                        DrawTextUi(
-                            dis->hDC,
-                            L"Select an authored entity to inspect reflected components.",
-                            helper,
-                            c.textMuted,
-                            smallFont_,
-                            DT_CENTER | DT_WORDBREAK);
-    
-                        result = TRUE;
-                        return true;
-                    }
-    
-                    std::wstring entityTitle;
-                    if (engine_)
-                    {
-                        const noc::NameComponent* name =
-                            engine_->GetWorld().GetName(selected);
-                        if (name && name->value[0] != '\0')
-                            entityTitle = Utf8ToWide_(name->value);
-                    }
-    
-                    if (entityTitle.empty())
-                    {
-                        std::wstringstream ss;
-                        ss << L"Entity "
-                            << selected.index
-                            << L":"
-                            << selected.generation;
-                        entityTitle = ss.str();
-                    }
-    
-                    RECT entityRc{
-                        rc.left + 14,
-                        rc.top + 10,
-                        rc.right - 14,
-                        rc.top + 36
+
+                RECT rc = dis->rcItem;
+                Fill(dis->hDC, rc, c.panelBg);
+
+                const noc::EntityHandle selected =
+                    inspectorModel_.Entity();
+
+                if (!selected.IsValid())
+                {
+                    RECT title{
+                        rc.left + 18,
+                        rc.top + 54,
+                        rc.right - 18,
+                        rc.top + 78
                     };
                     DrawTextUi(
                         dis->hDC,
-                        entityTitle.c_str(),
-                        entityRc,
+                        L"No object selected",
+                        title,
+                        c.textPrimary,
+                        uiBold_,
+                        DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+                    RECT helper{
+                        rc.left + 20,
+                        rc.top + 84,
+                        rc.right - 20,
+                        rc.top + 124
+                    };
+                    DrawTextUi(
+                        dis->hDC,
+                        L"Select an authored entity to inspect reflected components.",
+                        helper,
+                        c.textMuted,
+                        smallFont_,
+                        DT_CENTER | DT_WORDBREAK);
+
+                    result = TRUE;
+                    return true;
+                }
+
+                std::wstring entityTitle;
+                if (engine_)
+                {
+                    const noc::NameComponent* name =
+                        engine_->GetWorld().GetName(selected);
+                    if (name && name->value[0] != '\0')
+                        entityTitle = Utf8ToWide_(name->value);
+                }
+
+                if (entityTitle.empty())
+                {
+                    std::wstringstream ss;
+                    ss << L"Entity "
+                        << selected.index
+                        << L":"
+                        << selected.generation;
+                    entityTitle = ss.str();
+                }
+
+                RECT entityRc{
+                    rc.left + 14,
+                    rc.top + 10,
+                    rc.right - 14,
+                    rc.top + 36
+                };
+                DrawTextUi(
+                    dis->hDC,
+                    entityTitle.c_str(),
+                    entityRc,
+                    c.textPrimary,
+                    uiBold_,
+                    DT_LEFT | DT_VCENTER
+                        | DT_SINGLELINE | DT_END_ELLIPSIS);
+
+                int y =
+                    rc.top + 43 - inspectorScrollY_;
+                const int inspectorWidth =
+                    static_cast<int>(rc.right - rc.left);
+                const int labelWidth =
+                    (std::max)(95, inspectorWidth * 42 / 100);
+
+                const int listDcState =
+                    SaveDC(dis->hDC);
+                IntersectClipRect(
+                    dis->hDC,
+                    rc.left,
+                    rc.top + 40,
+                    rc.right,
+                    (std::max)(
+                        rc.top + 41,
+                        rc.bottom - 40));
+
+                for (const InspectorComponentView& component :
+                     inspectorModel_.Components())
+                {
+                    if (y >= rc.bottom - 44)
+                        break;
+
+                    RECT componentRc{
+                        rc.left + 8,
+                        y,
+                        rc.right - 8,
+                        y + 26
+                    };
+                    RoundBox(
+                        dis->hDC,
+                        componentRc,
+                        c.panelBgAlt,
+                        c.border,
+                        4);
+
+                    const std::wstring componentName =
+                        Utf8ToWide_(
+                            component.displayName.c_str());
+                    RECT componentText{
+                        componentRc.left + 8,
+                        componentRc.top,
+                        componentRc.right
+                            - (component.removable ? 70 : 8),
+                        componentRc.bottom
+                    };
+                    DrawTextUi(
+                        dis->hDC,
+                        componentName.c_str(),
+                        componentText,
                         c.textPrimary,
                         uiBold_,
                         DT_LEFT | DT_VCENTER
                             | DT_SINGLELINE | DT_END_ELLIPSIS);
-    
-                    int y =
-                        rc.top + 43 - inspectorScrollY_;
-                    const int inspectorWidth =
-                        static_cast<int>(rc.right - rc.left);
-                    const int labelWidth =
-                        (std::max)(95, inspectorWidth * 42 / 100);
-    
-                    const int listDcState =
-                        SaveDC(dis->hDC);
-                    IntersectClipRect(
-                        dis->hDC,
-                        rc.left,
-                        rc.top + 40,
-                        rc.right,
-                        (std::max)(
-                            rc.top + 41,
-                            rc.bottom - 40));
-    
-                    for (const InspectorComponentView& component :
-                         inspectorModel_.Components())
+
+                    y += 31;
+
+                    for (const InspectorPropertyView& property :
+                         component.properties)
                     {
                         if (y >= rc.bottom - 44)
                             break;
-    
-                        RECT componentRc{
-                            rc.left + 8,
-                            y,
-                            rc.right - 8,
-                            y + 26
-                        };
-                        RoundBox(
-                            dis->hDC,
-                            componentRc,
-                            c.panelBgAlt,
-                            c.border,
-                            4);
-    
-                        const std::wstring componentName =
+
+                        const wchar_t* presentationLabel =
+                            InspectorPropertyPresentationLabel(
+                                component.typeId,
+                                property);
+
+                        const std::wstring propertyName =
+                            presentationLabel
+                                ? std::wstring(presentationLabel)
+                                : Utf8ToWide_(
+                                    property.displayName.c_str());
+
+                        const std::wstring propertyValue =
                             Utf8ToWide_(
-                                component.displayName.c_str());
-                        RECT componentText{
-                            componentRc.left + 8,
-                            componentRc.top,
-                            componentRc.right
-                                - (component.removable ? 70 : 8),
-                            componentRc.bottom
+                                property.displayValue.c_str());
+
+                        RECT labelRc{
+                            rc.left + 14,
+                            y,
+                            rc.left + labelWidth,
+                            y + 24
                         };
-                        DrawTextUi(
-                            dis->hDC,
-                            componentName.c_str(),
-                            componentText,
-                            c.textPrimary,
-                            uiBold_,
-                            DT_LEFT | DT_VCENTER
-                                | DT_SINGLELINE | DT_END_ELLIPSIS);
-    
-                        y += 31;
-    
-                        for (const InspectorPropertyView& property :
-                             component.properties)
+                        RECT valueRc{
+                            rc.left + labelWidth + 4,
+                            y + 1,
+                            rc.right - 12,
+                            y + 23
+                        };
+
+                        if (InspectorPresentationFor(
+                                component.typeId,
+                                property)
+                            != InspectorEditPresentation::AabbMinMaxAxes)
                         {
-                            if (y >= rc.bottom - 44)
-                                break;
-    
-                            const wchar_t* presentationLabel =
-                                InspectorPropertyPresentationLabel(
-                                    component.typeId,
-                                    property);
-    
-                            const std::wstring propertyName =
-                                presentationLabel
-                                    ? std::wstring(presentationLabel)
-                                    : Utf8ToWide_(
-                                        property.displayName.c_str());
-    
-                            const std::wstring propertyValue =
-                                Utf8ToWide_(
-                                    property.displayValue.c_str());
-    
-                            RECT labelRc{
-                                rc.left + 14,
-                                y,
-                                rc.left + labelWidth,
-                                y + 24
-                            };
-                            RECT valueRc{
-                                rc.left + labelWidth + 4,
-                                y + 1,
-                                rc.right - 12,
-                                y + 23
-                            };
-    
-                            if (InspectorPresentationFor(
+                            DrawTextUi(
+                                dis->hDC,
+                                propertyName.c_str(),
+                                labelRc,
+                                c.textMuted,
+                                smallFont_,
+                                DT_LEFT | DT_VCENTER
+                                    | DT_SINGLELINE | DT_END_ELLIPSIS);
+                        }
+
+                        const bool resourcePicker =
+                            IsResourcePickerProperty(
+                                property);
+                        const bool boolToggle =
+                            IsBoolToggleProperty(
+                                property);
+                        const bool enumPicker =
+                            IsEnumPickerProperty(
+                                engine_
+                                    ? &engine_->Reflection()
+                                    : nullptr,
+                                property);
+
+                        const InspectorEditPresentation presentation =
+                            InspectorPresentationFor(
+                                component.typeId,
+                                property);
+
+                        const uint32_t controlCount =
+                            property.editable
+                                ? InspectorEditControlCount(
                                     component.typeId,
                                     property)
-                                != InspectorEditPresentation::AabbMinMaxAxes)
+                                : 1u;
+
+                        if (resourcePicker
+                            || boolToggle
+                            || enumPicker)
+                        {
+                            // The child button owns the value field chrome.
+                        }
+                        else if (presentation
+                            == InspectorEditPresentation::AabbMinMaxAxes)
+                        {
+                            constexpr int kAxisGap = 4;
+                            constexpr int kAxisLabelWidth = 11;
+                            const int width =
+                                static_cast<int>(
+                                    valueRc.right - valueRc.left);
+                            const int segmentWidth =
+                                (std::max)(
+                                    24,
+                                    (width - kAxisGap * 2) / 3);
+                            constexpr const wchar_t* kAxisNames[] = {
+                                L"X", L"Y", L"Z"
+                            };
+                            constexpr const wchar_t* kRowNames[] = {
+                                L"Min", L"Max"
+                            };
+
+                            for (uint32_t row = 0;
+                                 row < 2;
+                                 ++row)
                             {
+                                const int rowY =
+                                    y + static_cast<int>(row) * 27;
+
+                                RECT rowLabel{
+                                    rc.left + 14,
+                                    rowY,
+                                    rc.left + labelWidth,
+                                    rowY + 24
+                                };
+
+                                std::wstring nestedLabel =
+                                    propertyName;
+                                nestedLabel += L" ";
+                                nestedLabel += kRowNames[row];
+
                                 DrawTextUi(
                                     dis->hDC,
-                                    propertyName.c_str(),
-                                    labelRc,
+                                    nestedLabel.c_str(),
+                                    rowLabel,
                                     c.textMuted,
                                     smallFont_,
                                     DT_LEFT | DT_VCENTER
-                                        | DT_SINGLELINE | DT_END_ELLIPSIS);
-                            }
-    
-                            const bool resourcePicker =
-                                IsResourcePickerProperty(
-                                    property);
-                            const bool boolToggle =
-                                IsBoolToggleProperty(
-                                    property);
-                            const bool enumPicker =
-                                IsEnumPickerProperty(
-                                    engine_
-                                        ? &engine_->Reflection()
-                                        : nullptr,
-                                    property);
-    
-                            const InspectorEditPresentation presentation =
-                                InspectorPresentationFor(
-                                    component.typeId,
-                                    property);
-    
-                            const uint32_t controlCount =
-                                property.editable
-                                    ? InspectorEditControlCount(
-                                        component.typeId,
-                                        property)
-                                    : 1u;
-    
-                            if (resourcePicker
-                                || boolToggle
-                                || enumPicker)
-                            {
-                                // The child button owns the value field chrome.
-                            }
-                            else if (presentation
-                                == InspectorEditPresentation::AabbMinMaxAxes)
-                            {
-                                constexpr int kAxisGap = 4;
-                                constexpr int kAxisLabelWidth = 11;
-                                const int width =
-                                    static_cast<int>(
-                                        valueRc.right - valueRc.left);
-                                const int segmentWidth =
-                                    (std::max)(
-                                        24,
-                                        (width - kAxisGap * 2) / 3);
-                                constexpr const wchar_t* kAxisNames[] = {
-                                    L"X", L"Y", L"Z"
-                                };
-                                constexpr const wchar_t* kRowNames[] = {
-                                    L"Min", L"Max"
-                                };
-    
-                                for (uint32_t row = 0;
-                                     row < 2;
-                                     ++row)
-                                {
-                                    const int rowY =
-                                        y + static_cast<int>(row) * 27;
-    
-                                    RECT rowLabel{
-                                        rc.left + 14,
-                                        rowY,
-                                        rc.left + labelWidth,
-                                        rowY + 24
-                                    };
-    
-                                    std::wstring nestedLabel =
-                                        propertyName;
-                                    nestedLabel += L" ";
-                                    nestedLabel += kRowNames[row];
-    
-                                    DrawTextUi(
-                                        dis->hDC,
-                                        nestedLabel.c_str(),
-                                        rowLabel,
-                                        c.textMuted,
-                                        smallFont_,
-                                        DT_LEFT | DT_VCENTER
-                                            | DT_SINGLELINE
-                                            | DT_END_ELLIPSIS);
-    
-                                    for (uint32_t axis = 0;
-                                         axis < 3;
-                                         ++axis)
-                                    {
-                                        const int segmentLeft =
-                                            valueRc.left
-                                            + static_cast<int>(axis)
-                                                * (segmentWidth + kAxisGap);
-                                        const int segmentRight =
-                                            axis == 2
-                                                ? valueRc.right
-                                                : segmentLeft + segmentWidth;
-    
-                                        RECT axisRc{
-                                            segmentLeft,
-                                            rowY,
-                                            segmentLeft + kAxisLabelWidth,
-                                            rowY + 24
-                                        };
-                                        DrawTextUi(
-                                            dis->hDC,
-                                            kAxisNames[axis],
-                                            axisRc,
-                                            c.textMuted,
-                                            smallFont_,
-                                            DT_CENTER | DT_VCENTER
-                                                | DT_SINGLELINE);
-    
-                                        RECT fieldRc{
-                                            segmentLeft + kAxisLabelWidth,
-                                            rowY + 1,
-                                            segmentRight,
-                                            rowY + 23
-                                        };
-                                        RoundBox(
-                                            dis->hDC,
-                                            fieldRc,
-                                            c.inputBg,
-                                            c.border,
-                                            3);
-                                    }
-                                }
-                            }
-                            else if (controlCount > 1)
-                            {
-                                constexpr int kAxisGap = 4;
-                                constexpr int kAxisLabelWidth = 11;
-                                const int width =
-                                    static_cast<int>(
-                                        valueRc.right - valueRc.left);
-                                const int segmentWidth =
-                                    (std::max)(
-                                        24,
-                                        (width
-                                            - kAxisGap
-                                                * static_cast<int>(
-                                                    controlCount - 1))
-                                            / static_cast<int>(
-                                                controlCount));
-                                constexpr const wchar_t* kAxisNames[] = {
-                                    L"X", L"Y", L"Z", L"W"
-                                };
-    
+                                        | DT_SINGLELINE
+                                        | DT_END_ELLIPSIS);
+
                                 for (uint32_t axis = 0;
-                                     axis < controlCount;
+                                     axis < 3;
                                      ++axis)
                                 {
                                     const int segmentLeft =
@@ -3275,15 +3191,15 @@ namespace nocturne::editor
                                         + static_cast<int>(axis)
                                             * (segmentWidth + kAxisGap);
                                     const int segmentRight =
-                                        axis + 1 == controlCount
+                                        axis == 2
                                             ? valueRc.right
                                             : segmentLeft + segmentWidth;
-    
+
                                     RECT axisRc{
                                         segmentLeft,
-                                        y,
+                                        rowY,
                                         segmentLeft + kAxisLabelWidth,
-                                        y + 24
+                                        rowY + 24
                                     };
                                     DrawTextUi(
                                         dis->hDC,
@@ -3293,12 +3209,12 @@ namespace nocturne::editor
                                         smallFont_,
                                         DT_CENTER | DT_VCENTER
                                             | DT_SINGLELINE);
-    
+
                                     RECT fieldRc{
                                         segmentLeft + kAxisLabelWidth,
-                                        y + 1,
+                                        rowY + 1,
                                         segmentRight,
-                                        y + 23
+                                        rowY + 23
                                     };
                                     RoundBox(
                                         dis->hDC,
@@ -3308,71 +3224,134 @@ namespace nocturne::editor
                                         3);
                                 }
                             }
-                            else
+                        }
+                        else if (controlCount > 1)
+                        {
+                            constexpr int kAxisGap = 4;
+                            constexpr int kAxisLabelWidth = 11;
+                            const int width =
+                                static_cast<int>(
+                                    valueRc.right - valueRc.left);
+                            const int segmentWidth =
+                                (std::max)(
+                                    24,
+                                    (width
+                                        - kAxisGap
+                                            * static_cast<int>(
+                                                controlCount - 1))
+                                        / static_cast<int>(
+                                            controlCount));
+                            constexpr const wchar_t* kAxisNames[] = {
+                                L"X", L"Y", L"Z", L"W"
+                            };
+
+                            for (uint32_t axis = 0;
+                                 axis < controlCount;
+                                 ++axis)
                             {
+                                const int segmentLeft =
+                                    valueRc.left
+                                    + static_cast<int>(axis)
+                                        * (segmentWidth + kAxisGap);
+                                const int segmentRight =
+                                    axis + 1 == controlCount
+                                        ? valueRc.right
+                                        : segmentLeft + segmentWidth;
+
+                                RECT axisRc{
+                                    segmentLeft,
+                                    y,
+                                    segmentLeft + kAxisLabelWidth,
+                                    y + 24
+                                };
+                                DrawTextUi(
+                                    dis->hDC,
+                                    kAxisNames[axis],
+                                    axisRc,
+                                    c.textMuted,
+                                    smallFont_,
+                                    DT_CENTER | DT_VCENTER
+                                        | DT_SINGLELINE);
+
+                                RECT fieldRc{
+                                    segmentLeft + kAxisLabelWidth,
+                                    y + 1,
+                                    segmentRight,
+                                    y + 23
+                                };
                                 RoundBox(
                                     dis->hDC,
-                                    valueRc,
+                                    fieldRc,
                                     c.inputBg,
-                                    property.editable
-                                        ? c.border
-                                        : Blend(
-                                            c.border,
-                                            c.panelBg,
-                                            55),
+                                    c.border,
                                     3);
-    
-                                valueRc.left += 7;
-                                valueRc.right -= 5;
-                                if (!property.editable)
-                                {
-                                    DrawTextUi(
-                                        dis->hDC,
-                                        propertyValue.c_str(),
-                                        valueRc,
-                                        c.textMuted,
-                                        uiFont_,
-                                        DT_LEFT | DT_VCENTER
-                                            | DT_SINGLELINE
-                                            | DT_END_ELLIPSIS);
-                                }
                             }
-    
-                            y += 27 * static_cast<int>(
-                                InspectorPropertyRowCount(
-                                    component.typeId,
-                                    property));
                         }
-    
-                        y += 7;
+                        else
+                        {
+                            RoundBox(
+                                dis->hDC,
+                                valueRc,
+                                c.inputBg,
+                                property.editable
+                                    ? c.border
+                                    : Blend(
+                                        c.border,
+                                        c.panelBg,
+                                        55),
+                                3);
+
+                            valueRc.left += 7;
+                            valueRc.right -= 5;
+                            if (!property.editable)
+                            {
+                                DrawTextUi(
+                                    dis->hDC,
+                                    propertyValue.c_str(),
+                                    valueRc,
+                                    c.textMuted,
+                                    uiFont_,
+                                    DT_LEFT | DT_VCENTER
+                                        | DT_SINGLELINE
+                                        | DT_END_ELLIPSIS);
+                            }
+                        }
+
+                        y += 27 * static_cast<int>(
+                            InspectorPropertyRowCount(
+                                component.typeId,
+                                property));
                     }
-    
-                    RestoreDC(
-                        dis->hDC,
-                        listDcState);
-    
-                    RECT scrollTrack{
-                        rc.right - 10,
-                        rc.top + 42,
-                        rc.right,
-                        (std::max)(
-                            rc.top + 43,
-                            rc.bottom - 42)
-                    };
-                    DrawSlimThumb(
-                        dis->hDC,
-                        InspectorContentHeight_(),
-                        (std::max)(
-                            1,
-                            static_cast<int>(
-                                scrollTrack.bottom
-                                - scrollTrack.top)),
-                        inspectorScrollY_,
-                        scrollTrack);
-    
-                    result = TRUE;
-                    return true;
-                
+
+                    y += 7;
+                }
+
+                RestoreDC(
+                    dis->hDC,
+                    listDcState);
+
+                RECT scrollTrack{
+                    rc.right - 10,
+                    rc.top + 42,
+                    rc.right,
+                    (std::max)(
+                        rc.top + 43,
+                        rc.bottom - 42)
+                };
+                DrawSlimThumb(
+                    dis->hDC,
+                    InspectorContentHeight_(),
+                    (std::max)(
+                        1,
+                        static_cast<int>(
+                            scrollTrack.bottom
+                            - scrollTrack.top)),
+                    inspectorScrollY_,
+                    scrollTrack);
+
+                result = TRUE;
+                return true;
+            
     }
 
 }
