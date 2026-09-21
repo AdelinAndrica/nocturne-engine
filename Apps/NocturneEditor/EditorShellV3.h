@@ -276,6 +276,15 @@ namespace nocturne::editor
             UINT_PTR subclassId,
             DWORD_PTR refData);
 
+        [[nodiscard]] bool HandleInspectorCommand_(
+            int id,
+            int notification,
+            HWND source,
+            intptr_t& result);
+        [[nodiscard]] bool DrawInspector_(
+            const DRAWITEMSTRUCT& draw,
+            intptr_t& result);
+
         std::wstring ResolveContentRoot_(const std::wstring& configured) const;
         static std::wstring Utf8ToWide_(const char* text);
         static bool WideToUtf8_(
