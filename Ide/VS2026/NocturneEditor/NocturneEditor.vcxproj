@@ -12,6 +12,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\Apps\NocturneEditor\main.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorShellV3.cpp" />
+    <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorShellV3Controls.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorViewportController.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorCommands.cpp" />
     <ClCompile Include="..\..\..\Apps\NocturneEditor\EditorReflectionSnapshot.cpp" />
@@ -24,6 +25,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorShellV3.h" />
+    <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorShellV3Controls.h" />
     <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorHierarchyModel.h" />
     <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorViewportController.h" />
     <ClInclude Include="..\..\..\Apps\NocturneEditor\EditorGizmoTransaction.h" />
