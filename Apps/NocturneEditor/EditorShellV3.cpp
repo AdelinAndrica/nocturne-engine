@@ -1,37 +1,21 @@
 #include "EditorShellV3.h"
 #include "EditorShellV3Controls.h"
 #include "EditorSession.h"
-#include "EditorCommands.h"
-#include "EditorTransformMath.h"
-#include "Runtime/Entity.h"
 #include "EditorTheme.h"
-#include "EditorIconRenderer.h"
 #include "NocturneEditorResource.h"
-
-#include <algorithm>
-#include <cerrno>
-#include <cmath>
-#include <cstdio>
-#include <cstdint>
-#include <cstdlib>
-#include <filesystem>
-#include <memory>
-#include <new>
-#include <sstream>
-#include <string>
-#include <vector>
-
-#include <CommCtrl.h>
-#include <Windowsx.h>
-#include <dwmapi.h>
-#include <Richedit.h>
 
 #include "Core/Log.h"
 #include "Runtime/Engine.h"
 #include "Runtime/World.h"
-#include "Runtime/Components/TransformComponent.h"
-#include "Runtime/Reflection/BuiltinTypes.h"
-#include "Resources/Typed/MeshResource.h"
+
+#include <algorithm>
+#include <filesystem>
+#include <sstream>
+#include <string>
+
+#include <CommCtrl.h>
+#include <dwmapi.h>
+#include <Richedit.h>
 
 #pragma comment(lib, "Comctl32.lib")
 #pragma comment(lib, "Dwmapi.lib")
@@ -92,62 +76,22 @@ namespace nocturne::editor
         {
             RemoveWindowSubclass(
                 renameEdit_,
-                &EditorShellV3::InspectorBodySubclassProc_,
-                0x1630,
-                reinterpret_cast<DWORD_PTR>(this)))
-        {
-            NOC_LOG_WARN(
-                "Editor",
-                "%s",
-                "Inspector body subclass registration failed; wheel scrolling unavailable");
+                &EditorShellV3::RenameEditSubclassProc_,
+                0x1610);
+            DestroyWindow(renameEdit_);
+            renameEdit_ = nullptr;
         }
-        inspectorAddComponent_ = MakeButton(
-            hwnd_,
-            IdInspectorAddComponent,
-            L"+ Add Component",
-            Icon::None,
-            ButtonKind::Neutral,
-            uiFont_);
-        ShowWindow(inspectorAddComponent_, SW_HIDE);
-        content_.header = MakeHeader(hwnd_, L"Content Browser", Icon::Folder, uiBold_); content_.body = makeBody();
-        contentSearch_ = CreateWindowExW(0, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 0,0,0,0, hwnd_, reinterpret_cast<HMENU>(IdContentSearch), GetModuleHandleW(nullptr), nullptr); SendMessageW(contentSearch_, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont_), FALSE); SendMessageW(contentSearch_, EM_SETCUEBANNER, TRUE, reinterpret_cast<LPARAM>(L"Search Assets..."));
-        contentListMode_ = MakeButton(hwnd_, IdContentListMode, L"", Icon::List, ButtonKind::IconOnly, uiFont_); contentGridMode_ = MakeButton(hwnd_, IdContentGridMode, L"", Icon::Grid, ButtonKind::IconOnly, uiFont_); contentSettings_ = MakeButton(hwnd_, IdContentSettings, L"", Icon::Settings, ButtonKind::IconOnly, uiFont_); ButtonActive(contentListMode_, true);
-        contentTree_ = MakeTree(hwnd_, IdContentTree, uiFont_); contentTable_ = MakeTable(hwnd_, IdContentTable, uiFont_);
-        console_.header = MakeHeader(hwnd_, L"Console / Output", Icon::Console, uiBold_); console_.body = makeBody(); LoadLibraryW(L"Msftedit.dll");
-        consoleEdit_ = CreateWindowExW(0, MSFTEDIT_CLASS, L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | ES_NOHIDESEL, 0,0,0,0, hwnd_, reinterpret_cast<HMENU>(IdConsole), GetModuleHandleW(nullptr), nullptr); SendMessageW(consoleEdit_, WM_SETFONT, reinterpret_cast<WPARAM>(consoleFont_), FALSE); SendMessageW(consoleEdit_, EM_SETBKGNDCOLOR, 0, EditorTheme::Colors().inputBg); SendMessageW(consoleEdit_, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(8,8)); consoleScroll_ = MakeScroll(hwnd_, IdConsoleScroll);
-        buildPlay_.header = MakeHeader(hwnd_, L"Build / Play", Icon::Play, uiBold_); buildPlay_.body = makeBody(); playButton_ = MakeButton(hwnd_, IdPlay, L"Play (F5)", Icon::Play, ButtonKind::Primary, uiBold_); buildButton_ = MakeButton(hwnd_, IdBuild, L"Build", Icon::Cube, ButtonKind::Neutral, uiBold_);
-        status_ = makeBody(IdStatus);
-    }
+        renameEntity_ = noc::EntityHandle::Invalid();
+        renameEnding_ = false;
 
-    bool EditorShellV3::RequestEditorExit_()
-    {
-        if (!window_)
-            return false;
-
-        if (session_ && session_->SceneDirty())
-        {
-            // Design choice (not directly from the book): Phase 16 has no
-            // persistence yet, so exit confirmation is intentionally
-            // discard-or-cancel. Save remains Phase 17.
-            const int choice =
-                MessageBoxW(
-                    hwnd_,
-                    L"The current in-memory scene has unsaved authoring changes.\n\nDiscard them and exit Nocturne Editor?",
-                    L"Exit Nocturne Editor",
-                    MB_OKCANCEL
-                        | MB_ICONWARNING
-                        | MB_DEFBUTTON2);
-
-            if (choice != IDOK)
-            {
-                AppendConsole_(
-                    L"Exit cancelled; current scene retained.");
-                return false;
-            }
-        }
-
-        window_->RequestQuit();
-        return true;
+        if (window_) window_->SetMessageSink(nullptr);
+        if (fileMenu_) DestroyMenu(fileMenu_);
+        if (buildMenu_) DestroyMenu(buildMenu_);
+        if (actorMenu_) DestroyMenu(actorMenu_);
+        fileMenu_ = buildMenu_ = actorMenu_ = nullptr;
+        if (uiFont_) DeleteObject(uiFont_); if (uiBold_) DeleteObject(uiBold_); if (menuFont_) DeleteObject(menuFont_); if (smallFont_) DeleteObject(smallFont_); if (consoleFont_) DeleteObject(consoleFont_); if (brandFont_) DeleteObject(brandFont_);
+        if (windowBrush_) DeleteObject(windowBrush_); if (editBrush_) DeleteObject(editBrush_);
+        uiFont_ = uiBold_ = menuFont_ = smallFont_ = consoleFont_ = brandFont_ = nullptr; windowBrush_ = editBrush_ = nullptr; session_ = nullptr; engine_ = nullptr; window_ = nullptr; hwnd_ = nullptr;
     }
 
     bool EditorShellV3::OnWindowMessage(void* hwnd, uint32_t msg, uintptr_t wParam, intptr_t lParam, intptr_t& result)
